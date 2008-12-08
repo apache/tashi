@@ -25,6 +25,7 @@ import sys
 import threading
 import time
 import traceback
+import types
 
 from tashi.services.ttypes import TashiException, Errors, InstanceState, HostState
 
@@ -159,7 +160,11 @@ def signalHandler(signalNumber):
     return __decorator
 
 def boolean(value):
-    """Convert a string to a boolean"""
+    """Convert a variable to a boolean"""
+    if (type(value) == types.BooleanType):
+        return value
+    if (type(value) == types.IntType):
+        return (value != 0)
     lowercaseValue = value.lower()
     if lowercaseValue in ['yes', 'true', '1']:
         return True

@@ -355,8 +355,8 @@ class Qemu(VmControlInterface):
 		diskModel = "persistent" if instance.disks[0].persistent else "transient"
 		instanceId = instance.id
 		opts = instance.hints
-		if (diskModel != "transient"):
-			raise NotImplementedError
+#		if (diskModel != "transient"):
+#			raise NotImplementedError
 		return (image, macAddr, memory, cores, diskModel, instanceId, opts)
 	
 	def oldToInstance(self, image, macAddr, memory, cores, diskModel, opts):
