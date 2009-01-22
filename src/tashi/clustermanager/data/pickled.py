@@ -38,6 +38,9 @@ class Pickled(FromConfig):
 		ci = {}
 		for i in self.instances.itervalues():
 			i2 = Instance(d=i.__dict__)
+			i2.hostObj = None
+			i2.typeObj = None
+			i2.userObj = None
 			ci[i2.id] = i2
 		return ci
 	
