@@ -53,7 +53,7 @@ class ExamplePolicy():
 					min = None
 					minHost = None
 					for h in self.hosts.values():
-						if ((min is None or len(load[h.id]) < min) and h.up == True):
+						if ((min is None or len(load[h.id]) < min) and h.up == True and h.state == HostState.Normal):
 							min = len(load[h.id])
 							minHost = h
 					if (minHost):
