@@ -20,6 +20,7 @@
 import inspect
 import os
 import sys
+import types
 from tashi.services.ttypes import *
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport
@@ -37,15 +38,20 @@ def makeHTMLTable(list):
 		for k2 in k.__dict__.keys():
 			if (not k2.endswith("Obj")):
 				keys[k2] = k2
+	if ('id' in keys):
+		del keys['id']
+		keylist = ['id'] + keys.keys()
+	else:
+		keylist = keys.keys()
 	output = "<html>"
 	output = output + "<table>"
 	output = output + "<tr>"
-	for k in keys.keys():
+	for k in keylist:
 		output = output + "<td>%s</td>" % (k)
 	output = output + "</tr>"
 	for k in list:
 		output = output + "<tr>"
-		for k2 in keys.keys():
+		for k2 in keylist:
 			if (k2 == "state"):
 				output = output + "<td>%s</td>" % (str(vmStates[k.__dict__.get(k2, None)]))
 			else:
@@ -163,6 +169,18 @@ def main():
 	args = map(lambda x: eval(x), sys.argv[1:])
 	try:
 		res = f(*args)
+		def cmp(x, y):
+			try:
+				if (x.id < y.id):
+					return -1
+				elif (y.id < x.id):
+					return 1
+				else:
+					return 0
+			except Exception, e:
+				return 0
+		if (type(res) == types.ListType):
+			res.sort(cmp)
 		if (os.getenv("USE_HTML_TABLES")):
 			try:
 				makeHTMLTable(res)
