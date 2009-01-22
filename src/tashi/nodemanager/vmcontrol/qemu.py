@@ -153,7 +153,6 @@ class Qemu(VmControlInterface):
 		for vmId in controlledVMs:
 			try:
 				child = self.loadChildInfo(vmId)
-				child.OSchild = False
 				child.monitorFd = os.open(child.ptyFile, os.O_RDWR | os.O_NOCTTY)
 				child.monitor = os.fdopen(child.monitorFd)
 				self.controlledVMs[child.pid] = child
@@ -259,7 +258,9 @@ class Qemu(VmControlInterface):
 		child.pid = pid
 		child.ptyFile = ptyFile
 		child.monitorHistory = []
+		child.OSchild = False
 		child.errorBit = False
+		child.migratingOut = False
 		return child
 	
 	def saveChildInfo(self, child):
@@ -271,11 +272,12 @@ class Qemu(VmControlInterface):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
 		global lastCmd
 		(image, macAddr, memory, cores, diskModel, instanceId, opts) = self.instanceToOld(instance)
-		graphicString = "" if opts.get("enableDisplay", False) else "-nographic"
 		sourceString = "" if not source else "-incoming %s" % (source)
 		snapshotString = "" if diskModel == "persistent" else "-snapshot"
+		modelString = opts.get("nicModel", "e1000")
 		imageLocal = self.dfs.getLocalHandle("images/" + image)
-		cmd = "%s %s %s -hda %s -net nic,macaddr=%s -net tap -m %d -smp %d -serial none -monitor pty %s" % (self.QEMU_BIN, graphicString, snapshotString, imageLocal, macAddr, memory, cores, sourceString)
+		cmd = "%s %s -hda %s -net nic,macaddr=%s,model=%s -net tap -clock rtc -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, snapshotString, imageLocal, macAddr, modelString, memory, cores, sourceString)
+		log.info("QEMU command: %s" % (cmd))
 		lastCmd = cmd
 		cmd = cmd.split()
 		(pipe_r, pipe_w) = os.pipe()
