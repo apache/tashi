@@ -18,7 +18,9 @@
 # under the License.    
 
 if [[ $# -ne 4 ]]; then
-	echo "create <type> <image> <mac_1byte> <persistent>"
+	echo "create <name> <type> <image> <persistent>"
 else
-	./bin/createVm "Instance(d={'name':'foobar','type':$1,'disks':[DiskConfiguration(d={'uri':'$2','persistent':$4})],'nics':[NetworkConfiguration(d={'network':2,'mac':'52:54:00:00:10:$3'})], 'hints':{'display':'True'}})"
+	mac=`echo $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) | awk '{printf("%2.2x:%2.2x:%2.2x", $1, $2, $3)}'`
+	echo ./bin/createVm "Instance(d={'name':'$1','type':$2,'disks':[DiskConfiguration(d={'uri':'$3','persistent':$4})],'nics':[NetworkConfiguration(d={'network':2,'mac':'52:54:00:$mac'})], 'hints':{'display':'True'}})"
+	./bin/createVm "Instance(d={'name':'$1','type':$2,'disks':[DiskConfiguration(d={'uri':'$3','persistent':$4})],'nics':[NetworkConfiguration(d={'network':2,'mac':'52:54:00:$mac'})], 'hints':{'display':'True'}})"
 fi
