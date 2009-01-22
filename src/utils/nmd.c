@@ -27,7 +27,7 @@
 #include <assert.h>
 
 #define SLEEP_INTERVAL 10
-#define TASHI_PATH "/scratch/mryan3-d4/tashi/branches/mryan3/"
+#define TASHI_PATH "/usr/local/tashi/"
 #define LOG_FILE "/var/log/nodemanager.log"
 
 void make_invincible()
