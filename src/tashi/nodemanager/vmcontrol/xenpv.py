@@ -25,7 +25,7 @@ import logging
 
 from vmcontrolinterface import VmControlInterface
 from tashi.services.ttypes import Errors, InstanceState, TashiException
-from tashi.services.ttypes import Instance, MachineType
+from tashi.services.ttypes import Instance, MachineType, Host
 from tashi import boolean, convertExceptions, ConnectionManager
 from tashi.util import isolatedRPC
 
@@ -90,7 +90,7 @@ def listVms(prefix='tashi'):
 		instance.typeObj = MachineType()
 		instance.typeObj.memory = int(vminfo['memory'])
 		instance.typeObj.cores = int(vminfo['cores'])
-		
+		instance.disks = []
 
 		r[instance.vmId] = instance
 	return r
@@ -99,7 +99,7 @@ def listVms(prefix='tashi'):
 
 
 
-class XenPV(threading.Thread):
+class XenPV(VmControlInterface, threading.Thread):
 	def __init__(self, config, dfs, cm):
 		threading.Thread.__init__(self)
 		if self.__class__ is VmControlInterface:
@@ -120,7 +120,7 @@ class XenPV(threading.Thread):
 	# invoked every (self.sleeptime) seconds
 	@synchronizedmethod
 	def cron(self):
-		print 'xenpv cron woke up'
+#		print 'xenpv cron woke up'
 		vmlist = listVms(self.vmNamePrefix)
 		# If we are supposed to be managing a VM that is not
 		# in the list, tell the CM
@@ -138,14 +138,7 @@ class XenPV(threading.Thread):
                                                         os.unlink(diskname)
                                                 except:
                                                         print 'WARNING could not delete transient disk %s' % diskname
-				try:
-					isolatedRPC(self.cm, 'vmExited', self.hostId, vmId)
-				except Exception, e:
-					print "RPC failed for vmExited on CM"
-					print e
-					raise e
-					# FIXME: send this to the cm later
-					# self.exitedVms[vmId] = child
+                                self.nm.vmStateChange(a.vmId, a.state, InstanceState.Exited)
 		for vmId in vmlist.keys():
 			if not self.newvms.has_key(vmId):
 				print 'WARNING: found vm that should be managed, but is not'
@@ -164,12 +157,13 @@ class XenPV(threading.Thread):
 			    image, macAddr, memory, cores):
 		fn = os.path.join("/tmp", vmName)
 		cfgstr = """
-# kernel="/boot/vmlinuz-2.6.24-19-xen"
-# ramdisk="/boot/initrd.img-2.6.24-19-xen"
+# kernel="/boot/vmlinuz-2.6.24-17-xen"
+# ramdisk="/boot/initrd.img-2.6.24-17-xen"
 bootloader="/usr/bin/pygrub"
 disk=['tap:qcow:%s,xvda1,w']
 # vif = [ 'mac=%s' ]
-vif = ['ip=172.19.158.1']
+# vif = ['ip=172.19.158.1']
+vif = ['']
 memory=%i
 #cpus is a list of cpus for pinning, this is not what we want
 #cpus=%i
@@ -181,7 +175,8 @@ extra='xencons=tty'
 		f.close()
 		return fn
 	def deleteXenConfig(self, vmName):
-		os.unlink(os.path.join("/tmp", vmName))
+                pass
+#		os.unlink(os.path.join("/tmp", vmName))
 ########################################
 
         def vmName(self, instanceId):
@@ -222,7 +217,7 @@ extra='xencons=tty'
 					  instance.typeObj.cores)
 		cmd = "xm create %s"%fn
 		r = os.system(cmd)
-	#	self.deleteXenConfig(name)
+#                self.deleteXenConfig(name)
 		if r != 0:
 			print 'WARNING: "%s" returned %i' % ( cmd, r)
 			raise Exception, 'WARNING: "%s" returned %i' % ( cmd, r)
@@ -238,7 +233,7 @@ extra='xencons=tty'
 	# suspend/resume.  save/restore allow you to specify the state
 	# file, suspend/resume do not.
 	@synchronizedmethod
-	def suspendVM(self, vmId, target, suspendCookie=None):
+	def suspendVm(self, vmId, target, suspendCookie=None):
 		# FIXME: don't use hardcoded /tmp for temporary data.
 		# Get tmp location from config
 		infofile = target + ".info"
@@ -267,7 +262,7 @@ extra='xencons=tty'
 		return vmId
 	
 	@synchronizedmethod
-	def resumeVM(self, source):
+	def resumeVm(self, source):
 		infofile = source + ".info"
 		source = source + ".dat"
 		tmpfile = os.path.join("/tmp", source)
@@ -310,7 +305,7 @@ extra='xencons=tty'
 
 	
 	@synchronizedmethod
-	def pauseVM(self, vmId):
+	def pauseVm(self, vmId):
 		r = os.system("xm pause %i"%vmId)
 		if r != 0:
 			print "xm pause failed for VM %i"%vmId
@@ -319,16 +314,16 @@ extra='xencons=tty'
 		return vmId
 
 	@synchronizedmethod
-	def unpauseVM(self, VMId):
-		r = os.system("xm unpause %i"%VMId)
+	def unpauseVm(self, vmId):
+		r = os.system("xm unpause %i"%vmId)
 		if r != 0:
-			print "xm unpause failed for VM %i"%VMId
-			raise Exception,  "xm unpause failed for VM %i"%VMId
+			print "xm unpause failed for VM %i"%vmId
+			raise Exception,  "xm unpause failed for VM %i"%vmId
 		self.newvms[vmId].state = InstanceState.Running
-		return VMId
+		return vmId
 
 	@synchronizedmethod
-	def shutdownVM(self, vmId):
+	def shutdownVm(self, vmId):
 		r = os.system("xm shutdown %i"%vmId)
 		if r != 0:
 			print "xm shutdown failed for VM %i"%vmId
@@ -336,7 +331,7 @@ extra='xencons=tty'
 		return vmId
 
 	@synchronizedmethod
-	def destroyVM(self, vmId):
+	def destroyVm(self, vmId):
 		r = os.system("xm destroy %i"%vmId)
 		if r != 0:
 			print "xm destroy failed for VM %i"%vmId
@@ -345,10 +340,28 @@ extra='xencons=tty'
 
 	
 	@synchronizedmethod
-	def getVMInfo(self, vmId):
+	def getVmInfo(self, vmId):
 		return self.newvms[vmId]
 
 	@synchronizedmethod
-	def listVMs(self):
+	def listVms(self):
 		# On init, this should get a list from listVMs
 		return self.newvms.keys()
+
+
+        @synchronizedmethod
+        def getHostInfo(self):
+                host = Host()
+                memp = subprocess.Popen("xm info | awk '/^total_memory/ { print $3 }' ",
+                                        shell = True,
+                                        stdout = subprocess.PIPE)
+                mems = memp.stdout.readline()
+                host.memory = int(mems)
+                corep = subprocess.Popen("xm info | awk '/^nr_cpus/ { print $3 }' ",
+                                        shell = True,
+                                        stdout = subprocess.PIPE)
+                cores = corep.stdout.readline()
+                host.cores = int(cores)
+                return host
+
+

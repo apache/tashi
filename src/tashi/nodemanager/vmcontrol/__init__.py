@@ -18,4 +18,3 @@
 from vmcontrolinterface import VmControlInterface
 from qemu import Qemu
 from xenpv import XenPV
-from newxen import NewXen
