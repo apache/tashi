@@ -275,8 +275,9 @@ class Qemu(VmControlInterface):
 		sourceString = "" if not source else "-incoming %s" % (source)
 		snapshotString = "" if diskModel == "persistent" else "-snapshot"
 		modelString = opts.get("nicModel", "e1000")
+		clockString = opts.get("clock", "dynticks")
 		imageLocal = self.dfs.getLocalHandle("images/" + image)
-		cmd = "%s %s -hda %s -net nic,macaddr=%s,model=%s -net tap -clock rtc -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, snapshotString, imageLocal, macAddr, modelString, memory, cores, sourceString)
+		cmd = "%s -clock %s %s -hda %s -net nic,macaddr=%s,model=%s -net tap -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, clockString, snapshotString, imageLocal, macAddr, modelString, memory, cores, sourceString)
 		log.info("QEMU command: %s" % (cmd))
 		lastCmd = cmd
 		cmd = cmd.split()
