@@ -55,10 +55,10 @@ rmservices:
 	if test -d src/tashi/thrift/gen-py; then echo Removing tashi.thrift.gen-py...; rm -rf src/tashi/thrift/gen-py; fi
 	if test -d src/tashi/messaging/messagingthrift; then echo Removing tashi.messaging.messagingthrift; rm -rf src/tashi/messaging/messagingthrift; fi
 
-bin: bindir bin/getInstances bin/clustermanager.py bin/nodemanager.py
+bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py
 bindir:
 	if test ! -d bin; then mkdir bin; fi
-rmbin: rmclustermanager rmnodemanager rmclients
+rmbin: rmclustermanager rmnodemanager rmtashi-client
 	if test -d bin; then rmdir bin; fi
 bin/getInstances: src/tashi/services
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
@@ -74,7 +74,11 @@ bin/nodemanager.py: src/tashi/nodemanager/nodemanager.py
 	(cd bin; ln -s ../src/tashi/nodemanager/nodemanager.py .)
 rmnodemanager:
 	if test -e bin/nodemanager.py; then echo Removing nodemanager symlink...; rm bin/nodemanager.py; fi
-
+bin/tashi-client.py:
+	@echo Symlinking in tashi-client...
+	(cd bin; ln -s ../src/tashi/client/tashi-client.py .)
+rmtashi-client:
+	if test -e bin/tashi-client.py; then echo Removing tashi-client symlink...; rm bin/tashi-client.py; fi
 src/tags:
 	@echo Generating tags...
 	(cd src; ctags-exuberant -R --c++-kinds=+p --fields=+iaS --extra=+q -f ./tags .)
