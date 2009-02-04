@@ -15,6 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from util import *
-from connectionmanager import ConnectionManager
-from version import version
+version = "Wed Feb  4 15:20:15 EST 2009"

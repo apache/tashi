@@ -21,10 +21,10 @@
 .SILENT:
 
 # Explicit builds
-all: src/tashi/services bin src/utils/nmd
+default: src/tashi/services bin src/utils/nmd
 	@echo Done
 
-mryan3: src/tashi/services bin src/utils/nmd src/tags doc/html
+all: src/tashi/services bin src/utils/nmd src/tags doc/html
 	@echo Done
 
 doc: rmdoc doc/html
@@ -33,6 +33,9 @@ doc: rmdoc doc/html
 clean: rmnmd rmbin rmtags rmservices rmdoc
 	if [ `find . -name "*.pyc" | wc -l` -gt 0 ]; then echo Removing python byte-code...; rm `find . -name "*.pyc"`; fi
 	@echo Done
+
+version:
+	sed -i "s/version = .*/version = \"`date`\"/" src/tashi/version.py
 
 # Implicit builds
 src/utils/nmd: src/utils/Makefile src/utils/nmd.c

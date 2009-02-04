@@ -48,7 +48,8 @@ enum InstanceState {
 
 enum HostState {
 	Normal = 1,
-	Drained = 2
+	Drained = 2,
+	VersionMismatch = 3
 }
 
 exception TashiException {
@@ -63,7 +64,8 @@ struct Host {
 	4:bool decayed,
 	5:HostState state,
 	6:i32 memory,
-	7:i32 cores
+	7:i32 cores,
+	8:string version
 	// Other properties (disk?)
 }
 

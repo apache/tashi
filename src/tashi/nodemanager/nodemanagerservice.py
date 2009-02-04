@@ -29,7 +29,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from tashi.services.ttypes import ResumeVmRes, Host, HostState, InstanceState, TashiException, Errors, Instance
 from tashi.services import clustermanagerservice
 from tashi.nodemanager import RPC
-from tashi import boolean, vmStates, logged, ConnectionManager, timed
+from tashi import boolean, vmStates, logged, ConnectionManager, timed, version
 
 class NodeManagerService():
 	"""RPC handler for the NodeManager
@@ -120,6 +120,7 @@ class NodeManagerService():
 		host.cores = os.sysconf("SC_NPROCESSORS_ONLN")
 		host.up = True
 		host.decayed = False
+		host.version = version
 		return host
 	
 	def junk(self):

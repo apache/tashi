@@ -29,7 +29,7 @@ from tashi.messaging.thriftmessaging import MessageBrokerThrift
 from tashi.messaging.tashimessaging import TashiLogHandler
 from tashi.services.ttypes import Errors, InstanceState, HostState, TashiException
 from tashi.services import nodemanagerservice
-from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed
+from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version
 
 def RPC(oldFunc):
 	return convertExceptions(oldFunc)
@@ -50,6 +50,7 @@ class ClusterManagerService():
 		self.decayedInstances = {}
 		self.expireHostTime = float(self.config.get('ClusterManagerService', 'expireHostTime'))
 		self.allowDecayed = float(self.config.get('ClusterManagerService', 'allowDecayed'))
+		self.allowMismatchedVersions = boolean(self.config.get('ClusterManagerService', 'allowMismatchedVersions'))
 		now = time.time()
 		for instance in self.data.getInstances().itervalues():
 			instanceId = instance.id
@@ -339,10 +340,15 @@ class ClusterManagerService():
 			raise TashiException(d={'errno':Errors.NoSuchHostId, 'msg':'Host id and hostname mismatch'})
 		try:
 			self.lastContacted[host.id] = time.time()
+			oldHost.version = host.version
 			oldHost.memory = host.memory
 			oldHost.cores = host.cores
 			oldHost.up = True
 			oldHost.decayed = False
+			if (host.version != version and not self.allowMismatchedVersions):
+				oldHost.state = HostState.VersionMismatch
+			if (host.version == version and oldHost.state == HostState.VersionMismatch):
+				oldHost.state = HostState.Normal
 			for instance in instances:
 				try:
 					oldInstance = self.data.acquireInstance(instance.id)
