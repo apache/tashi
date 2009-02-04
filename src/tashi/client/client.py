@@ -29,6 +29,8 @@ from thrift.transport.TSocket import TSocket
 from tashi.services import clustermanagerservice
 from tashi import vmStates
 
+from tashi.util import getConfig
+
 def makeHTMLTable(list):
 	(stdin_r, stdin_w) = os.pipe()
 	pipe = os.popen("tput cols")
@@ -152,9 +154,15 @@ def main():
 		for m in methods:
 			os.unlink(m)
 		sys.exit(0)
-	host = os.getenv('TASHI_CM_HOST', 'localhost')
-	port = os.getenv('TASHI_CM_PORT', '9882')
-	timeout = float(os.getenv('TASHI_CM_TIMEOUT', '5000.0'))
+
+	(config,configFiles) = getConfig(["Client"])
+	cfgHost = config.get('Client', 'clusterManagerHost')
+	cfgPort = config.get('Client', 'clusterManagerPort')
+	cfgTimeout = float(config.get('Client', 'clusterManagerTimeout'))
+	host = os.getenv('TASHI_CM_HOST', cfgHost)
+	port = os.getenv('TASHI_CM_PORT', cfgPort)
+	timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
+
 	socket = TSocket(host, int(port))
 	socket.setTimeout(timeout)
 	transport = TBufferedTransport(socket)

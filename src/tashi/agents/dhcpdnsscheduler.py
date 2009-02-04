@@ -207,10 +207,10 @@ class DhcpDnsScheduler():
 					os.write(1, "%s\n" % (str(e)))
 				time.sleep(2)
 
-def createClient():
-	host = os.getenv('TASHI_CM_HOST', 'localhost')
-	port = os.getenv('TASHI_CM_PORT', '9882')
-	timeout = float(os.getenv('TASHI_CM_TIMEOUT', '5000.0'))
+def createClient(config):
+	host = config.get('Client', 'clusterManagerHost')
+	port = config.get('Client', 'clusterManagerPort')
+	timeout = float(config.get('Client', 'clusterManagerTimeout')) * 1000.0
 	socket = TSocket(host, int(port))
 	socket.setTimeout(timeout)
 	transport = TBufferedTransport(socket)
@@ -221,7 +221,7 @@ def createClient():
 
 def main():
 	(config, configFiles) = getConfig(["Agent"])
-	(client, transport) = createClient()
+	(client, transport) = createClient(config)
 	agent = DhcpDnsScheduler(config, client, transport)
 	agent.start()
 

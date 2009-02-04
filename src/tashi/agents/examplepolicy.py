@@ -26,6 +26,7 @@ from thrift.server.TServer import TThreadedServer
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport
 from tashi.services import clustermanagerservice
+from tashi.util import getConfig
 
 class ExamplePolicy():
 	def __init__(self, client, transport):
@@ -76,10 +77,11 @@ class ExamplePolicy():
 					print e
 				time.sleep(2)
 
-def createClient():
-	host = os.getenv('TASHI_CM_HOST', 'localhost')
-	port = os.getenv('TASHI_CM_PORT', '9882')
-	timeout = float(os.getenv('TASHI_CM_TIMEOUT', '5000.0'))
+def createClient(config):
+	host = config.get('Client', 'clusterManagerHost')
+	port = config.get('Client', 'clusterManagerPort')
+	timeout = float(config.get('Client', 'clusterManagerTimeout')) * 1000.0
+
 	socket = TSocket(host, int(port))
 	socket.setTimeout(timeout)
 	transport = TBufferedTransport(socket)
@@ -89,7 +91,8 @@ def createClient():
 	return (client, transport)
 
 def main():
-	(client, transport) = createClient()
+	(config, configFiles) = getConfig(["Agent"])
+	(client, transport) = createClient(config)
 	agent = ExamplePolicy(client, transport)
 	agent.start()
 
