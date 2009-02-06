@@ -18,6 +18,7 @@
 # under the License.    
 
 import os
+import random
 import sys
 import types
 from tashi.services.ttypes import *
@@ -71,6 +72,12 @@ def checkIid(instance):
 
 def requiredArg(name):
 	raise ValueError("Missing required argument %s" % (name))
+
+def randomMac():
+	return ("52:54:00:%2.2x:%2.2x:%2.2x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+
+def randomNetwork():
+	return [NetworkConfiguration(d={'mac':randomMac(), 'network':1})]
 
 def parseDisks(arg):
 	try:
@@ -130,19 +137,55 @@ def getVmLayout():
 		hosts[i.hostId].usedCores += machineTypes[i.type].cores
 	return hosts.values()
 
+def createMany(instance, count):
+	l = len(str(count))
+	basename = instance.name
+	instances = []
+	for i in range(0, count):
+		for nic in instance.nics:
+			nic.mac = randomMac()
+		instance.name = basename + (("-%" + str(l) + "." + str(l) + "d") % (i))
+		instances.append(client.createVm(instance))
+	return instances
+
+def destroyMany(basename):
+	instances = client.getInstances()
+	count = 0
+	for i in instances:
+		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
+			client.destroyVm(i.id)
+			count = count + 1
+	if (count == 0):
+		raise ValueError("That is an unused basename")
+	return None
+
+def getMyInstances():
+	userId = getUser()
+	_instances = client.getInstances()
+	instances = []
+	for i in _instances:
+		if (i.userId == userId):
+			instances.append(i)
+	return instances
+
 # Used to define default views on functions and to provide extra functionality (getVmLayout)
 extraViews = {
+'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
+'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
-'getInstances': (None, ['id','hostId','name','user','state','disk','memory','cores'])
+'getInstances': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
+'getMyInstances': (getMyInstances, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores'])
 }
 
 # Used to specify what args are excepted for a function, what to use to convert the string to a value, what to use as a default value if it's missing, and whether the argument was required or not
 argLists = {
-'createVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, lambda: [NetworkConfiguration(d={'mac':"",'network':1})], False), ('hints', parseHints, lambda: {}, False)],
+'createVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False)],
+'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
 'shutdownVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'destroyVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
+'destroyMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'suspendVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('destination', str, lambda: requiredArg('destination'), True)],
-'resumeVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, lambda: [NetworkConfiguration(d={'mac':"",'network':1})], False), ('hints', parseHints, lambda: {}, False), ('source', str, lambda: requiredArg('source'), True)],
+'resumeVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('source', str, lambda: requiredArg('source'), True)],
 'migrateVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('targetHostId', int, lambda: requiredArg('targetHostId'), True)],
 'pauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'unpauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
@@ -150,14 +193,17 @@ argLists = {
 'getHosts': [],
 'getUsers': [],
 'getInstances': [],
+'getMyInstances': [],
 'getVmLayout': [],
 }
 
 # Used to convert the dictionary built from the arguments into an object that can be used by thrift
 convertArgs = {
 'createVm': '[Instance(d={"userId":userId,"name":name,"type":type,"disks":disks,"nics":nics,"hints":hints})]',
+'createMany': '[Instance(d={"userId":userId,"name":basename,"type":type,"disks":disks,"nics":nics,"hints":hints}), count]',
 'shutdownVm': '[instance]',
 'destroyVm': '[instance]',
+'destroyMany': '[basename]',
 'suspendVm': '[instance, destination]',
 'resumeVm': '[Instance(d={"userId":userId,"name":name,"type":type,"disks":disks,"nics":nics,"hints":hints}), source]',
 'migrateVm': '[instance, targetHostId]',
@@ -168,8 +214,10 @@ convertArgs = {
 # Example use strings
 examples = {
 'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --type 9 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics 2:52:54:00:00:12:34,1:52:54:00:00:56:78 --hints enableDisplay=True'],
+'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance foobar'],
 'destroyVm': ['--instance 12345', '--instance foobar'],
+'destroyMany': ['--basename foobar'],
 'suspendVm': ['--instance 12345 --destination imgfile', '--instance foobar --destination imgfile'],
 'resumeVm': ['--name foobar --disks i386-hardy.qcow2 --nics 2:52:54:00:7a:8c:9d --source foobar'],
 'migrateVm': ['--instanc 12345 --targetHostId 73', '--instance foobar --targetHostId 73'],
@@ -179,6 +227,7 @@ examples = {
 'getHosts': [''],
 'getUsers': [''],
 'getInstances': [''],
+'getMyInstances': [''],
 'getVmLayout': [''],
 }
 
@@ -200,11 +249,13 @@ def usage(f = None):
 			else:
 				line += " [--%s <value>]" % (arg[0])
 		print line
-		print
-		for example in examples[f]:
-			print "\t\t" + f + " " + example
-		print
+		if ("--examples" in sys.argv):
+			print
+			for example in examples.get(f, []):
+				print "\t\t" + f + " " + example
+			print
 	print "Additionally, all functions accept --show-<name> and --hide-<name>, which show and hide columns during table generation"
+	print "Use \"--examples\" to see examples of all the functions"
 	sys.exit(-1)
 
 def transformState(obj):
@@ -350,7 +401,7 @@ def main():
 		args = sys.argv[2:]
 		vals = {}
 		for arg in args:
-			if (arg == "--help"):
+			if (arg == "--help" or arg == "--examples"):
 				usage(function)
 		for parg in possibleArgs:
 			(parg, conv, default, required) = parg
