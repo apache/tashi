@@ -1,4 +1,4 @@
-# Licensed to the Apache Software Foundation (ASF) under one
+#( Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
 # regarding copyright ownership.  The ASF licenses this file
@@ -28,7 +28,7 @@ from thrift.server.TServer import TThreadedServer
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport
 from tashi.services import clustermanagerservice
-from tashi.util import getConfig
+from tashi.util import getConfig, boolean
 
 class DhcpDnsScheduler():
 	def __init__(self, config, client, transport):
@@ -43,6 +43,7 @@ class DhcpDnsScheduler():
 		self.dhcpKeyName = config.get('DhcpDnsScheduler', 'dhcpKeyName')
 		self.dhcpSecretKey = config.get('DhcpDnsScheduler', 'dhcpSecretKey')
 		self.ipRange = config.get('DhcpDnsScheduler', 'ipRange')
+		self.reverseDns = boolean(config.get('DhcpDnsScheduler', 'reverseDns'))
 		(ip, bits) = self.ipRange.split("/")
 		bits = int(bits)
 		ipNum = self.strToIp(ip)
@@ -121,6 +122,12 @@ class DhcpDnsScheduler():
 		stdin.write("server %s\n" % (self.dnsServer))
 		stdin.write("update add %s.%s %d A %s\n" % (name, self.dnsDomain, self.dnsExpire, ip))
 		stdin.write("\n")
+		if (self.reverseDns):
+			ipSegments = map(int, ip.split("."))
+			ipSegments.reverse()
+			reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
+			stdin.write("update add %s %d IN PTR %s.%s.\n" % (reverseIpStr, self.dnsExpire, name, self.dnsDomain))
+			stdin.write("\n")
 		stdin.close()
 		output = stdout.read()
 		stdout.close()
@@ -132,6 +139,13 @@ class DhcpDnsScheduler():
 			cmd = "nsupdate"
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dnsServer))
+		if (self.reverseDns):
+			ip = socket.gethostbyname(name)
+			ipSegments = map(int, ip.split("."))
+			ipSegments.reverse()
+			reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
+			stdin.write("update delete %s IN PTR\n" % (reverseIpStr))
+			stdin.write("\n")
 		stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
 		stdin.write("\n")
 		stdin.close()
