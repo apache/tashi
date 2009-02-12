@@ -195,6 +195,7 @@ argLists = {
 'getInstances': [],
 'getMyInstances': [],
 'getVmLayout': [],
+'vmmSpecificCall': [('instance', checkIid, lambda: requiredArg('instance'), True), ('arg', str, lambda: requiredArg('arg'), True)],
 }
 
 # Used to convert the dictionary built from the arguments into an object that can be used by thrift
@@ -209,6 +210,7 @@ convertArgs = {
 'migrateVm': '[instance, targetHostId]',
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
+'vmmSpecificCall': '[instance, arg]',
 }
 
 # Example use strings
@@ -229,6 +231,7 @@ examples = {
 'getInstances': [''],
 'getMyInstances': [''],
 'getVmLayout': [''],
+'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc']
 }
 
 show_hide = []

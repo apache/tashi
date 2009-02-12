@@ -277,6 +277,10 @@ class NodeManagerService():
 		return instance
 	
 	@RPC
+	def vmmSpecificCall(self, vmId, arg):
+		return self.vmm.vmmSpecificCall(vmId, arg)
+	
+	@RPC
 	def listVms(self):
 		return self.instances.keys()
 	

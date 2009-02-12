@@ -325,6 +325,17 @@ class ClusterManagerService():
 				instance.userObj = None
 		return instances
 	
+	@RPC
+	def vmmSpecificCall(self, instanceId, arg):
+		instance = self.data.getInstance(instanceId)
+		hostname = self.data.getHost(instance.hostId).name
+		try:
+			res = self.proxy[hostname].vmmSpecificCall(instance.vmId, arg)
+		except Exception:
+			self.log.exception('vmmSpecificCall failed on host %s with vmId %d' % (hostname, instance.vmId))
+			raise
+		return res
+	
 #	@timed
 	@RPC
 	def registerNodeManager(self, host, instances):

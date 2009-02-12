@@ -92,6 +92,8 @@ class Qemu(VmControlInterface):
 		self.controlledVMs = {}
 		self.usedPorts = []
 		self.usedPortsLock = threading.Lock()
+		self.vncPort = 1
+		self.vncPortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -153,6 +155,10 @@ class Qemu(VmControlInterface):
 		for vmId in controlledVMs:
 			try:
 				child = self.loadChildInfo(vmId)
+				self.vncPortLock.acquire()
+				if (child.vncPort >= self.vncPort):
+					self.vncPort = child.vncPort + 1
+				self.vncPortLock.release()
 				child.monitorFd = os.open(child.ptyFile, os.O_RDWR | os.O_NOCTTY)
 				child.monitor = os.fdopen(child.monitorFd)
 				self.controlledVMs[child.pid] = child
@@ -257,10 +263,16 @@ class Qemu(VmControlInterface):
 		child.opts = opts
 		child.pid = pid
 		child.ptyFile = ptyFile
-		child.monitorHistory = []
-		child.OSchild = False
-		child.errorBit = False
-		child.migratingOut = False
+		if ('monitorHistory' not in child.__dict__):
+			child.monitorHistory = []
+		if ('OSchild' not in child.__dict__):
+			child.OSchild = False
+		if ('errorBit' not in child.__dict__):
+			child.errorBit = False
+		if ('migratingOut' not in child.__dict__):
+			child.migratingOut = False
+		if ('vncPort' not in child.__dict__):
+			child.vncPort = -1
 		return child
 	
 	def saveChildInfo(self, child):
@@ -303,6 +315,7 @@ class Qemu(VmControlInterface):
 		os.close(pipe_w)
 		child = self.anonClass(pid=pid, image=image, macAddr=macAddr, memory=memory, cores=cores, opts=opts, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = False, OSchild = True)
 		child.ptyFile = None
+		child.vncPort = -1
 		self.saveChildInfo(child)
 		self.controlledVMs[child.pid] = child
 		log.info("Adding vmId %d" % (child.pid))
@@ -487,6 +500,30 @@ class Qemu(VmControlInterface):
 		child.migratingOut = False
 		# XXX: the child could have exited between these two points, but I don't know how to fix that since it might not be our child process
 		os.kill(child.pid, signal.SIGKILL)
+	
+	def vmmSpecificCall(self, vmId, arg):
+		arg = arg.lower()
+		if (arg == "startvnc"):
+			child = self.getChildFromPid(vmId)
+			hostname = socket.gethostname()
+			if (child.vncPort == -1):
+				self.vncPortLock.acquire()
+				port = self.vncPort
+				self.vncPort = self.vncPort + 1
+				self.vncPortLock.release()
+				self.enterCommand(child, "change vnc :%d" % (port))
+				child.vncPort = port
+				self.saveChildInfo(child)
+			port = child.vncPort
+			return "%s:%d" % (hostname, port)
+		elif (arg == "stopvnc"):
+			child = self.getChildFromPid(vmId)
+			self.enterCommand(child, "change vnc none")
+			child.vncPort = -1
+			self.saveChildInfo(child)
+			return "None"
+		else:
+			return "Unknown arg %s" % (arg)
 	
 	def listVms(self):
 		return self.controlledVMs.keys()

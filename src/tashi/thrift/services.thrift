@@ -135,6 +135,8 @@ service clustermanagerservice {
 
 	list<Instance> getInstances() throws (1:TashiException e)
 	
+	string vmmSpecificCall(1:i32 instanceId, 2:string arg) throws (1:TashiException e)
+	
 	// NodeManager-facing RPCs
 	i32 registerNodeManager(1:Host host, 2:list<Instance> instances) throws (1:TashiException e)
 	void vmUpdate(1:i32 instanceId, 2:Instance instance, 3:InstanceState old) throws (1:TashiException e)
@@ -168,6 +170,8 @@ service nodemanagerservice {
 
 	Instance getVmInfo(1:i32 vmId) throws (1:TashiException e)
 	list<i32> listVms() throws (1:TashiException e)
-
+	
+	string vmmSpecificCall(1:i32 vmId, 2:string arg) throws (1:TashiException e)
+	
 	// Host getHostInfo() throws (1:TashiException e)
 }
