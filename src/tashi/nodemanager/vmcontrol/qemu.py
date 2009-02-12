@@ -40,40 +40,41 @@ def controlConsole(child, port):
 	listenSocket.bind(("0.0.0.0", port))
 	#print "bound"
 	try:
-		listenSocket.listen(5)
-		ls = listenSocket.fileno()
-		input = child.monitorFd
-		output = child.monitorFd
-		#print "listen"
-		select.select([ls], [], [])
-		(s, clientAddr) = listenSocket.accept()
-		while s:
-			if (output != -1):
-				(rl, wl, el) = select.select([s, output], [], [])
-			else:
-				(rl, wl, el) = select.select([s], [], [])
-			if (len(rl) > 0):
-				if (rl[0] == s):
-					#print "from s"
-					buf = s.recv(4096)
-					if (buf == ""):
-						s.close()
-						listenSocket.close()
-						s = None
-						continue
-					if (output != -1):
-						os.write(child.monitorFd, buf)
-				elif (rl[0] == output):
-					#print "from output"
-					buf = os.read(output, 4096)
-					#print "read complete"
-					if (buf == ""):
-						output = -1
-					else:
-						s.send(buf)
-	except:
-		s.close()
-		listenSocket.close()
+		try:
+			listenSocket.listen(5)
+			ls = listenSocket.fileno()
+			input = child.monitorFd
+			output = child.monitorFd
+			#print "listen"
+			select.select([ls], [], [])
+			(s, clientAddr) = listenSocket.accept()
+			while s:
+				if (output != -1):
+					(rl, wl, el) = select.select([s, output], [], [])
+				else:
+					(rl, wl, el) = select.select([s], [], [])
+				if (len(rl) > 0):
+					if (rl[0] == s):
+						#print "from s"
+						buf = s.recv(4096)
+						if (buf == ""):
+							s.close()
+							listenSocket.close()
+							s = None
+							continue
+						if (output != -1):
+							os.write(child.monitorFd, buf)
+					elif (rl[0] == output):
+						#print "from output"
+						buf = os.read(output, 4096)
+						#print "read complete"
+						if (buf == ""):
+							output = -1
+						else:
+							s.send(buf)
+		except:
+			s.close()
+			listenSocket.close()
 	finally:
 		#print "Thread exiting"
 		pass
@@ -284,8 +285,14 @@ class Qemu(VmControlInterface):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
 		global lastCmd
 		(image, macAddr, memory, cores, diskModel, instanceId, opts) = self.instanceToOld(instance)
-		sourceString = "" if not source else "-incoming %s" % (source)
-		snapshotString = "" if diskModel == "persistent" else "-snapshot"
+		if (not source):
+			sourceString = ""
+		else:
+			sourceString = "-incoming %s" % (source)
+		if (diskModel == "persistent"):
+			snapshotString = ""
+		else:
+			snapshotString = "-snapshot"
 		modelString = opts.get("nicModel", "e1000")
 		clockString = opts.get("clock", "dynticks")
 		imageLocal = self.dfs.getLocalHandle("images/" + image)
@@ -368,7 +375,10 @@ class Qemu(VmControlInterface):
 		macAddr = instance.nics[0].mac
 		memory = instance.typeObj.memory
 		cores = instance.typeObj.cores
-		diskModel = "persistent" if instance.disks[0].persistent else "transient"
+		if (instance.disks[0].persistent):
+			diskModel = "persistent"
+		else:
+			diskModel = "transient"
 		instanceId = instance.id
 		opts = instance.hints
 #		if (diskModel != "transient"):
@@ -446,7 +456,8 @@ class Qemu(VmControlInterface):
 			stdin.close()
 			r = stdout.read()
 			lc = int(r.strip())
-			time.sleep(1.0 if lc < 1 else 0.0)
+			if (lc < 1):
+				time.sleep(1.0)
 		return transportCookie
 	
 	def migrateVm(self, vmId, target, transportCookie):

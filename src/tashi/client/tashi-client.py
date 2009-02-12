@@ -27,7 +27,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.transport.TSocket import TSocket
 
 from tashi.services import clustermanagerservice
-from tashi import vmStates, hostStates, boolean, getConfig
+from tashi import vmStates, hostStates, boolean, getConfig, stringPartition
 
 users = {}
 machineTypes = {}
@@ -85,7 +85,7 @@ def parseDisks(arg):
 		disks = []
 		for strDisk in strDisks:
 			strDisk = strDisk.strip()
-			(l, s, r) = strDisk.partition(":")
+			(l, s, r) = stringPartition(strDisk, ":")
 			if (r == ""):
 				r = "False"
 			r = boolean(r)
@@ -101,7 +101,7 @@ def parseNics(arg):
 		nics = []
 		for strNic in strNics:
 			strNic = strNic.strip()
-			(l, s, r) = strNic.partition(":")
+			(l, s, r) = stringPartition(strNic, ":")
 			l = int(l)
 			nic = NetworkConfiguration(d={'mac':r, 'network':l})
 			nics.append(nic)
@@ -115,7 +115,7 @@ def parseHints(arg):
 		hints = {}
 		for strHint in strHints:
 			strHint = strHint.strip()
-			(l, s, r) = strHint.partition("=")
+			(l, s, r) = stringPartition(strHint, "=")
 			hints[l] = r
 		return hints
 	except:
@@ -398,53 +398,54 @@ def main():
 	client._transport = transport
 	client._transport.open()
 	try:
-		if (function not in argLists):
-			usage()
-		possibleArgs = argLists[function]
-		args = sys.argv[2:]
-		vals = {}
-		for arg in args:
-			if (arg == "--help" or arg == "--examples"):
-				usage(function)
-		for parg in possibleArgs:
-			(parg, conv, default, required) = parg
-			val = None
-			for i in range(0, len(args)):
-				arg = args[i]
-				if (arg.startswith("--") and arg[2:] == parg):
-					val = conv(args[i+1])
-			if (val == None):
-				val = default()
-			vals[parg] = val
-		for arg in args:
-			if (arg.startswith("--hide-")):
-				show_hide.append((False, arg[7:]))
-			if (arg.startswith("--show-")):
-				show_hide.append((True, arg[7:]))
-		f = getattr(client, function, None)
-		if (f is None):
-			f = extraViews[function][0]
-		if (function in convertArgs):
-			fargs = eval(convertArgs[function], globals(), vals)
-		else:
-			fargs = []
-		res = f(*fargs)
-		if (res != None):
-			keys = extraViews.get(function, (None, None))[1]
-			try:
-				if (type(res) == types.ListType):
-					makeTable(res, keys)
-				else:
-					pprint(res)
-			except Exception, e:
-				print e
-	except TashiException, e:
-		print "TashiException:"
-		print e.msg
-		exitCode = e.errno
-	except Exception, e:
-		print e
-		usage(function)
+		try:
+			if (function not in argLists):
+				usage()
+			possibleArgs = argLists[function]
+			args = sys.argv[2:]
+			vals = {}
+			for arg in args:
+				if (arg == "--help" or arg == "--examples"):
+					usage(function)
+			for parg in possibleArgs:
+				(parg, conv, default, required) = parg
+				val = None
+				for i in range(0, len(args)):
+					arg = args[i]
+					if (arg.startswith("--") and arg[2:] == parg):
+						val = conv(args[i+1])
+				if (val == None):
+					val = default()
+				vals[parg] = val
+			for arg in args:
+				if (arg.startswith("--hide-")):
+					show_hide.append((False, arg[7:]))
+				if (arg.startswith("--show-")):
+					show_hide.append((True, arg[7:]))
+			f = getattr(client, function, None)
+			if (f is None):
+				f = extraViews[function][0]
+			if (function in convertArgs):
+				fargs = eval(convertArgs[function], globals(), vals)
+			else:
+				fargs = []
+			res = f(*fargs)
+			if (res != None):
+				keys = extraViews.get(function, (None, None))[1]
+				try:
+					if (type(res) == types.ListType):
+						makeTable(res, keys)
+					else:
+						pprint(res)
+				except Exception, e:
+					print e
+		except TashiException, e:
+			print "TashiException:"
+			print e.msg
+			exitCode = e.errno
+		except Exception, e:
+			print e
+			usage(function)
 	finally:
 		client._transport.close()
 	sys.exit(exitCode)

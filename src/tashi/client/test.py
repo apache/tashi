@@ -38,7 +38,7 @@ from tashi.util import getConfig
 
 import tashi.client.client
 
-class ClientConnection():
+class ClientConnection(object):
     '''Creates an rpc proxy'''
     def __init__(self, host, port):
 	self.host = host

@@ -34,7 +34,7 @@ from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed
 def RPC(oldFunc):
 	return convertExceptions(oldFunc)
 
-class ClusterManagerService():
+class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
 	
 	def __init__(self, config, data):
@@ -350,50 +350,51 @@ class ClusterManagerService():
 			self.data.releaseHost(oldHost)
 			raise TashiException(d={'errno':Errors.NoSuchHostId, 'msg':'Host id and hostname mismatch'})
 		try:
-			self.lastContacted[host.id] = time.time()
-			oldHost.version = host.version
-			oldHost.memory = host.memory
-			oldHost.cores = host.cores
-			oldHost.up = True
-			oldHost.decayed = False
-			if (host.version != version and not self.allowMismatchedVersions):
-				oldHost.state = HostState.VersionMismatch
-			if (host.version == version and oldHost.state == HostState.VersionMismatch):
-				oldHost.state = HostState.Normal
-			for instance in instances:
-				try:
-					oldInstance = self.data.acquireInstance(instance.id)
-				except TashiException, e:
-					if (e.errno == Errors.NoSuchInstanceId):
-						self.log.info('Host %s reported an instance %d that did not previously exist (decay)' % (host.name, instance.id))
+			try:
+				self.lastContacted[host.id] = time.time()
+				oldHost.version = host.version
+				oldHost.memory = host.memory
+				oldHost.cores = host.cores
+				oldHost.up = True
+				oldHost.decayed = False
+				if (host.version != version and not self.allowMismatchedVersions):
+					oldHost.state = HostState.VersionMismatch
+				if (host.version == version and oldHost.state == HostState.VersionMismatch):
+					oldHost.state = HostState.Normal
+				for instance in instances:
+					try:
+						oldInstance = self.data.acquireInstance(instance.id)
+					except TashiException, e:
+						if (e.errno == Errors.NoSuchInstanceId):
+							self.log.info('Host %s reported an instance %d that did not previously exist (decay)' % (host.name, instance.id))
+							oldHost.decayed = True
+							continue
+							#oldInstance = self.data.registerInstance(instance)
+						else:
+							raise
+					try:
+						if (oldInstance.hostId != host.id):
+							self.log.info('Host %s is claiming instance %d actually owned by hostId %s (decay)' % (host.name, oldInstance.id, str(oldInstance.hostId)))
+							oldHost.decayed = True
+							continue
+						oldInstance.decayed = (oldInstance.state != instance.state)
+						self.updateDecay(self.decayedInstances, oldInstance)
+						if (oldInstance.decayed):
+							self.log.info('State reported as %s instead of %s for instance %d on host %s (decay)' % (vmStates[instance.state], vmStates[oldInstance.state], instance.id, host.name))
+					finally:
+						self.data.releaseInstance(oldInstance)
+				instanceIds = [instance.id for instance in instances]
+				for instanceId in [instance.id for instance in self.data.getInstances().itervalues() if instance.hostId == host.id]:
+					if (instanceId not in instanceIds):
+						self.log.info('instance %d was not reported by host %s as expected (decay)' % (instanceId, host.name))
+						instance = self.data.acquireInstance(instanceId)
+						instance.decayed = True
+						self.updateDecay(self.decayedInstances, instance)
 						oldHost.decayed = True
-						continue
-						#oldInstance = self.data.registerInstance(instance)
-					else:
-						raise
-				try:
-					if (oldInstance.hostId != host.id):
-						self.log.info('Host %s is claiming instance %d actually owned by hostId %s (decay)' % (host.name, oldInstance.id, str(oldInstance.hostId)))
-						oldHost.decayed = True
-						continue
-					oldInstance.decayed = (oldInstance.state != instance.state)
-					self.updateDecay(self.decayedInstances, oldInstance)
-					if (oldInstance.decayed):
-						self.log.info('State reported as %s instead of %s for instance %d on host %s (decay)' % (vmStates[instance.state], vmStates[oldInstance.state], instance.id, host.name))
-				finally:
-					self.data.releaseInstance(oldInstance)
-			instanceIds = [instance.id for instance in instances]
-			for instanceId in [instance.id for instance in self.data.getInstances().itervalues() if instance.hostId == host.id]:
-				if (instanceId not in instanceIds):
-					self.log.info('instance %d was not reported by host %s as expected (decay)' % (instanceId, host.name))
-					instance = self.data.acquireInstance(instanceId)
-					instance.decayed = True
-					self.updateDecay(self.decayedInstances, instance)
-					oldHost.decayed = True
-					self.data.releaseInstance(instance)
-		except Exception, e:
-			oldHost.decayed = True
-			raise
+						self.data.releaseInstance(instance)
+			except Exception, e:
+				oldHost.decayed = True
+				raise
 		finally:
 			self.updateDecay(self.decayedHosts, oldHost)
 			self.data.releaseHost(oldHost)

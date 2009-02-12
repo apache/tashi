@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -76,7 +76,7 @@ class MessageBrokerSoap(soaplib.wsgi_soap.SimpleWSGISoapApp, MessageBroker):
 
 
 
-class MessageBrokerSoapProxy():
+class MessageBrokerSoapProxy(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port
@@ -130,7 +130,7 @@ class SubscriberSoap(soaplib.wsgi_soap.SimpleWSGISoapApp, Subscriber):
     def stop(self):
         self.server.stop()
 
-class SubscriberSoapProxy():
+class SubscriberSoapProxy(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port

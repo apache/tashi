@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -28,7 +30,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from tashi.services import clustermanagerservice
 from tashi.util import getConfig
 
-class ExamplePolicy():
+class ExamplePolicy(object):
 	def __init__(self, client, transport):
 		self.client = client
 		self.transport = transport

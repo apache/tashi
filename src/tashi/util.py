@@ -33,7 +33,10 @@ def broken(oldFunc):
 	"""Decorator that is used to mark a function as temporarily broken"""
 	def newFunc(*args, **kw):
 		raise RuntimeError("%s is broken!" % (oldFunc.__name__))
-	newFunc.__doc__ = "[Broken] " + "" if oldFunc.__doc__ is None else oldFunc.__doc__
+	if (oldFunc.__doc__ is None):
+		newFunc.__doc__ = "[Broken]"
+	else:
+		newFunc.__doc__ = "[Broken] " + oldFunc.__doc__
 	newFunc.__name__ = oldFunc.__name__
 	newFunc.__module__ = oldFunc.__module__
 	return newFunc
@@ -237,6 +240,15 @@ def debugConsole(globalDict):
 					print e
 	if (os.getenv("DEBUG", "0") == "1"):
 		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
+
+def stringPartition(s, field):
+	index = s.find(field)
+	if (index == -1):
+		return (s, "", "")
+	l = s[:index]
+	sep = s[index:index+len(field)]
+	r = s[index+len(field):]
+	return (l, sep, r)
 
 def enumToStringDict(cls):
 	d = {}

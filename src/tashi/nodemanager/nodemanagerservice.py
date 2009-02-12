@@ -31,7 +31,7 @@ from tashi.services import clustermanagerservice
 from tashi.nodemanager import RPC
 from tashi import boolean, vmStates, logged, ConnectionManager, timed, version
 
-class NodeManagerService():
+class NodeManagerService(object):
 	"""RPC handler for the NodeManager
 	   
 	   Perhaps in the future I can hide the dfs from the 

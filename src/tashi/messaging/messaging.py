@@ -30,7 +30,7 @@ import traceback
 from threadpool import ThreadPoolClass, threadpool, ThreadPool
 from threadpool import threadpoolmethod, threaded, synchronized, synchronizedmethod
 
-class RWLock():
+class RWLock(object):
     """RWLock: Simple reader/writer lock implementation
     FIXME: this implementation will starve writers!
     Methods:
@@ -60,7 +60,7 @@ class RWLock():
 
 
 
-class MessageBroker():
+class MessageBroker(object):
     def __init__(self):
         self.sublock = RWLock()
         self.subscribers = []
@@ -123,7 +123,7 @@ class MessageBroker():
         for message in messages:
             self.publish(message)
 
-class Subscriber():
+class Subscriber(object):
     def __init__(self, broker, pmatch={}, nmatch={}, synchronized=False):
         self.broker = broker
         self.lock = threading.Lock()
@@ -187,7 +187,7 @@ class Subscriber():
 
 
     
-class Publisher():
+class Publisher(object):
     '''Superclass for pub/sub publishers
 
     FIXME: use finer-grained locking'''

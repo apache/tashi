@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-class VmControlInterface():
+class VmControlInterface(object):
 	"""Interface description for VM controllers -- like Qemu, Xen, etc"""
 
 	def __init__(self, config, dfs, nm):
