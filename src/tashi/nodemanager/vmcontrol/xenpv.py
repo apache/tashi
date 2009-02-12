@@ -161,9 +161,9 @@ class XenPV(VmControlInterface, threading.Thread):
 # ramdisk="/boot/initrd.img-2.6.24-17-xen"
 bootloader="/usr/bin/pygrub"
 disk=['tap:qcow:%s,xvda1,w']
-# vif = [ 'mac=%s' ]
+vif = [ 'mac=%s' ]
 # vif = ['ip=172.19.158.1']
-vif = ['']
+# vif = ['']
 memory=%i
 #cpus is a list of cpus for pinning, this is not what we want
 #cpus=%i
