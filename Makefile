@@ -90,3 +90,13 @@ doc/html:
 	epydoc --html -o doc/html --include-log --name=tashi --graph=all --exclude=tashi.services --exclude=tashi.messaging.messagingthrift ./src/tashi
 rmdoc:
 	if test -d doc/html; then echo Removing HTML docs...; rm -rf ./doc/html; fi
+
+## for now only print warnings having to do with bad indentation. pylint doesn't make it easy to enable only 1,2 checks
+disabled_warnings=$(shell pylint --list-msgs|grep :W0| awk -F: '{ORS=","; if ($$2 != "W0311" && $$2 != "W0312"){ print $$2}}')
+pysrc=$(shell find . \! -path '*gen-py*' \! -path '*services*' \! -path '*messagingthrift*' \! -name '__init__.py' -name "*.py")
+tidy: $(addprefix tidyfile/,$(pysrc))
+	@echo Insuring .py files are nice and tidy!
+
+tidyfile/%: %
+	@echo Checking tidy for $*
+	pylint --report=no --disable-msg-cat=R,C,E --disable-msg=$(disabled_warnings) --indent-string="\t" $* 2> /dev/null; 
