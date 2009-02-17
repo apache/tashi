@@ -18,23 +18,23 @@
 import tashi.messaging.tashimessaging
 
 class Notifier(tashi.messaging.tashimessaging.TashiLogHandler):
-    def vmExited(self, instance):
-        try:
-            isolatedRPC(self.cm, 'vmExited', self.hostId, vmId)
-        except Exception, e:
-            print "RPC failed for vmExited on CM"
-            print e
-            # FIXME: send this to the cm later
-            # self.exitedVms[vmId] = child
+	def vmExited(self, instance):
+		try:
+			isolatedRPC(self.cm, 'vmExited', self.hostId, vmId)
+		except Exception, e:
+			print "RPC failed for vmExited on CM"
+			print e
+			# FIXME: send this to the cm later
+			# self.exitedVms[vmId] = child
 
-        msg = {}
+		msg = {}
 
-        msg['timestamp'] = str(time.time())
-        msg['hostname'] = ''    # FIXME: fill this in
-        msg['message-type'] = 'vm-event'
-        msg['vm-event'] = 'vm-exited'
-        
-        msg['instance-id'] = str(instance.id)
-        msg['host-id'] = str(instance.hostId)
-        print 'Notifier publishing ', msg
-        self.publish(message)
+		msg['timestamp'] = str(time.time())
+		msg['hostname'] = ''	# FIXME: fill this in
+		msg['message-type'] = 'vm-event'
+		msg['vm-event'] = 'vm-exited'
+		
+		msg['instance-id'] = str(instance.id)
+		msg['host-id'] = str(instance.hostId)
+		print 'Notifier publishing ', msg
+		self.publish(message)

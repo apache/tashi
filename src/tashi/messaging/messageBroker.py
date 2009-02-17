@@ -31,18 +31,18 @@ long_options = ['port=']
 params = {"port":1717}
 
 try:
-    optlist, args = getopt.getopt(sys.argv[1:], options, long_options)
+	optlist, args = getopt.getopt(sys.argv[1:], options, long_options)
 except getopt.GetoptError, err:
-    print str(err)
-    sys.exit(2)
+	print str(err)
+	sys.exit(2)
 
 for opt in optlist:
-    if opt[0] == "--port":
-        try:
-            params["port"] = int(opt[1])
-        except:
-            print "--port expects an integer, got %s" % opt[1]
-            sys.exit(0)
+	if opt[0] == "--port":
+		try:
+			params["port"] = int(opt[1])
+		except:
+			print "--port expects an integer, got %s" % opt[1]
+			sys.exit(0)
 
 print "Starting message broker on port %i" % params["port"]
 broker = thriftmessaging.MessageBrokerThrift(params["port"], daemon=False)

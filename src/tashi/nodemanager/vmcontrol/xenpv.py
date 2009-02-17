@@ -108,7 +108,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		self.dfs = dfs
 		self.cm = cm
 
-                self.vmNamePrefix = self.config.get("XenPV", "vmNamePrefix")
+		self.vmNamePrefix = self.config.get("XenPV", "vmNamePrefix")
 		self.transientDir = self.config.get('XenPV', 'transientDir')
 
 		self.newvms = listVms(self.vmNamePrefix)
@@ -130,15 +130,15 @@ class XenPV(VmControlInterface, threading.Thread):
 		for vmId in self.newvms.keys():
 			if not vmlist.has_key(vmId):
 				a = self.newvms.pop(vmId)
-                                # If the vm had transient disks, delete them
-                                for i in range(len(a.disks)):
-                                        if a.disks[i].persistent == False:
-                                                diskname = self.transientDisk(a.id, i)
-                                                try:
-                                                        os.unlink(diskname)
-                                                except:
-                                                        print 'WARNING could not delete transient disk %s' % diskname
-                                self.nm.vmStateChange(a.vmId, a.state, InstanceState.Exited)
+				# If the vm had transient disks, delete them
+				for i in range(len(a.disks)):
+					if a.disks[i].persistent == False:
+						diskname = self.transientDisk(a.id, i)
+						try:
+							os.unlink(diskname)
+						except:
+							print 'WARNING could not delete transient disk %s' % diskname
+				self.nm.vmStateChange(a.vmId, a.state, InstanceState.Exited)
 		for vmId in vmlist.keys():
 			if not self.newvms.has_key(vmId):
 				print 'WARNING: found vm that should be managed, but is not'
@@ -175,17 +175,17 @@ extra='xencons=tty'
 		f.close()
 		return fn
 	def deleteXenConfig(self, vmName):
-                pass
+		pass
 #		os.unlink(os.path.join("/tmp", vmName))
 ########################################
 
-        def vmName(self, instanceId):
-                return "%s-%i"%(self.vmNamePrefix, int(instanceId))
-        def transientDisk(self, instanceId, disknum):
-                newdisk = os.path.join(self.transientDir,
-                                       'tashi-%i-%i.qcow' %(instanceId, disknum))
-                return newdisk
-                
+	def vmName(self, instanceId):
+		return "%s-%i"%(self.vmNamePrefix, int(instanceId))
+	def transientDisk(self, instanceId, disknum):
+		newdisk = os.path.join(self.transientDir,
+				       'tashi-%i-%i.qcow' %(instanceId, disknum))
+		return newdisk
+		
 
 	@synchronizedmethod
 	def instantiateVm(self, instance):
@@ -203,9 +203,9 @@ extra='xencons=tty'
 			imageLocal = self.dfs.getLocalHandle(instance.disks[i].uri)
 			instance.disks[i].local = imageLocal
 			if instance.disks[i].persistent == False:
-                                newdisk = self.transientDisk(instance.id, i)
-                                cmd = 'qcow-create 0 %s %s' % (newdisk, imageLocal)
-                                print 'creating new disk with "%s"' % cmd
+				newdisk = self.transientDisk(instance.id, i)
+				cmd = 'qcow-create 0 %s %s' % (newdisk, imageLocal)
+				print 'creating new disk with "%s"' % cmd
 				os.system(cmd)
 				instance.disks[i].local = newdisk
 
@@ -217,7 +217,7 @@ extra='xencons=tty'
 					  instance.typeObj.cores)
 		cmd = "xm create %s"%fn
 		r = os.system(cmd)
-#                self.deleteXenConfig(name)
+#		self.deleteXenConfig(name)
 		if r != 0:
 			print 'WARNING: "%s" returned %i' % ( cmd, r)
 			raise Exception, 'WARNING: "%s" returned %i' % ( cmd, r)
@@ -248,7 +248,7 @@ extra='xencons=tty'
 		name = domIdToName(vmId)
 		cPickle.dump(instance, infof)
 		infof.close()
-                
+		
 
 		# FIXME: handle errors
 		cmd = "xm save %i %s"%(vmId, tmpfile)
@@ -258,7 +258,7 @@ extra='xencons=tty'
 			raise Exception,  "replace this with a real exception!"
 		r = self.dfs.copyTo(tmpfile, target)
 		self.newvms.pop(vmId)
- 		os.unlink(tmpfile)
+		os.unlink(tmpfile)
 		return vmId
 	
 	@synchronizedmethod
@@ -288,13 +288,13 @@ extra='xencons=tty'
 	@synchronizedmethod
 	def migrateVm(self, vmId, target, transportCookie):
 		cmd = "xm migrate -l %i %s"%(vmId, target)
-                r = os.system(cmd)
-                if r != 0:
-                        # FIXME: throw exception
-                        print "migrate failed for VM %i"%vmId
-                        raise Exception,  "migrate failed for VM %i"%vmId
+		r = os.system(cmd)
+		if r != 0:
+			# FIXME: throw exception
+			print "migrate failed for VM %i"%vmId
+			raise Exception,  "migrate failed for VM %i"%vmId
 		self.newvms.pop(vmId)
-                return vmId
+		return vmId
 	@synchronizedmethod
 	def receiveVm(self, transportCookie):
 		instance = cPickle.loads(transportCookie)
@@ -349,19 +349,19 @@ extra='xencons=tty'
 		return self.newvms.keys()
 
 
-        @synchronizedmethod
-        def getHostInfo(self):
-                host = Host()
-                memp = subprocess.Popen("xm info | awk '/^total_memory/ { print $3 }' ",
-                                        shell = True,
-                                        stdout = subprocess.PIPE)
-                mems = memp.stdout.readline()
-                host.memory = int(mems)
-                corep = subprocess.Popen("xm info | awk '/^nr_cpus/ { print $3 }' ",
-                                        shell = True,
-                                        stdout = subprocess.PIPE)
-                cores = corep.stdout.readline()
-                host.cores = int(cores)
-                return host
+	@synchronizedmethod
+	def getHostInfo(self):
+		host = Host()
+		memp = subprocess.Popen("xm info | awk '/^total_memory/ { print $3 }' ",
+					shell = True,
+					stdout = subprocess.PIPE)
+		mems = memp.stdout.readline()
+		host.memory = int(mems)
+		corep = subprocess.Popen("xm info | awk '/^nr_cpus/ { print $3 }' ",
+					shell = True,
+					stdout = subprocess.PIPE)
+		cores = corep.stdout.readline()
+		host.cores = int(cores)
+		return host
 
 

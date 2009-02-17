@@ -50,10 +50,10 @@ class ConnectionManager(object):
 			return connectWrap
 	
 	def __getitem__(self, hostname):
-                port = self.port
-                if len(hostname) == 2:
-                        port = hostname[1]
-                        hostname = hostname[0]
+		port = self.port
+		if len(hostname) == 2:
+			port = hostname[1]
+			hostname = hostname[0]
 		socket = TSocket(hostname, port)
 		socket.setTimeout(self.timeout)
 		transport = TBufferedTransport(socket)

@@ -49,8 +49,8 @@ def main():
 	server = TThreadedServer(processor, transport)
 	debugConsole(globals())
 	
-        notifier = notification.Notifier(config)
-        log.addHandler(notifier)
+	notifier = notification.Notifier(config)
+	log.addHandler(notifier)
 
 	try:
 		server.serve()

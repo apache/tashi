@@ -155,26 +155,26 @@ def isolatedRPC(client, method, *args, **kw):
 	return res
 
 def signalHandler(signalNumber):
-    """Used to denote a particular function as the signal handler for a 
-       specific signal"""
-    def __decorator(function):
-        signal.signal(signalNumber, function)
-        return function
-    return __decorator
+	"""Used to denote a particular function as the signal handler for a 
+	   specific signal"""
+	def __decorator(function):
+		signal.signal(signalNumber, function)
+		return function
+	return __decorator
 
 def boolean(value):
-    """Convert a variable to a boolean"""
-    if (type(value) == types.BooleanType):
-        return value
-    if (type(value) == types.IntType):
-        return (value != 0)
-    lowercaseValue = value.lower()
-    if lowercaseValue in ['yes', 'true', '1']:
-        return True
-    elif lowercaseValue in ['no', 'false', '0']:
-        return False
-    else:
-        raise ValueError
+	"""Convert a variable to a boolean"""
+	if (type(value) == types.BooleanType):
+		return value
+	if (type(value) == types.IntType):
+		return (value != 0)
+	lowercaseValue = value.lower()
+	if lowercaseValue in ['yes', 'true', '1']:
+		return True
+	elif lowercaseValue in ['no', 'false', '0']:
+		return False
+	else:
+		raise ValueError
 
 def instantiateImplementation(className, *args):
 	"""Create an instance of an object with the given class name and list 

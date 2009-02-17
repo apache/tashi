@@ -41,10 +41,10 @@ if __name__ == '__main__':
 	print 'Copying generated code to \'tashi.services\' package...'
 	shutil.copytree('gen-py/services', '../services')
 	
-        print 'Generatign Python code for \'messagingthrift\'...'
-        os.system('rm -rf gen-py')
-        os.system('thrift --gen py messagingthrift.thrift')
-        
-        print 'Copying generated code to \'tashi.messaging.messagingthrift\' package...'
-        shutil.copytree(os.path.join('gen-py', 'messagingthrift'),
-                        os.path.join('..', 'messaging', 'messagingthrift'))
+	print 'Generatign Python code for \'messagingthrift\'...'
+	os.system('rm -rf gen-py')
+	os.system('thrift --gen py messagingthrift.thrift')
+	
+	print 'Copying generated code to \'tashi.messaging.messagingthrift\' package...'
+	shutil.copytree(os.path.join('gen-py', 'messagingthrift'),
+			os.path.join('..', 'messaging', 'messagingthrift'))

@@ -373,7 +373,7 @@ def pprint(obj, depth = 0, key = None):
 				pprint(v, depth + 1, k)
 			print (" " * (depth * INDENT)) + "}"
 	else:
-			print (" " * (depth * INDENT)) + keyString + str(valueManip(obj))
+		print (" " * (depth * INDENT)) + keyString + str(valueManip(obj))
 
 def main():
 	"""Main function for the client program"""

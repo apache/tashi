@@ -33,44 +33,44 @@ from tashi.services import clustermanagerservice
 from tashi.util import signalHandler, boolean, instantiateImplementation, getConfig, debugConsole
 
 def startClusterManager(config):
-    global service, data
-    
-    # start the event broker
-    broker = MessageBrokerThrift(int(config.get('MessageBroker', 'port')))
-    broker.ready.wait()
-    messageHandler = TashiLogHandler(config)
-    log.addHandler(messageHandler)
+	global service, data
+	
+	# start the event broker
+	broker = MessageBrokerThrift(int(config.get('MessageBroker', 'port')))
+	broker.ready.wait()
+	messageHandler = TashiLogHandler(config)
+	log.addHandler(messageHandler)
 
-    data = instantiateImplementation(config.get("ClusterManager", "data"), config)
-    service = instantiateImplementation(config.get("ClusterManager", "service"), config, data)
-    processor = clustermanagerservice.Processor(service)
-    transport = TServerSocket(int(config.get('ClusterManagerService', 'port')))
-    server = TThreadedServer(processor, transport)
-    
-    debugConsole(globals())
-    
-    try:
-        server.serve()
-    except KeyboardInterrupt:
-        handleSIGTERM(signal.SIGTERM, None)
+	data = instantiateImplementation(config.get("ClusterManager", "data"), config)
+	service = instantiateImplementation(config.get("ClusterManager", "service"), config, data)
+	processor = clustermanagerservice.Processor(service)
+	transport = TServerSocket(int(config.get('ClusterManagerService', 'port')))
+	server = TThreadedServer(processor, transport)
+	
+	debugConsole(globals())
+	
+	try:
+		server.serve()
+	except KeyboardInterrupt:
+		handleSIGTERM(signal.SIGTERM, None)
 
 @signalHandler(signal.SIGTERM)
 def handleSIGTERM(signalNumber, stackFrame):
-    log.info('Exiting cluster manager after receiving a SIGINT signal')
-    sys.exit(0)
-    
+	log.info('Exiting cluster manager after receiving a SIGINT signal')
+	sys.exit(0)
+	
 def main():
-    global log
-    
-    # setup configuration and logging
-    (config, configFiles) = getConfig(["ClusterManager"])
-    logging.config.fileConfig(configFiles)
-    log = logging.getLogger(__file__)
-    log.info('Using configuration file(s) %s' % configFiles)
-    
-    # bind the database
-    log.info('Starting cluster manager')
-    startClusterManager(config)
+	global log
+	
+	# setup configuration and logging
+	(config, configFiles) = getConfig(["ClusterManager"])
+	logging.config.fileConfig(configFiles)
+	log = logging.getLogger(__file__)
+	log.info('Using configuration file(s) %s' % configFiles)
+	
+	# bind the database
+	log.info('Starting cluster manager')
+	startClusterManager(config)
 
 if __name__ == "__main__":
-    main()
+	main()
