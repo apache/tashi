@@ -93,8 +93,10 @@ class Qemu(VmControlInterface):
 		self.controlledVMs = {}
 		self.usedPorts = []
 		self.usedPortsLock = threading.Lock()
-		self.vncPort = 1
+		self.vncPorts = []
 		self.vncPortLock = threading.Lock()
+		self.consolePort = 10000
+		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -128,6 +130,10 @@ class Qemu(VmControlInterface):
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
 				child = controlledVMs[vmId]
 				del controlledVMs[vmId]
+				if (child.vncPort >= 0):
+					self.vncPortLock.acquire()
+					self.vncPorts.remove(child.vncPort)
+					self.vncPortLock.release()
 				log.info("Removing vmId %d" % (vmId))
 				if (child.OSchild):
 					os.waitpid(vmId, 0)
@@ -157,8 +163,8 @@ class Qemu(VmControlInterface):
 			try:
 				child = self.loadChildInfo(vmId)
 				self.vncPortLock.acquire()
-				if (child.vncPort >= self.vncPort):
-					self.vncPort = child.vncPort + 1
+				if (child.vncPort >= 0):
+					self.vncPorts.append(child.vncPort)
 				self.vncPortLock.release()
 				child.monitorFd = os.open(child.ptyFile, os.O_RDWR | os.O_NOCTTY)
 				child.monitor = os.fdopen(child.monitorFd)
@@ -519,20 +525,35 @@ class Qemu(VmControlInterface):
 			hostname = socket.gethostname()
 			if (child.vncPort == -1):
 				self.vncPortLock.acquire()
-				port = self.vncPort
-				self.vncPort = self.vncPort + 1
+				port = 0
+				while (port in self.vncPorts):
+					port = port + 1
+				self.vncPorts.append(port)
 				self.vncPortLock.release()
 				self.enterCommand(child, "change vnc :%d" % (port))
 				child.vncPort = port
 				self.saveChildInfo(child)
 			port = child.vncPort
-			return "%s:%d" % (hostname, port)
+			return "VNC started on %s:%d" % (hostname, port+5900)
 		elif (arg == "stopvnc"):
 			child = self.getChildFromPid(vmId)
 			self.enterCommand(child, "change vnc none")
-			child.vncPort = -1
-			self.saveChildInfo(child)
-			return "None"
+			if (child.vncPort != -1):
+				self.vncPortLock.acquire()
+				self.vncPorts.remove(child.vncPort)
+				self.vncPortLock.release()
+				child.vncPort = -1
+				self.saveChildInfo(child)
+			return "VNC halted"
+		elif (arg == "startconsole"):
+			child = self.getChildFromPid(vmId)
+			hostname = socket.gethostname()
+			self.consolePortLock.acquire()
+			consolePort = self.consolePort
+			self.consolePort = self.consolePort+1
+			self.consolePortLock.release()
+			threading.Thread(target=lambda: controlConsole(child,consolePort)).start()
+			return "Control console listenting on %s:%d" % (hostname, consolePort)
 		else:
 			return "Unknown arg %s" % (arg)
 	
