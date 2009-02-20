@@ -18,3 +18,4 @@
 from datainterface import DataInterface
 from fromconfig import FromConfig
 from pickled import Pickled
+from sql import SQL
