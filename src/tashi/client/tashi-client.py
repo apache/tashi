@@ -342,7 +342,7 @@ def makeTable(list, keys=None):
 		
 def simpleType(obj):
 	"""Determines whether an object is a simple type -- used as a helper function to pprint"""
-	if (type(obj) is not type([])):
+	if (type(obj) is not types.ListType):
 		if (not getattr(obj, "__dict__", None)):
 			return True
 	return False
@@ -356,7 +356,7 @@ def pprint(obj, depth = 0, key = None):
 			valueManip = lambda x: vmStates[x]
 	else:
 		keyString = ""
-	if (type(obj) is type([])):
+	if (type(obj) is types.ListType):
 		if (reduce(lambda x, y: x and simpleType(y), obj, True)):
 			print (" " * (depth * INDENT)) + keyString + str(obj)
 		else:

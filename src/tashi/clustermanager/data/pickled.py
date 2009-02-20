@@ -69,6 +69,8 @@ class Pickled(FromConfig):
 		self.networks = networks
 		self.users = users
 		for i in self.instances.itervalues():
+			if (i.id >= self.maxInstanceId):
+				self.maxInstanceId = i.id + 1
 			i._lock = threading.Lock()
 			self.lockNames[i._lock] = "i%d" % (i.id)
 		for h in self.hosts.itervalues():

@@ -174,7 +174,7 @@ class Qemu(VmControlInterface):
 				log.exception("Failed to load VM info for %d", vmId)
 			else:
 				log.info("Loaded VM info for %d", vmId)
-		self.matchSystemPids(controlledVMs)
+		self.matchSystemPids(self.controlledVMs)
 	
 	def pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
