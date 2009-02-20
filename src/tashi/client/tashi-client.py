@@ -30,19 +30,12 @@ from tashi.services import clustermanagerservice
 from tashi import vmStates, hostStates, boolean, getConfig, stringPartition
 
 users = {}
-machineTypes = {}
 
 def fetchUsers():
 	if (users == {}):
 		_users = client.getUsers()
 		for user in _users:
 			users[user.id] = user
-
-def fetchMachineTypes():
-	if (machineTypes == {}):
-		_machineTypes = client.getMachineTypes()
-		for machineType in _machineTypes:
-			machineTypes[machineType.id] = machineType
 
 def getUser():
 	fetchUsers()
@@ -122,7 +115,6 @@ def parseHints(arg):
 		raise ValueError("Incorrect format for hints argument")
 
 def getVmLayout():
-	fetchMachineTypes()
 	_hosts = client.getHosts()
 	_instances = client.getInstances()
 	hosts = {}
@@ -133,8 +125,8 @@ def getVmLayout():
 		hosts[h.id] = h
 	for i in _instances:
 		hosts[i.hostId].instances.append(i.id)
-		hosts[i.hostId].usedMemory += machineTypes[i.type].memory
-		hosts[i.hostId].usedCores += machineTypes[i.type].cores
+		hosts[i.hostId].usedMemory += i.memory
+		hosts[i.hostId].usedCores += i.cores
 	return hosts.values()
 
 def createMany(instance, count):
@@ -179,19 +171,19 @@ extraViews = {
 
 # Used to specify what args are excepted for a function, what to use to convert the string to a value, what to use as a default value if it's missing, and whether the argument was required or not
 argLists = {
-'createVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False)],
-'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
+'createVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False)],
+'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
 'shutdownVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'destroyVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'destroyMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'suspendVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('destination', str, lambda: requiredArg('destination'), True)],
-'resumeVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('type', int, lambda: 1, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('source', str, lambda: requiredArg('source'), True)],
+'resumeVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('source', str, lambda: requiredArg('source'), True)],
 'migrateVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('targetHostId', int, lambda: requiredArg('targetHostId'), True)],
 'pauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'unpauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
-'getMachineTypes': [],
 'getHosts': [],
 'getUsers': [],
+'getNetworks': [],
 'getInstances': [],
 'getMyInstances': [],
 'getVmLayout': [],
@@ -200,13 +192,13 @@ argLists = {
 
 # Used to convert the dictionary built from the arguments into an object that can be used by thrift
 convertArgs = {
-'createVm': '[Instance(d={"userId":userId,"name":name,"type":type,"disks":disks,"nics":nics,"hints":hints})]',
-'createMany': '[Instance(d={"userId":userId,"name":basename,"type":type,"disks":disks,"nics":nics,"hints":hints}), count]',
+'createVm': '[Instance(d={"userId":userId,"name":name,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints})]',
+'createMany': '[Instance(d={"userId":userId,"name":basename,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), count]',
 'shutdownVm': '[instance]',
 'destroyVm': '[instance]',
 'destroyMany': '[basename]',
 'suspendVm': '[instance, destination]',
-'resumeVm': '[Instance(d={"userId":userId,"name":name,"type":type,"disks":disks,"nics":nics,"hints":hints}), source]',
+'resumeVm': '[Instance(d={"userId":userId,"name":name,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), source]',
 'migrateVm': '[instance, targetHostId]',
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
@@ -215,7 +207,7 @@ convertArgs = {
 
 # Example use strings
 examples = {
-'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --type 9 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics 2:52:54:00:00:12:34,1:52:54:00:00:56:78 --hints enableDisplay=True'],
+'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics 2:52:54:00:00:12:34,1:52:54:00:00:56:78 --hints enableDisplay=True'],
 'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance foobar'],
 'destroyVm': ['--instance 12345', '--instance foobar'],
@@ -225,9 +217,9 @@ examples = {
 'migrateVm': ['--instanc 12345 --targetHostId 73', '--instance foobar --targetHostId 73'],
 'pauseVm': ['--instance 12345', '--instance foobar'],
 'unpauseVm': ['---instance 12345', '--instance foobar'],
-'getMachineTypes': [''],
 'getHosts': [''],
 'getUsers': [''],
+'getNetworks': [''],
 'getInstances': [''],
 'getMyInstances': [''],
 'getVmLayout': [''],
@@ -264,7 +256,6 @@ def usage(f = None):
 def transformState(obj):
 	if (type(obj) == Instance):
 		fetchUsers()
-		fetchMachineTypes()
 		obj.state = vmStates[obj.state]
 		if (obj.userId in users):
 			obj.user = users[obj.userId].name
@@ -273,8 +264,6 @@ def transformState(obj):
 		obj.disk = obj.disks[0].uri
 		if (obj.disks[0].persistent):
 			obj.disk += ":True"
-		obj.memory = machineTypes[obj.type].memory
-		obj.cores = machineTypes[obj.type].cores
 	elif (type(obj) == Host):
 		obj.state = hostStates[obj.state]
 

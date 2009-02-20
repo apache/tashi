@@ -52,12 +52,6 @@ class DataInterface(object):
 	def getInstance(self, id):
 		raise NotImplementedError
 	
-	def getMachineTypes(self):
-		raise NotImplementedError
-	
-	def getMachineType(self, id):
-		raise NotImplementedError
-	
 	def getNetworks(self):
 		raise NotImplementedError
 	

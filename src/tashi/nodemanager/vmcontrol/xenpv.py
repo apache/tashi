@@ -25,7 +25,7 @@ import logging
 
 from vmcontrolinterface import VmControlInterface
 from tashi.services.ttypes import Errors, InstanceState, TashiException
-from tashi.services.ttypes import Instance, MachineType, Host
+from tashi.services.ttypes import Instance, Host
 from tashi import boolean, convertExceptions, ConnectionManager
 from tashi.util import isolatedRPC
 
@@ -87,9 +87,8 @@ def listVms(prefix='tashi'):
 		instance.state = InstanceState.Running
 		if(vminfo['state'][2] !='-'):
 			instance.state = InstanceState.Paused
-		instance.typeObj = MachineType()
-		instance.typeObj.memory = int(vminfo['memory'])
-		instance.typeObj.cores = int(vminfo['cores'])
+		instance.memory = int(vminfo['memory'])
+		instance.cores = int(vminfo['cores'])
 		instance.disks = []
 
 		r[instance.vmId] = instance
@@ -213,8 +212,8 @@ extra='xencons=tty'
 		fn = self.createXenConfig(name, 
 					  instance.disks[0].local, 
 					  instance.nics[0].mac, 
-					  instance.typeObj.memory,
-					  instance.typeObj.cores)
+					  instance.memory,
+					  instance.cores)
 		cmd = "xm create %s"%fn
 		r = os.system(cmd)
 #		self.deleteXenConfig(name)

@@ -379,8 +379,8 @@ class Qemu(VmControlInterface):
 			raise NotImplementedError
 		image = instance.disks[0].uri
 		macAddr = instance.nics[0].mac
-		memory = instance.typeObj.memory
-		cores = instance.typeObj.cores
+		memory = instance.memory
+		cores = instance.cores
 		if (instance.disks[0].persistent):
 			diskModel = "persistent"
 		else:
@@ -395,11 +395,10 @@ class Qemu(VmControlInterface):
 		instance = self.anonClass()
 		instance.disks = [self.anonClass()]
 		instance.nics = [self.anonClass()]
-		instance.typeObj = self.anonClass()
 		instance.disks[0].uri = image
 		instance.nics[0].mac = macAddr
-		instance.typeObj.memory = memory
-		instance.typeObj.cores = cores
+		instance.memory = memory
+		instance.cores = cores
 		instance.disks[0].persistent = (diskModel == "persistent")
 		instance.id = -1
 		instance.hints = opts

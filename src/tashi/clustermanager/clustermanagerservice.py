@@ -51,6 +51,9 @@ class ClusterManagerService(object):
 		self.expireHostTime = float(self.config.get('ClusterManagerService', 'expireHostTime'))
 		self.allowDecayed = float(self.config.get('ClusterManagerService', 'allowDecayed'))
 		self.allowMismatchedVersions = boolean(self.config.get('ClusterManagerService', 'allowMismatchedVersions'))
+		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
+		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
+		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
 		now = time.time()
 		for instance in self.data.getInstances().itervalues():
 			instanceId = instance.id
@@ -153,13 +156,33 @@ class ClusterManagerService(object):
 				self.log.exception('Exception in monitorHosts')
 			time.sleep(sleepFor)
 	
+	def normalize(self, instance):
+		instance.vmId = None
+		instance.hostId = None
+		instance.decayed = False
+		instance.state = InstanceState.Pending
+		# At some point, check userId
+		if (not self.allowDuplicateNames):
+			for i in self.data.getInstances().itervalues():
+				if (i.name == instance.name):
+					raise TashiException(d={'errno':Errors.InvalidInstance,'msg':"The name %s is already in use" % (instance.name)})
+		if (instance.cores < 1):
+			raise TashiException(d={'errno':Errors.InvalidInstance,'msg':"Number of cores must be >= 1"})
+		if (instance.cores > self.maxCores):
+			raise TashiException(d={'errno':Errors.InvalidInstance,'msg':"Number of cores must be <= %d" % (self.maxCores)})
+		if (instance.memory < 1):
+			raise TashiException(d={'errno':Errors.InvalidInstance,'msg':"Amount of memory must be >= 1"})
+		if (instance.memory > self.maxMemory):
+			raise TashiException(d={'errno':Errors.InvalidInstance,'msg':"Amount of memory must be <= %d" % (self.maxMemory)})
+		# Make sure disk spec is valid
+		# Make sure network spec is valid
+		# Ignore hints
+		return instance
+	
 	@RPC
 	def createVm(self, instance):
 		"""Function to add a VM to the list of pending VMs"""
-		instance.state = InstanceState.Pending
-		# XXX: Synchronize on MachineType
-		instance.typeObj = self.data.getMachineTypes()[instance.type]
-		instance.decayed = False
+		instance = self.normalize(instance)
 		instance = self.data.registerInstance(instance)
 		self.data.releaseInstance(instance)
 		return instance
@@ -213,8 +236,6 @@ class ClusterManagerService(object):
 	@RPC
 	def resumeVm(self, instance, source):
 		instance.state = InstanceState.Pending
-		# XXX: Synchronize on MachineType
-		instance.typeObj = self.data.getMachineTypes()[instance.type]
 		instance.decayed = False
 		instance.hints['__resume_source'] = source
 		instance = self.data.registerInstance(instance)
@@ -296,10 +317,6 @@ class ClusterManagerService(object):
 		return
 	
 	@RPC
-	def getMachineTypes(self):
-		return self.data.getMachineTypes().values()
-	
-	@RPC
 	def getHosts(self):
 		return self.data.getHosts().values()
 	
@@ -313,17 +330,7 @@ class ClusterManagerService(object):
 	
 	@RPC
 	def getInstances(self):
-		instances = self.data.getInstances().values()
-		for instance in instances:
-			if (instance.hostId):
-				instance.hostObj = self.data.getHost(instance.hostId)
-			else:
-				instance.hostObj = None
-			if (instance.userId):
-				instance.userObj = self.data.getUser(instance.userId)
-			else:
-				instance.userObj = None
-		return instances
+		return self.data.getInstances().values()
 	
 	@RPC
 	def vmmSpecificCall(self, instanceId, arg):

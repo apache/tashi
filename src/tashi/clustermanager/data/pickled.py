@@ -38,9 +38,6 @@ class Pickled(FromConfig):
 		ci = {}
 		for i in self.instances.itervalues():
 			i2 = Instance(d=i.__dict__)
-			i2.hostObj = None
-			i2.typeObj = None
-			i2.userObj = None
 			ci[i2.id] = i2
 		return ci
 	
@@ -53,19 +50,18 @@ class Pickled(FromConfig):
 	
 	def save(self):
 		file = open(self.file, "w")
-		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.machineTypes, self.networks, self.users), file)
+		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
 		file.close()
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
 			file = open(self.file, "r")
-			(hosts, instances, machineTypes, networks, users) = cPickle.load(file)
+			(hosts, instances, networks, users) = cPickle.load(file)
 			file.close()
 		else:
-			(hosts, instances, machineTypes, networks, users) = ({}, {}, {}, {}, {})
+			(hosts, instances, networks, users) = ({}, {}, {}, {})
 		self.hosts = hosts
 		self.instances = instances
-		self.machineTypes = machineTypes
 		self.networks = networks
 		self.users = users
 		for i in self.instances.itervalues():

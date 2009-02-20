@@ -25,7 +25,6 @@ class FromConfig(DataInterface):
 		DataInterface.__init__(self, config)
 		self.hosts = {}
 		self.instances = {}
-		self.machineTypes = {}
 		self.networks = {}
 		self.users = {}
 #		self.locks = {}
@@ -44,11 +43,6 @@ class FromConfig(DataInterface):
 				host._lock = threading.Lock()
 				self.lockNames[host._lock] = "h%d" % (host.id)
 				self.hosts[host.id] = host
-			if (name.startswith("machinetype")):
-				machineType = eval(value)
-				if (machineType.__class__ is not MachineType):
-					raise ValueError, "Entry %s is not a MachineType" % (name)
-				self.machineTypes[machineType.id] = machineType
 			if (name.startswith("network")):
 				network = eval(value)
 				if (network.__class__ is not Network):
@@ -150,12 +144,6 @@ class FromConfig(DataInterface):
 		if (not instance):
 			raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (id)})
 		return instance
-	
-	def getMachineTypes(self):
-		return self.machineTypes
-	
-	def getMachineType(self, id):
-		return self.machineTypes[id]
 	
 	def getNetworks(self):
 		return self.networks

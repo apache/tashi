@@ -25,7 +25,8 @@ enum Errors {
 	InstanceIdAlreadyExists = 7,
 	HostNameMismatch = 8,
 	HostNotUp = 9,
-	HostStateError = 10
+	HostStateError = 10,
+	InvalidInstance = 11
 }
 
 enum InstanceState {
@@ -79,13 +80,6 @@ struct User {
 	2:string name
 }
 
-struct MachineType {
-	1:i32 id,
-	2:string name,
-	3:i32 memory,
-	4:i32 cores
-}
-
 struct DiskConfiguration {
 	1:string uri,
 	2:bool persistent
@@ -100,17 +94,15 @@ struct Instance {
 	1:i32 id,
 	2:i32 vmId,
 	3:i32 hostId,
-	4:Host hostObj,
-	5:bool decayed,
-	6:InstanceState state,
-	7:i32 userId,
-	8:User userObj,
-	9:string name, // User specified
-	10:i32 type, // User specified
-	11:MachineType typeObj,
-	12:list<DiskConfiguration> disks, // User specified
-	13:list<NetworkConfiguration> nics // User specified
-	14:map<string, string> hints // User specified
+	4:bool decayed,
+	5:InstanceState state,
+	6:i32 userId,
+	7:string name, // User specified
+	8:i32 cores, // User specified
+	9:i32 memory, // User specified
+	10:list<DiskConfiguration> disks, // User specified
+	11:list<NetworkConfiguration> nics // User specified
+	12:map<string, string> hints // User specified
 }
 
 service clustermanagerservice {
@@ -128,7 +120,6 @@ service clustermanagerservice {
 	void pauseVm(1:i32 instanceId) throws (1:TashiException e)
 	void unpauseVm(1:i32 instanceId) throws (1:TashiException e)
 	
-	list<MachineType> getMachineTypes() throws (1:TashiException e)
 	list<Host> getHosts() throws (1:TashiException e)
 	list<Network> getNetworks() throws (1:TashiException e)
 	list<User> getUsers() throws (1:TashiException e)
