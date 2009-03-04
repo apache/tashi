@@ -55,10 +55,10 @@ rmservices:
 	if test -d src/tashi/thrift/gen-py; then echo Removing tashi.thrift.gen-py...; rm -rf src/tashi/thrift/gen-py; fi
 	if test -d src/tashi/messaging/messagingthrift; then echo Removing tashi.messaging.messagingthrift; rm -rf src/tashi/messaging/messagingthrift; fi
 
-bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py
+bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py
 bindir:
 	if test ! -d bin; then mkdir bin; fi
-rmbin: rmclustermanager rmnodemanager rmtashi-client
+rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive
 	if test -d bin; then rmdir bin; fi
 bin/getInstances: src/tashi/services
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
@@ -74,6 +74,11 @@ bin/nodemanager.py: src/tashi/nodemanager/nodemanager.py
 	(cd bin; ln -s ../src/tashi/nodemanager/nodemanager.py .)
 rmnodemanager:
 	if test -e bin/nodemanager.py; then echo Removing nodemanager symlink...; rm bin/nodemanager.py; fi
+bin/primitive.py: src/tashi/agents/primitive.py
+	@echo Symlinking in primitive...
+	(cd bin; ln -s ../src/tashi/agents/primitive.py .)
+rmprimitive:
+	if test -e bin/primitive.py; then echo Removing primitve-agent symlink...; rm bin/primitive.py; fi
 bin/tashi-client.py:
 	@echo Symlinking in tashi-client...
 	(cd bin; ln -s ../src/tashi/client/tashi-client.py .)

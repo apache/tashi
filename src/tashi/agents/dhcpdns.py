@@ -1,6 +1,4 @@
-#! /usr/bin/env python
-
-#( Licensed to the Apache Software Foundation (ASF) under one
+# Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
 # regarding copyright ownership.  The ASF licenses this file
@@ -17,35 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from socket import gethostname
+import logging
 import os
 import socket
-import sys
-import threading
-import time
+from instancehook import InstanceHook
+from tashi import boolean
 
-from tashi.services.ttypes import *
-from thrift.transport.TSocket import TServerSocket, TSocket
-from thrift.server.TServer import TThreadedServer
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
-from tashi.services import clustermanagerservice
-from tashi.util import getConfig, boolean
-
-class DhcpDnsScheduler(object):
-	def __init__(self, config, client, transport):
-		self.config = config
-		self.client = client
-		self.transport = transport
-		self.dnsKeyFile = config.get('DhcpDnsScheduler', 'dnsKeyFile')
-		self.dnsServer = config.get('DhcpDnsScheduler', 'dnsServer')
-		self.dnsDomain = config.get('DhcpDnsScheduler', 'dnsDomain')
-		self.dnsExpire = int(config.get('DhcpDnsScheduler', 'dnsExpire'))
-		self.dhcpServer = config.get('DhcpDnsScheduler', 'dhcpServer')
-		self.dhcpKeyName = config.get('DhcpDnsScheduler', 'dhcpKeyName')
-		self.dhcpSecretKey = config.get('DhcpDnsScheduler', 'dhcpSecretKey')
-		self.ipRange = config.get('DhcpDnsScheduler', 'ipRange')
-		self.reverseDns = boolean(config.get('DhcpDnsScheduler', 'reverseDns'))
+class DhcpDns(InstanceHook):
+	def __init__(self, config, client, transport, post=False):
+		InstanceHook.__init__(self, config, client, post)
+		self.dnsKeyFile = self.config.get('DhcpDns', 'dnsKeyFile')
+		self.dnsServer = self.config.get('DhcpDns', 'dnsServer')
+		self.dnsDomain = self.config.get('DhcpDns', 'dnsDomain')
+		self.dnsExpire = int(self.config.get('DhcpDns', 'dnsExpire'))
+		self.dhcpServer = self.config.get('DhcpDns', 'dhcpServer')
+		self.dhcpKeyName = self.config.get('DhcpDns', 'dhcpKeyName')
+		self.dhcpSecretKey = self.config.get('DhcpDns', 'dhcpSecretKey')
+		self.ipRange = self.config.get('DhcpDns', 'ipRange')
+		self.reverseDns = boolean(self.config.get('DhcpDns', 'reverseDns'))
+		self.log = logging.getLogger(__file__)
 		(ip, bits) = self.ipRange.split("/")
 		bits = int(bits)
 		ipNum = self.strToIp(ip)
@@ -53,18 +41,16 @@ class DhcpDnsScheduler(object):
 		self.ipMax = self.ipMin + (1<<(32-bits)) - 3
 		self.usedIPs = {}
 		self.currentIP = self.ipMin
-		if (not self.transport.isOpen()):
-			self.transport.open()
 		instances = self.client.getInstances()
 		for i in instances:
 			try:
 				ip = socket.gethostbyname(i.name)
 				ipNum = self.strToIp(ip)
+				self.log.info('Added %s->%s during reinitialization' % (i.name, ip))
 				self.usedIPs[ipNum] = ip
 			except Exception, e:
 				pass
-		os.write(1, "usedIPs: %s\n" % (str(self.usedIPs)))
-	
+		
 	def strToIp(self, s):
 		ipNum = reduce(lambda x, y: x*256+y, map(int, s.split(".")))
 		return ipNum
@@ -153,93 +139,27 @@ class DhcpDnsScheduler(object):
 		stdin.close()
 		output = stdout.read()
 		stdout.close()
+	
+	def preCreate(self, instance):
+		ip = self.allocateIP()
+		self.log.info("Adding %s:{%s->%s, %s->%s} to DHCP/DNS" % (instance.name, instance.nics[0].mac, ip, instance.name, ip))
+		try:
+			self.addDhcp(instance.name, ip, instance.nics[0].mac)
+			self.addDns(instance.name, ip)
+		except Exception, e:
+			self.log.exception("Failed to add host %s to DHCP/DNS" % (instance.name))
 
-	def start(self):
-		oldInstances = []
-		while True:
-			try:
-				if (not self.transport.isOpen()):
-					self.transport.open()
-				hosts = {}
-				load = {}
-				for h in self.client.getHosts():
-					hosts[h.id] = h
-					load[h.id] = []
-				load[None] = []
-				instances = self.client.getInstances()
-				instanceIds = [i.id for i in instances]
-				for i in oldInstances:
-					if (i.id not in instanceIds):
-						try:
-							ip = socket.gethostbyname(i.name)
-							ipNum = self.strToIp(ip)
-							del self.usedIPs[ipNum]
-						except Exception, e:
-							os.write(1, "%s\n" % (str(e)))
-							os.write(1, "Failed to remove from pool of usedIPs\n")
-						os.write(1, "usedIPs: %s\n" % (str(self.usedIPs)))
-						os.write(1, "Removing %s from DHCP/DNS\n" % (i.name))
-						self.removeDns(i.name)
-						self.removeDhcp(i.name)
-				oldInstances = instances
-				for i in instances:
-					if (i.hostId or i.state == InstanceState.Pending):
-						load[i.hostId] = load[i.hostId] + [i.id]
-				self.hosts = hosts
-				self.load = load
-				if (len(self.load.get(None, [])) > 0):
-					i = self.load[None][0]
-					min = None
-					minHost = None
-					for h in self.hosts.values():
-						if ((min is None or len(load[h.id]) < min) and h.up == True and h.state == HostState.Normal):
-							min = len(load[h.id])
-							minHost = h
-					if (minHost):
-						inst = None
-						for _inst in instances:
-							if (_inst.id == i):
-								inst = _inst
-						ip = self.allocateIP()
-						os.write(1, "Adding %s to DHCP/DNS\n" % (inst.name))
-						self.addDhcp(inst.name, ip, inst.nics[0].mac)
-						self.addDns(inst.name, ip)
-						os.write(1, "Scheduling instance %d on host %s\n" % (i, minHost.name))
-						self.client.activateVm(i, minHost)
-						continue
-				time.sleep(2)
-			except TashiException, e:
-				os.write(1, "%s\n" % (e.msg))
-				try:
-					self.transport.close()
-				except Exception, e:
-					os.write(1, "%s\n" % str(e))
-				time.sleep(2)
-			except Exception, e:
-				os.write(1, "%s\n" % (str(e)))
-				try:
-					self.transport.close()
-				except Exception, e:
-					os.write(1, "%s\n" % (str(e)))
-				time.sleep(2)
+	def postDestroy(self, instance):
+		try:
+			ip = socket.gethostbyname(instance.name)
+			ipNum = self.strToIp(ip)
+			del self.usedIPs[ipNum]
+		except Exception, e:
+			self.log.exception("Failed to remove host %s from pool of usedIPs" % (instance.name))
+		self.log.info("Removing %s from DHCP/DNS" % (instance.name))
+		try:
+			self.removeDns(instance.name)
+			self.removeDhcp(instance.name)
+		except Exception, e:
+			self.log.exception("Failed to remove host %s from DHCP/DNS" % (instance.name))
 
-def createClient(config):
-	host = config.get('Client', 'clusterManagerHost')
-	port = config.get('Client', 'clusterManagerPort')
-	timeout = float(config.get('Client', 'clusterManagerTimeout')) * 1000.0
-	socket = TSocket(host, int(port))
-	socket.setTimeout(timeout)
-	transport = TBufferedTransport(socket)
-	protocol = TBinaryProtocol(transport)
-	client = clustermanagerservice.Client(protocol)
-	transport.open()
-	return (client, transport)
-
-def main():
-	(config, configFiles) = getConfig(["Agent"])
-	(client, transport) = createClient(config)
-	agent = DhcpDnsScheduler(config, client, transport)
-	agent.start()
-
-if __name__ == "__main__":
-	main()
