@@ -41,13 +41,13 @@ import tashi.client.client
 class ClientConnection(object):
 	'''Creates an rpc proxy'''
 	def __init__(self, host, port):
-	self.host = host
-	self.port = port
-	self.transport = TBufferedTransport(TSocket(host, int(port)))
-	self.protocol = TBinaryProtocol(self.transport)
-	self.client = clustermanagerservice.Client(self.protocol)
-	self.client._transport = self.transport
-	self.client._transport.open()
+		self.host = host
+		self.port = port
+		self.transport = TBufferedTransport(TSocket(host, int(port)))
+		self.protocol = TBinaryProtocol(self.transport)
+		self.client = clustermanagerservice.Client(self.protocol)
+		self.client._transport = self.transport
+		self.client._transport.open()
 	def __del__(self):
 		self.client._transport.close()
 
