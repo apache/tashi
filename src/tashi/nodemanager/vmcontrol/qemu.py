@@ -339,7 +339,7 @@ class Qemu(VmControlInterface):
 		while not ptyFile:
 			l = child.stderr.readline()
 			if (l == ""):
-				os.waitpid(pid, 0)
+				os.waitpid(child.pid, 0)
 				raise Exception, "Failed to start VM -- ptyFile not found"
 			if (l.find("char device redirected to ") != -1):
 				ptyFile=l[26:].strip()
