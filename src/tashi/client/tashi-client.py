@@ -120,13 +120,16 @@ def getVmLayout():
 	hosts = {}
 	for h in _hosts:
 		h.instances = []
+		h.instanceIds = []
 		h.usedMemory = 0
 		h.usedCores = 0
 		hosts[h.id] = h
 	for i in _instances:
-		hosts[i.hostId].instances.append(i.id)
-		hosts[i.hostId].usedMemory += i.memory
-		hosts[i.hostId].usedCores += i.cores
+		if (i.hostId in hosts):
+			hosts[i.hostId].instanceIds.append(i.id)
+			hosts[i.hostId].instances.append(i.name)
+			hosts[i.hostId].usedMemory += i.memory
+			hosts[i.hostId].usedCores += i.cores
 	return hosts.values()
 
 def createMany(instance, count):
