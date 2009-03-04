@@ -27,6 +27,11 @@ import time
 import traceback
 import types
 
+from thrift.transport.TSocket import TServerSocket, TSocket
+from thrift.server.TServer import TThreadedServer
+from thrift.protocol.TBinaryProtocol import TBinaryProtocol
+from thrift.transport.TTransport import TBufferedTransport
+from tashi.services import clustermanagerservice
 from tashi.services.ttypes import TashiException, Errors, InstanceState, HostState
 
 def broken(oldFunc):
@@ -249,6 +254,22 @@ def stringPartition(s, field):
 	sep = s[index:index+len(field)]
 	r = s[index+len(field):]
 	return (l, sep, r)
+
+def createClient(config):
+	cfgHost = config.get('Client', 'clusterManagerHost')
+	cfgPort = config.get('Client', 'clusterManagerPort')
+	cfgTimeout = config.get('Client', 'clusterManagerTimeout')
+	host = os.getenv('TASHI_CM_HOST', cfgHost)
+	port = os.getenv('TASHI_CM_PORT', cfgPort)
+	timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
+	socket = TSocket(host, int(port))
+	socket.setTimeout(timeout)
+	transport = TBufferedTransport(socket)
+	protocol = TBinaryProtocol(transport)
+	client = clustermanagerservice.Client(protocol)
+	transport.open()
+	client._transport = transport
+	return (client, transport)
 
 def enumToStringDict(cls):
 	d = {}

@@ -27,7 +27,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.transport.TSocket import TSocket
 
 from tashi.services import clustermanagerservice
-from tashi import vmStates, hostStates, boolean, getConfig, stringPartition
+from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
 
 users = {}
 
@@ -375,20 +375,8 @@ def main():
 	if (len(sys.argv) < 2):
 		usage()
 	function = sys.argv[1]
-	(config,configFiles) = getConfig(["Client"])
-	cfgHost = config.get('Client', 'clusterManagerHost')
-	cfgPort = config.get('Client', 'clusterManagerPort')
-	cfgTimeout = float(config.get('Client', 'clusterManagerTimeout'))
-	host = os.getenv('TASHI_CM_HOST', cfgHost)
-	port = os.getenv('TASHI_CM_PORT', cfgPort)
-	timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
-	socket = TSocket(host, int(port))
-	socket.setTimeout(timeout)
-	transport = TBufferedTransport(socket)
-	protocol = TBinaryProtocol(transport)
-	client = clustermanagerservice.Client(protocol)
-	client._transport = transport
-	client._transport.open()
+	(config, configFiles) = getConfig(["Client"])
+	(client, transport) = createClient(config)
 	try:
 		try:
 			if (function not in argLists):
