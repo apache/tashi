@@ -30,12 +30,19 @@ from tashi.services import clustermanagerservice
 from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
 
 users = {}
+networks = {}
 
 def fetchUsers():
 	if (users == {}):
 		_users = client.getUsers()
 		for user in _users:
 			users[user.id] = user
+
+def fetchNetworks():
+	if (networks == {}):
+		_networks = client.getNetworks()
+		for network in _networks:
+			networks[network.id] = network
 
 def getUser():
 	fetchUsers()
@@ -70,7 +77,12 @@ def randomMac():
 	return ("52:54:00:%2.2x:%2.2x:%2.2x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
 
 def randomNetwork():
-	return [NetworkConfiguration(d={'mac':randomMac(), 'network':1})]
+	fetchNetworks()
+	networkId = 1
+	for network in networks:
+		if (networks[network].name == "default"):
+			networkId = network
+	return [NetworkConfiguration(d={'mac':randomMac(), 'network':networkId})]
 
 def parseDisks(arg):
 	try:
@@ -96,6 +108,8 @@ def parseNics(arg):
 			strNic = strNic.strip()
 			(l, s, r) = stringPartition(strNic, ":")
 			l = int(l)
+			if (r==''):
+				r = randomMac()
 			nic = NetworkConfiguration(d={'mac':r, 'network':l})
 			nics.append(nic)
 		return nics
