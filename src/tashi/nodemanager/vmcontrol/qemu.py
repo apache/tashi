@@ -259,15 +259,11 @@ class Qemu(VmControlInterface):
 	def loadChildInfo(self, vmId):
 		child = self.anonClass(pid=vmId)
 		info = open(self.INFO_DIR + "/%d"%(child.pid), "r")
-		(image, macAddr, memory, cores, opts, pid, ptyFile) = cPickle.load(info)
+		(instance, pid, ptyFile) = cPickle.load(info)
 		info.close()
 		if (pid != child.pid):
 			raise Exception, "PID mismatch"
-		child.image = image
-		child.macAddr = macAddr
-		child.memory = memory
-		child.cores = cores
-		child.opts = opts
+		child.instance = instance
 		child.pid = pid
 		child.ptyFile = ptyFile
 		if ('monitorHistory' not in child.__dict__):
@@ -284,7 +280,7 @@ class Qemu(VmControlInterface):
 	
 	def saveChildInfo(self, child):
 		info = open(self.INFO_DIR + "/%d"%(child.pid), "w")
-		cPickle.dump((child.image, child.macAddr, child.memory, child.cores, child.opts, child.pid, child.ptyFile), info)
+		cPickle.dump((child.instance, child.pid, child.ptyFile), info)
 		info.close()
 
 	def startVm(self, instance, source):
@@ -326,7 +322,7 @@ class Qemu(VmControlInterface):
 			os.execl(self.QEMU_BIN, *cmd)
 			sys.exit(-1)
 		os.close(pipe_w)
-		child = self.anonClass(pid=pid, image=image, macAddr=macAddr, memory=memory, cores=cores, opts=opts, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = False, OSchild = True)
+		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = False, OSchild = True)
 		child.ptyFile = None
 		child.vncPort = -1
 		self.saveChildInfo(child)
@@ -372,38 +368,6 @@ class Qemu(VmControlInterface):
 		self.enterCommand(child, "quit", expectPrompt=False)
 		return vmId
 	
-	def instanceToOld(self, instance):
-		if (len(instance.disks) != 1):
-			raise NotImplementedError
-		if (len(instance.nics) != 1):
-			raise NotImplementedError
-		image = instance.disks[0].uri
-		macAddr = instance.nics[0].mac
-		memory = instance.memory
-		cores = instance.cores
-		if (instance.disks[0].persistent):
-			diskModel = "persistent"
-		else:
-			diskModel = "transient"
-		instanceId = instance.id
-		opts = instance.hints
-#		if (diskModel != "transient"):
-#			raise NotImplementedError
-		return (image, macAddr, memory, cores, diskModel, instanceId, opts)
-	
-	def oldToInstance(self, image, macAddr, memory, cores, diskModel, opts):
-		instance = self.anonClass()
-		instance.disks = [self.anonClass()]
-		instance.nics = [self.anonClass()]
-		instance.disks[0].uri = image
-		instance.nics[0].mac = macAddr
-		instance.memory = memory
-		instance.cores = cores
-		instance.disks[0].persistent = (diskModel == "persistent")
-		instance.id = -1
-		instance.hints = opts
-		return instance
-	
 	def instantiateVm(self, instance):
 		(vmId, cmd) = self.startVm(instance, None)
 		child = self.getChildFromPid(vmId)
@@ -415,7 +379,7 @@ class Qemu(VmControlInterface):
 	def suspendVm(self, vmId, target, suspendCookie):
 		child = self.getChildFromPid(vmId)
 		info = self.dfs.open("%s.info" % (target), "w")
-		cPickle.dump((child.image, child.macAddr, child.memory, child.cores, child.opts, suspendCookie), info)
+		cPickle.dump((child.instance, suspendCookie), info)
 		info.close()
 		# XXX: Use fifo to improve performance
 		vmId = self.stopVm(vmId, "\"exec:gzip -c > /tmp/%s.dat\"" % (target), True)
@@ -426,12 +390,11 @@ class Qemu(VmControlInterface):
 		# XXX: Read in and unzip directly (or use fifo)
 		self.dfs.copyFrom("%s.dat" % (source), "/tmp/%s.dat" % (source))
 		info = self.dfs.open("%s.info" % (source), "r")
-		(image, macAddr, memory, cores, opts, suspendCookie) = cPickle.load(info)
+		(instance, suspendCookie) = cPickle.load(info)
 		info.close()
 		tmpFile = self.genTmpFilename()
 		os.mkfifo(tmpFile)
 		zcat = subprocess.Popen(args=["/bin/bash", "-c", "zcat /tmp/%s.dat > %s" % (source, tmpFile)], executable="/bin/bash", close_fds=True)
-		instance = self.oldToInstance(image, macAddr, memory, cores, "transient", opts)
 		(vmId, cmd) = self.startVm(instance, "file://%s" % tmpFile)
 		zcat.wait()
 		os.unlink(tmpFile)
