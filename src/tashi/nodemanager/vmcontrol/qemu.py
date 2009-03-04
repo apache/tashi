@@ -28,7 +28,7 @@ import sys
 import time
 
 from tashi.services.ttypes import *
-from tashi.util import broken, logged
+from tashi.util import broken, logged, scrubString
 from vmcontrolinterface import VmControlInterface
 
 log = logging.getLogger(__file__)
@@ -285,22 +285,28 @@ class Qemu(VmControlInterface):
 
 	def startVm(self, instance, source):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
-		global lastCmd
-		(image, macAddr, memory, cores, diskModel, instanceId, opts) = self.instanceToOld(instance)
+		clockString = instance.hints.get("clock", "dynticks")
+		diskInterface = instance.hints.get("diskInterface", "ide")
+		diskString = ""
+		for index in range(0, len(instance.disks)):
+			disk = instance.disks[index]
+			uri = scrubString(disk.uri)
+			imageLocal = self.dfs.getLocalHandle("images/" + uri)
+			if (disk.persistent):
+				snapshot = "off"
+			else:
+				snapshot = "on"
+			diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
+		nicModel = instance.hints.get("nicModel", "e1000")
+		nicString = ""
+		for nic in instance.nics:
+			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, nic.network, nic.network)
 		if (not source):
 			sourceString = ""
 		else:
 			sourceString = "-incoming %s" % (source)
-		if (diskModel == "persistent"):
-			snapshotString = ""
-		else:
-			snapshotString = "-snapshot"
-		modelString = opts.get("nicModel", "e1000")
-		clockString = opts.get("clock", "dynticks")
-		imageLocal = self.dfs.getLocalHandle("images/" + image)
-		cmd = "%s -clock %s %s -hda %s -net nic,macaddr=%s,model=%s -net tap -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, clockString, snapshotString, imageLocal, macAddr, modelString, memory, cores, sourceString)
+		cmd = "%s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, clockString, diskString, nicString, instance.memory, instance.cores, sourceString)
 		log.info("QEMU command: %s" % (cmd))
-		lastCmd = cmd
 		cmd = cmd.split()
 		(pipe_r, pipe_w) = os.pipe()
 		pid = os.fork()

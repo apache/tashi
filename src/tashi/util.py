@@ -255,6 +255,13 @@ def stringPartition(s, field):
 	r = s[index+len(field):]
 	return (l, sep, r)
 
+def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_."):
+	ns = ""
+	for c in s:
+		if (c in allowed):
+			ns = ns + c
+	return ns
+
 def createClient(config):
 	cfgHost = config.get('Client', 'clusterManagerHost')
 	cfgPort = config.get('Client', 'clusterManagerPort')
