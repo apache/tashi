@@ -90,6 +90,7 @@ class Primitive(object):
 									hook.preCreate(inst)
 								self.log.info("Scheduling instance %s on host %s" % (inst.name, minHost.name))	
 								self.client.activateVm(i, minHost)
+								load[minHost.id] = load[minHost.id] + [i]
 							else:
 								self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
 						except Exception, e:
