@@ -196,7 +196,7 @@ class ClusterManagerService(object):
 		try:
 			self.proxy[hostname].shutdownVm(instance.vmId)
 		except Exception:
-			self.log.exception('shutdownVm failed for host %s vmId %d' % (instance.hostname, instance.vmId))
+			self.log.exception('shutdownVm failed for host %s vmId %d' % (instance.name, instance.vmId))
 			raise
 		return
 	
