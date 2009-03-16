@@ -513,6 +513,12 @@ class Qemu(VmControlInterface):
 				child.vncPort = -1
 				self.saveChildInfo(child)
 			return "VNC halted"
+		elif (arg.startswith("changecdrom:")):
+			child = self.getChildFromPid(vmId)
+			iso = scrubString(arg[12:])
+			imageLocal = self.dfs.getLocalHandle("images/" + iso)
+			self.enterCommand(child, "change ide1-cd0 %s" % (imageLocal))
+			return "Changed ide1-cd0 to %s" % (iso)
 		elif (arg == "startconsole"):
 			child = self.getChildFromPid(vmId)
 			hostname = socket.gethostname()
