@@ -26,7 +26,7 @@ import time
 import logging.config
 
 from tashi.services.ttypes import *
-from tashi.util import getConfig, createClient, instantiateImplementation
+from tashi.util import getConfig, createClient, instantiateImplementation, boolean
 
 class Primitive(object):
 	def __init__(self, config, client, transport):
@@ -78,13 +78,27 @@ class Primitive(object):
 						try:
 							min = None
 							minHost = None
-							for h in hosts.values():
-								if ((min is None or len(load[h.id]) < min) and h.up == True and h.state == HostState.Normal):
-									memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
-									coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
-									if (memUsage <= h.memory and coreUsage <= h.cores):
-										min = len(load[h.id])
-										minHost = h
+							targetHost = inst.hints.get("targetHost", None)
+							try:
+								allowElsewhere = boolean(inst.hints.get("allowElsewhere", "False"))
+							except Exception, e:
+								allowElsewhere = False
+							if (targetHost != None):
+								for h in hosts.values():
+									if ((str(h.id) == targetHost or h.name == targetHost) and h.up == True and h.state == HostState.Normal):
+										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+										if (memUsage <= h.memory and coreUsage <= h.cores):
+											min = len(load[h.id])
+											minHost = h
+							if ((targetHost == None or allowElsewhere) and minHost == None):
+								for h in hosts.values():
+									if ((min is None or len(load[h.id]) < min) and h.up == True and h.state == HostState.Normal):
+										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+										if (memUsage <= h.memory and coreUsage <= h.cores):
+											min = len(load[h.id])
+											minHost = h
 							if (minHost):
 								for hook in self.hooks:
 									hook.preCreate(inst)
