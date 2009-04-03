@@ -42,7 +42,10 @@ class Primitive(object):
 			(name, value) = item
 			name = name.lower()
 			if (name.startswith("hook")):
-				self.hooks.append(instantiateImplementation(value, config, client, transport, False))
+				try:
+					self.hooks.append(instantiateImplementation(value, config, client, transport, False))
+				except:
+					self.log.exception("Failed to load hook %s" % (value))
 	
 	def start(self):
 		oldInstances = {}
