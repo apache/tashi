@@ -417,7 +417,7 @@ class Qemu(VmControlInterface):
 			port = int(random.random()*1000+19000)
 		self.usedPorts.append(port)
 		self.usedPortsLock.release()
-		(vmId, cmd) = self.startVm(instance, "tcp://0.0.0.0:%d" % (port))
+		(vmId, cmd) = self.startVm(instance, "tcp:0.0.0.0:%d" % (port))
 		transportCookie = cPickle.dumps((port, vmId, socket.gethostname()))
 		child = self.getChildFromPid(vmId)
 		child.cmd = cmd
@@ -440,7 +440,7 @@ class Qemu(VmControlInterface):
 			(port, _vmId, _hostname) = cPickle.loads(transportCookie)
 			child = self.getChildFromPid(vmId)
 			child.migratingOut = True
-			res = self.stopVm(vmId, "tcp://%s:%d" % (target, port), False)
+			res = self.stopVm(vmId, "tcp:%s:%d" % (target, port), False)
 			# XXX: Some sort of feedback would be nice
 			# XXX: Should we block?
 			self.waitForExit(vmId)
