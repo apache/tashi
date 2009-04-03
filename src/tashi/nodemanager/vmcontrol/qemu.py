@@ -28,7 +28,7 @@ import sys
 import time
 
 from tashi.services.ttypes import *
-from tashi.util import broken, logged, scrubString
+from tashi.util import broken, logged, scrubString, boolean
 from vmcontrolinterface import VmControlInterface
 
 log = logging.getLogger(__file__)
@@ -90,6 +90,7 @@ class Qemu(VmControlInterface):
 		self.migrationRetries = int(self.config.get("Qemu", "migrationRetries"))
 		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout"))
 		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout"))
+		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument"))
 		self.controlledVMs = {}
 		self.usedPorts = []
 		self.usedPortsLock = threading.Lock()
@@ -294,9 +295,14 @@ class Qemu(VmControlInterface):
 			imageLocal = self.dfs.getLocalHandle("images/" + uri)
 			if (disk.persistent):
 				snapshot = "off"
+				migrate = "off"
 			else:
 				snapshot = "on"
-			diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
+				migrate = "on"
+			if (self.useMigrateArgument):
+				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,migrate=%s,media=disk " % (imageLocal, diskInterface, index, snapshot, migrate)
+			else:
+				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
 		for nic in instance.nics:
