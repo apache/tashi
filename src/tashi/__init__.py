@@ -18,3 +18,4 @@
 from util import *
 from connectionmanager import ConnectionManager
 from version import version
+from ganglialoghandler import GangliaLogHandler
