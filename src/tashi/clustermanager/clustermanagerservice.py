@@ -281,7 +281,6 @@ class ClusterManagerService(object):
 		except Exception, e:
 			self.log.exception('receiveVm failed')
 			raise
-		#print 'VM %i Migrated!  New vmId=%i, new hostId=%i' % (instance.id, vmId, targetHostId)
 		return
 	
 	@RPC

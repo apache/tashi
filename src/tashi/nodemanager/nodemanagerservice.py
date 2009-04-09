@@ -58,7 +58,7 @@ class NodeManagerService(object):
 			if (vmId not in vmList):
 				self.log.warning('vmcontrol backend does not report %d' % (vmId))
 				self.vmStateChange(vmId, None, InstanceState.Exited)
-		threading.Thread(target=self.junk).start()
+		threading.Thread(target=self.backupVmInfoAndFlushNotifyCM).start()
 		threading.Thread(target=self.registerWithClusterManager).start()
 	
 	def loadVmInfo(self):
@@ -80,7 +80,6 @@ class NodeManagerService(object):
 		except Exception, e:
 			self.log.exception('Failed to save VM info to %s' % (self.infoFile))
 	
-	#@logged
 	def vmStateChange(self, vmId, old, cur):
 		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
 		instance = self.getInstance(vmId)
@@ -100,7 +99,6 @@ class NodeManagerService(object):
 			success()
 		return True
 	
-	#@timed	
 	def getHostInfo(self):
 		host = Host()
 		host.id = self.id
@@ -123,7 +121,7 @@ class NodeManagerService(object):
 		host.version = version
 		return host
 	
-	def junk(self):
+	def backupVmInfoAndFlushNotifyCM(self):
 		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
 		while True:
 			start = time.time()
@@ -157,21 +155,14 @@ class NodeManagerService(object):
 	
 	def registerWithClusterManager(self):
 		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
-		#@timed
-		def body():
-			try:
-				#self.log.info('registering with CM at %f' % (time.time()))
-				host = self.getHostInfo()
-				instances = self.instances.values()
-				#@timed
-				def RPC(self):
-					self.id = cm.registerNodeManager(host, instances)
-				RPC(self)
-			except Exception, e:
-				self.log.exception('Failed to register with the CM')
 		while True:
 			start = time.time()
-			body()
+			try:
+				host = self.getHostInfo()
+				instances = self.instances.values()
+				self.id = cm.registerNodeManager(host, instances)
+			except Exception, e:
+				self.log.exception('Failed to register with the CM')
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):
 				time.sleep(toSleep)

@@ -242,7 +242,7 @@ def debugConsole(globalDict):
 				try:
 					exec(input) in globalDict
 				except Exception, e:
-					print e
+					sys.stdout.write(str(e) + "\n")
 	if (os.getenv("DEBUG", "0") == "1"):
 		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
 
