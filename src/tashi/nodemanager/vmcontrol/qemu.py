@@ -137,7 +137,10 @@ class Qemu(VmControlInterface):
 					self.vncPortLock.release()
 				log.info("Removing vmId %d" % (vmId))
 				if (child.OSchild):
-					os.waitpid(vmId, 0)
+					try:
+						os.waitpid(vmId, 0)
+					except:
+						log.exception("waitpid failed")
 				if (child.errorBit):
 					if (child.OSchild):
 						f = open("/tmp/%d.err" % (vmId), "w")
@@ -180,8 +183,11 @@ class Qemu(VmControlInterface):
 	def pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
 		while True:
-			self.matchSystemPids(self.controlledVMs)
-			time.sleep(self.POLL_DELAY)
+			try:
+				time.sleep(self.POLL_DELAY)
+				self.matchSystemPids(self.controlledVMs)
+			except:
+				log.exception("Exception in poolVMsLoop")
 	
 	def waitForExit(self, vmId):
 		"""This waits until an element is removed from the dictionary -- the polling thread must detect an exit"""
@@ -347,7 +353,10 @@ class Qemu(VmControlInterface):
 		while not ptyFile:
 			l = child.stderr.readline()
 			if (l == ""):
-				os.waitpid(child.pid, 0)
+				try:
+					os.waitpid(child.pid, 0)
+				except:
+					log.exception("waitpid failed")
 				raise Exception, "Failed to start VM -- ptyFile not found"
 			if (l.find("char device redirected to ") != -1):
 				ptyFile=l[26:].strip()
