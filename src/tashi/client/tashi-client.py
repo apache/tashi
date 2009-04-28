@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-import os
+import os.path
 import random
 import sys
 import types
@@ -273,7 +273,7 @@ def usage(func = None):
 			print "Unknown function %s" % (func)
 			print
 		functions = argLists
-		print "%s is the client program for Tashi, a system for cloud-computing on BigData." % (sys.argv[0])
+		print "%s is the client program for Tashi, a system for cloud-computing on BigData." % (os.path.basename(sys.argv[0]))
 		print "Visit http://incubator.apache.org/tashi/ for more information."
 		print
 	else:
