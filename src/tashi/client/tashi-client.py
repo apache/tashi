@@ -23,7 +23,7 @@ import sys
 import types
 from tashi.services.ttypes import *
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
+from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.transport.TSocket import TSocket
 
 from tashi.services import clustermanagerservice
@@ -222,6 +222,27 @@ convertArgs = {
 'vmmSpecificCall': '[instance, arg]',
 }
 
+# Descriptions
+description = {
+'createVm': 'Creates a new VM with a set of properties specified on the command line',
+'createMany': 'Utility function that creates many VMs with the same set of parameters',
+'shutdownVm': 'Attempts to shutdown a VM nicely',
+'destroyVm': 'Immediately destroys a VM -- it is the same as unplugging a physical machine and should be used for non-persistent VMs or when all else fails',
+'destroyMany': 'Destroys a group of VMs created with createMany',
+'suspendVm': 'Suspends a running VM to disk',
+'resumeVm': 'Resumes a suspended VM from disk',
+'migrateVm': 'Live-migrates a VM to a different host',
+'pauseVm': 'Pauses a running VM',
+'unpauseVm': 'Unpauses a paused VM',
+'getHosts': 'Gets a list of hosts running Node Managers',
+'getUsers': 'Gets a list of users',
+'getNetworks': 'Gets a list of available networks for VMs to be placed on',
+'getInstances': 'Gets a list of all VMs in Tashi',
+'getMyInstances': 'Utility function that only lists VMs owned by the current user',
+'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
+'vmmSpecificCall': 'Direct access to VMM-specific functionality'
+}
+
 # Example use strings
 examples = {
 'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics 2:52:54:00:00:12:34,1:52:54:00:00:56:78 --hints enableDisplay=True'],
@@ -245,13 +266,17 @@ examples = {
 
 show_hide = []
 
-def usage(f = None):
+def usage(func = None):
 	"""Print program usage"""
-	print "Usage:"
-	if (f == None):
+	if (func == None):
 		functions = argLists
 	else:
-		functions = {f: argLists[f]}
+		if (func not in argLists):
+			print "Unknown function %s" % (func)
+			functions = argLists
+		else:
+			functions = {func: argLists[func]}
+	print "Usage:"
 	for f in functions:
 		args = argLists[f]
 		line = "\t" + f
@@ -261,13 +286,19 @@ def usage(f = None):
 			else:
 				line += " [--%s <value>]" % (arg[0])
 		print line
-		if ("--examples" in sys.argv):
+		if ("--help" in sys.argv and f in description):
 			print
+			print "\t\t" + description[f]
+			print
+		if ("--examples" in sys.argv):
+			if ("--help" not in sys.argv or f not in description):
+				print
 			for example in examples.get(f, []):
 				print "\t\t" + f + " " + example
 			print
 	print "Additionally, all functions accept --show-<name> and --hide-<name>, which show and hide columns during table generation"
-	print "Use \"--examples\" to see examples of all the functions"
+	if ("--examples" not in sys.argv):
+		print "Use \"--examples\" to see examples"
 	sys.exit(-1)
 
 def transformState(obj):
@@ -381,6 +412,18 @@ def pprint(obj, depth = 0, key = None):
 	else:
 		print (" " * (depth * INDENT)) + keyString + str(valueManip(obj))
 
+def matchFunction(func):
+	if (func == "--help" or func == "--examples"):
+		usage()
+	lowerFunc = func.lower()
+	lowerFuncsList = map(lambda x: (x.lower(), x), argLists.keys())
+	lowerFuncs = {}
+	for (l, f) in lowerFuncsList:
+		lowerFuncs[l] = f
+	if (lowerFunc in lowerFuncs):
+		return lowerFuncs[lowerFunc]
+	usage(func)
+
 def main():
 	"""Main function for the client program"""
 	global INDENT, exitCode, client
@@ -388,60 +431,57 @@ def main():
 	INDENT = (os.getenv("INDENT", 4))
 	if (len(sys.argv) < 2):
 		usage()
-	function = sys.argv[1]
+	function = matchFunction(sys.argv[1])
 	(config, configFiles) = getConfig(["Client"])
-	(client, transport) = createClient(config)
-	try:
-		try:
-			if (function not in argLists):
-				usage()
-			possibleArgs = argLists[function]
-			args = sys.argv[2:]
-			vals = {}
-			for arg in args:
-				if (arg == "--help" or arg == "--examples"):
-					usage(function)
-			for parg in possibleArgs:
-				(parg, conv, default, required) = parg
-				val = None
-				for i in range(0, len(args)):
-					arg = args[i]
-					if (arg.startswith("--") and arg[2:] == parg):
-						val = conv(args[i+1])
-				if (val == None):
-					val = default()
-				vals[parg] = val
-			for arg in args:
-				if (arg.startswith("--hide-")):
-					show_hide.append((False, arg[7:]))
-				if (arg.startswith("--show-")):
-					show_hide.append((True, arg[7:]))
-			f = getattr(client, function, None)
-			if (f is None):
-				f = extraViews[function][0]
-			if (function in convertArgs):
-				fargs = eval(convertArgs[function], globals(), vals)
-			else:
-				fargs = []
-			res = f(*fargs)
-			if (res != None):
-				keys = extraViews.get(function, (None, None))[1]
-				try:
-					if (type(res) == types.ListType):
-						makeTable(res, keys)
-					else:
-						pprint(res)
-				except Exception, e:
-					print e
-		except TashiException, e:
-			print "TashiException:"
-			print e.msg
-			exitCode = e.errno
-		except Exception, e:
-			print e
+	possibleArgs = argLists[function]
+	args = sys.argv[2:]
+	for arg in args:
+		if (arg == "--help" or arg == "--examples"):
 			usage(function)
-	finally:
-		client._transport.close()
+	try:
+		vals = {}
+		(client, transport) = createClient(config)
+		for parg in possibleArgs:
+			(parg, conv, default, required) = parg
+			val = None
+			for i in range(0, len(args)):
+				arg = args[i]
+				if (arg.startswith("--") and arg[2:] == parg):
+					val = conv(args[i+1])
+			if (val == None):
+				val = default()
+			vals[parg] = val
+		for arg in args:
+			if (arg.startswith("--hide-")):
+				show_hide.append((False, arg[7:]))
+			if (arg.startswith("--show-")):
+				show_hide.append((True, arg[7:]))
+		f = getattr(client, function, None)
+		if (f is None):
+			f = extraViews[function][0]
+		if (function in convertArgs):
+			fargs = eval(convertArgs[function], globals(), vals)
+		else:
+			fargs = []
+		res = f(*fargs)
+		if (res != None):
+			keys = extraViews.get(function, (None, None))[1]
+			try:
+				if (type(res) == types.ListType):
+					makeTable(res, keys)
+				else:
+					pprint(res)
+			except Exception, e:
+				print e
+	except TashiException, e:
+		print "TashiException:"
+		print e.msg
+		exitCode = e.errno
+	except TTransportException, e:
+		print e
+	except Exception, e:
+		print e
+		usage(function)
 	sys.exit(exitCode)
 
 if __name__ == "__main__":
