@@ -268,14 +268,16 @@ show_hide = []
 
 def usage(func = None):
 	"""Print program usage"""
-	if (func == None):
-		functions = argLists
-	else:
-		if (func not in argLists):
+	if (func == None or func not in argLists):
+		if (func != None):
 			print "Unknown function %s" % (func)
-			functions = argLists
-		else:
-			functions = {func: argLists[func]}
+			print
+		functions = argLists
+		print "%s is the client program for Tashi, a system for cloud-computing on BigData." % (sys.argv[0])
+		print "Visit http://incubator.apache.org/tashi/ for more information."
+		print
+	else:
+		functions = {func: argLists[func]}
 	print "Usage:"
 	for f in functions:
 		args = argLists[f]
@@ -296,6 +298,8 @@ def usage(func = None):
 			for example in examples.get(f, []):
 				print "\t\t" + f + " " + example
 			print
+	if ("--help" not in sys.argv and "--examples" not in sys.argv):
+		print
 	print "Additionally, all functions accept --show-<name> and --hide-<name>, which show and hide columns during table generation"
 	if ("--examples" not in sys.argv):
 		print "Use \"--examples\" to see examples"
