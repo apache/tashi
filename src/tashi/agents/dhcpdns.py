@@ -31,16 +31,34 @@ class DhcpDns(InstanceHook):
 		self.dhcpServer = self.config.get('DhcpDns', 'dhcpServer')
 		self.dhcpKeyName = self.config.get('DhcpDns', 'dhcpKeyName')
 		self.dhcpSecretKey = self.config.get('DhcpDns', 'dhcpSecretKey')
-		self.ipRange = self.config.get('DhcpDns', 'ipRange')
+		items = self.config.items('DhcpDns')
+		items.sort()
+		self.ipRange = {}
+		for item in items:
+			(name, value) = item
+			name = name.lower()
+			if (name.startswith('iprange')):
+				network = name[7:]
+				try:
+					network = int(network)
+				except:
+					continue
+				self.ipRange[network] = value	
 		self.reverseDns = boolean(self.config.get('DhcpDns', 'reverseDns'))
 		self.log = logging.getLogger(__file__)
-		(ip, bits) = self.ipRange.split("/")
-		bits = int(bits)
-		ipNum = self.strToIp(ip)
-		self.ipMin = ((ipNum>>(32-bits))<<(32-bits)) + 2
-		self.ipMax = self.ipMin + (1<<(32-bits)) - 3
+		self.ipMin = {}
+		self.ipMax = {}
+		self.currentIP = {}
 		self.usedIPs = {}
-		self.currentIP = self.ipMin
+		for k in self.ipRange:
+			ipRange = self.ipRange[k]
+			(min, max) = ipRange.split("-")	
+			min = min.strip()
+			max = max.strip()
+			ipNum = self.strToIp(min)
+			self.ipMin[k] = self.strToIp(min)
+			self.ipMax[k] = self.strToIp(max)
+			self.currentIP[k] = self.ipMin[k]
 		instances = self.client.getInstances()
 		for i in instances:
 			try:
@@ -58,15 +76,15 @@ class DhcpDns(InstanceHook):
 	def ipToStr(self, ip):
 		return "%d.%d.%d.%d" % (ip>>24, (ip>>16)%256, (ip>>8)%256, ip%256)
 	
-	def allocateIP(self):
-		self.currentIP = self.currentIP + 1
-		while (self.currentIP in self.usedIPs or self.currentIP > self.ipMax):
-			if (self.currentIP > self.ipMax):
-				self.currentIP = self.ipMin
+	def allocateIP(self, network):
+		while (self.currentIP[network] in self.usedIPs or self.currentIP[network] > self.ipMax[network]):
+			if (self.currentIP[network] > self.ipMax[network]):
+				self.currentIP[network] = self.ipMin[network]
 			else:
-				self.currentIP = self.currentIP + 1
-		ipString = self.ipToStr(self.currentIP)
-		self.usedIPs[self.currentIP] = ipString
+				self.currentIP[network] = self.currentIP[network] + 1
+		ipString = self.ipToStr(self.currentIP[network])
+		self.usedIPs[self.currentIP[network]] = ipString
+		self.currentIP[network] = self.currentIP[network] + 1
 		return ipString
 	
 	def addDhcp(self, name, ipaddr, hwaddr):
@@ -141,7 +159,10 @@ class DhcpDns(InstanceHook):
 		stdout.close()
 	
 	def preCreate(self, instance):
-		ip = self.allocateIP()
+		if (len(instance.nics) < 1):
+			return
+		network = instance.nics[0].network
+		ip = self.allocateIP(network)
 		self.log.info("Adding %s:{%s->%s, %s->%s} to DHCP/DNS" % (instance.name, instance.nics[0].mac, ip, instance.name, ip))
 		try:
 			self.addDhcp(instance.name, ip, instance.nics[0].mac)
@@ -150,6 +171,8 @@ class DhcpDns(InstanceHook):
 			self.log.exception("Failed to add host %s to DHCP/DNS" % (instance.name))
 
 	def postDestroy(self, instance):
+		if (len(instance.nics) < 1):
+			return
 		try:
 			ip = socket.gethostbyname(instance.name)
 			ipNum = self.strToIp(ip)
