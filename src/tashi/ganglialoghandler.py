@@ -25,41 +25,34 @@ import tashi
 logging.tashi = tashi
 
 class GangliaLogHandler(logging.Handler):
-	def __init__(self, windowSize, windows, interface):
+	def __init__(self, dmax, retry):
 		logging.Handler.__init__(self)
-		self.msgIndex = 0
-		self.windowIndex = 0
-		self.lastRollover = time.time()
+		self.dmax = dmax
+		self.retry = retry
 		self.name = os.path.basename(sys.argv[0])
-		self.windowSize = windowSize
-		self.windows = windows
-		self.interface = interface.lower()
+		self.msgIndex = 0
 		self.disable = False
+		self.disableAt = 0.0
 	
 	def emit(self, record):
+		now = time.time()
 		if (self.disable):
-			return
-		try:
-			now = time.time()
-			msg = self.format(record)
-			if (now > self.lastRollover + self.windowSize):
-				self.lastRollover = now
-				self.msgIndex = 0
-				self.windowIndex = self.windowIndex + 1
-				if (self.windowIndex >= self.windows):
-					self.windowIndex = 0
-			metricName = "tashi_log_%s_%d_%d" % (self.name, self.windowIndex, self.msgIndex)
-			metricValue = msg.replace("'", '"')
-			metricType = "string"
-			if (self.interface == "default"):
-				(stdin, stdout) = os.popen4("gmetric -n '%s' -v '%s' -t '%s'" % (metricName, metricValue, metricType))
+			if (now - self.disableAt > self.retry):
+				disable = False
 			else:
-				(stdin, stdout) = os.popen4("gmetric -n '%s' -v '%s' -t '%s' -i '%s'" % (metricName, metricValue, metricType, self.interface))
+				return
+		try:
+			msg = self.format(record)
+			metricName = "tashi_log_%s_%d_%d" % (self.name, self.msgIndex, int(now*1000))
+			metricValue = msg.replace('"', "'")
+			metricType = "string"
+			(stdin, stdout) = os.popen4('gmetric -n "%s" -v "%s" -t "%s" -d "%d"' % (metricName, metricValue, metricType, self.dmax))
 			stdin.close()
 			res = stdout.read()
 			if (res != ""):
 				print "Failed to exec gmetric, disabling: %s" % (res)
 				self.disable = True
+				self.disableAt = now
 			stdout.close()
 			self.msgIndex = self.msgIndex + 1
 		except Exception, e:
