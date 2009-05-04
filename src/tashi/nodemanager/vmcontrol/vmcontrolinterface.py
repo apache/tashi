@@ -79,3 +79,7 @@ class VmControlInterface(object):
 	def listVms(self):
 		"""Returns a list of vmIds to the caller"""
 		raise NotImplementedError
+	
+	def getHostInfo(self, service):
+		"""Returns a Host object for the current host"""
+		raise NotImplementedError

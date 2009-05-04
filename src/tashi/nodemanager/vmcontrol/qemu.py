@@ -29,6 +29,7 @@ import time
 
 from tashi.services.ttypes import *
 from tashi.util import broken, logged, scrubString, boolean
+from tashi import version
 from vmcontrolinterface import VmControlInterface
 
 log = logging.getLogger(__file__)
@@ -289,7 +290,29 @@ class Qemu(VmControlInterface):
 		info = open(self.INFO_DIR + "/%d"%(child.pid), "w")
 		cPickle.dump((child.instance, child.pid, child.ptyFile), info)
 		info.close()
-
+	
+	def getHostInfo(self, service):
+		host = Host()
+		host.id = service.id
+		host.name = socket.gethostname()
+		memoryStr = os.popen2("head -n 1 /proc/meminfo | awk '{print $2 \" \" $3}'")[1].read().strip()
+		if (memoryStr[-2:] == "kB"):
+			host.memory = int(memoryStr[:-2])/1024
+		elif (memoryStr[-2:] == "mB"):
+			host.memory = int(memoryStr[:-2])
+		elif (memoryStr[-2:] == "gB"):
+			host.memory = int(memoryStr[:-2])*1024
+		elif (memoryStr[-2:] == " B"):
+			host.memory = int(memoryStr[:-2])/(1024*1024)
+		else:
+			log.warning('Unable to determine amount of physical memory - reporting 0')
+			host.memory = 0
+		host.cores = os.sysconf("SC_NPROCESSORS_ONLN")
+		host.up = True
+		host.decayed = False
+		host.version = version
+		return host
+	
 	def startVm(self, instance, source):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
 		clockString = instance.hints.get("clock", "dynticks")

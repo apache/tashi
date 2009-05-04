@@ -29,7 +29,7 @@ from thrift.transport.TTransport import TBufferedTransport
 from tashi.services.ttypes import ResumeVmRes, Host, HostState, InstanceState, TashiException, Errors, Instance
 from tashi.services import clustermanagerservice
 from tashi.nodemanager import RPC
-from tashi import boolean, vmStates, logged, ConnectionManager, timed, version
+from tashi import boolean, vmStates, logged, ConnectionManager, timed
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
@@ -99,28 +99,6 @@ class NodeManagerService(object):
 			success()
 		return True
 	
-	def getHostInfo(self):
-		host = Host()
-		host.id = self.id
-		host.name = socket.gethostname()
-		memoryStr = os.popen2("head -n 1 /proc/meminfo | awk '{print $2 \" \" $3}'")[1].read().strip()
-		if (memoryStr[-2:] == "kB"):
-			host.memory = int(memoryStr[:-2])/1024
-		elif (memoryStr[-2:] == "mB"):
-			host.memory = int(memoryStr[:-2])
-		elif (memoryStr[-2:] == "gB"):
-			host.memory = int(memoryStr[:-2])*1024
-		elif (memoryStr[-2:] == " B"):
-			host.memory = int(memoryStr[:-2])/(1024*1024)
-		else:
-			self.log.warning('Unable to determine amount of physical memory - reporting 0')
-			host.memory = 0
-		host.cores = os.sysconf("SC_NPROCESSORS_ONLN")
-		host.up = True
-		host.decayed = False
-		host.version = version
-		return host
-	
 	def backupVmInfoAndFlushNotifyCM(self):
 		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
 		while True:
@@ -158,7 +136,7 @@ class NodeManagerService(object):
 		while True:
 			start = time.time()
 			try:
-				host = self.getHostInfo()
+				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
 				self.id = cm.registerNodeManager(host, instances)
 			except Exception, e:

@@ -22,11 +22,12 @@ import subprocess		# FIXME: should switch os.system to this
 import time 
 import threading
 import logging
+import socket
 
 from vmcontrolinterface import VmControlInterface
 from tashi.services.ttypes import Errors, InstanceState, TashiException
 from tashi.services.ttypes import Instance, Host
-from tashi import boolean, convertExceptions, ConnectionManager
+from tashi import boolean, convertExceptions, ConnectionManager, version
 from tashi.util import isolatedRPC
 
 import tashi.parallel
@@ -90,7 +91,6 @@ def listVms(prefix='tashi'):
 		instance.memory = int(vminfo['memory'])
 		instance.cores = int(vminfo['cores'])
 		instance.disks = []
-
 		r[instance.vmId] = instance
 	return r
 
@@ -101,14 +101,13 @@ def listVms(prefix='tashi'):
 class XenPV(VmControlInterface, threading.Thread):
 	def __init__(self, config, dfs, cm):
 		threading.Thread.__init__(self)
-		if self.__class__ is VmControlInterface:
-			raise NotImplementedError
 		self.config = config
 		self.dfs = dfs
 		self.cm = cm
 
 		self.vmNamePrefix = self.config.get("XenPV", "vmNamePrefix")
 		self.transientDir = self.config.get('XenPV', 'transientDir')
+		self.defaultVmType = self.config.get('XenPV', 'defaultVmType') 
 
 		self.newvms = listVms(self.vmNamePrefix)
 		self.hostId = -1
@@ -153,24 +152,61 @@ class XenPV(VmControlInterface, threading.Thread):
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
-			    image, macAddr, memory, cores):
+			    image, macAddr, memory, cores, hints):
 		fn = os.path.join("/tmp", vmName)
-		cfgstr = """
-# kernel="/boot/vmlinuz-2.6.24-17-xen"
-# ramdisk="/boot/initrd.img-2.6.24-17-xen"
+		vmType = hints.get('vmtype', self.defaultVmType)
+		print 'starting vm with type: ', vmType
+		bootstr = ''
+		if vmType == 'pvgrub':
+			# FIXME: untested, requires Xen 3.3
+			bootstr = '''
+kernel = '/usr/lib/xen/boot/pv-grub-x86_64.gz'
+extra = '(hd0,0)/grub/menu.lst'
+'''
+		elif vmType == 'pygrub':
+			bootstr = '''
 bootloader="/usr/bin/pygrub"
+'''
+		elif vmType == 'kernel':
+			kernel = hints.get('kernel', None)
+			ramdisk = hints.get('ramdisk', None)
+			if kernel == None:
+				try:
+					kernel = self.config.get('XenPV', 'defaultKernel')
+				except:
+					raise Exception, "vmtype=kernel requires kernel= argument"
+			bootstr = "kernel=\"%s\"\n"%kernel
+			if ramdisk == None:
+				try:
+					ramdisk = self.config.get('XenPV', 'defaultRamdisk')
+				except:
+					ramdisk = None
+			if ramdisk != None:
+				bootstr = bootstr + "ramdisk = \"%s\"\n"%ramdisk
+		elif vmType == 'hvm':
+			# FIXME: untested, I don't have any hvm domains set up
+			bootstr = '''
+import os, re
+arch = os.uname()[4]
+if re.search('63', arch):
+	arch_libdir = 'lib64'
+else:
+	arch_libdir = 'lib'
+kernel = '/usr/lib/xen/boot/hvmlocader'
+builder = 'hvm'
+'''
+		else:
+			raise Exception, "Unknown vmType in hints: %s"%vmType
+		cfgstr = """
 disk=['tap:qcow:%s,xvda1,w']
 vif = [ 'mac=%s' ]
-# vif = ['ip=172.19.158.1']
-# vif = ['']
 memory=%i
-#cpus is a list of cpus for pinning, this is not what we want
-#cpus=%i
+vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
 """%(image, macAddr, memory, cores)
 		f = open(fn, "w")
-		f.write(cfgstr)
+		f.write(bootstr+cfgstr)
 		f.close()
 		return fn
 	def deleteXenConfig(self, vmName):
@@ -213,7 +249,8 @@ extra='xencons=tty'
 					  instance.disks[0].local, 
 					  instance.nics[0].mac, 
 					  instance.memory,
-					  instance.cores)
+					  instance.cores,
+					  instance.hints)
 		cmd = "xm create %s"%fn
 		r = os.system(cmd)
 #		self.deleteXenConfig(name)
@@ -349,8 +386,10 @@ extra='xencons=tty'
 
 
 	@synchronizedmethod
-	def getHostInfo(self):
+	def getHostInfo(self, service):
 		host = Host()
+		host.id = service.id
+		host.name = socket.gethostname()
 		memp = subprocess.Popen("xm info | awk '/^total_memory/ { print $3 }' ",
 					shell = True,
 					stdout = subprocess.PIPE)
@@ -361,6 +400,9 @@ extra='xencons=tty'
 					stdout = subprocess.PIPE)
 		cores = corep.stdout.readline()
 		host.cores = int(cores)
+		host.up = True
+		host.decayed = False
+		host.version = version
 		return host
 
 
