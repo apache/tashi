@@ -340,7 +340,11 @@ class Qemu(VmControlInterface):
 			sourceString = ""
 		else:
 			sourceString = "-incoming %s" % (source)
-		cmd = "%s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, clockString, diskString, nicString, instance.memory, instance.cores, sourceString)
+		if (boolean(instance.hints.get("noAcpi", False))):
+			noAcpiString = "-no-acpi"
+		else:
+			noAcpiString = ""
+		cmd = "%s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, noAcpiString, clockString, diskString, nicString, instance.memory, instance.cores, sourceString)
 		log.info("QEMU command: %s" % (cmd))
 		cmd = cmd.split()
 		(pipe_r, pipe_w) = os.pipe()
@@ -566,6 +570,8 @@ class Qemu(VmControlInterface):
 			self.consolePortLock.release()
 			threading.Thread(target=lambda: controlConsole(child,consolePort)).start()
 			return "Control console listenting on %s:%d" % (hostname, consolePort)
+		elif (arg == "list"):
+			return "startVnc\nstopVnc\nchangeCdrom:<image.iso>\nstartConsole"
 		else:
 			return "Unknown arg %s" % (arg)
 	
