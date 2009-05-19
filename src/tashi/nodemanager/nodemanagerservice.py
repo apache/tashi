@@ -163,7 +163,7 @@ class NodeManagerService(object):
 	def suspendVm(self, vmId, name, suspendCookie):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Suspending
-		threading.Thread(target=lambda: self.vmm.suspendVm(vmId, name, suspendCookie)).start()
+		threading.Thread(target=self.vmm.suspendVm, args=(vmId, name, suspendCookie)).start()
 	
 	@RPC
 	def resumeVm(self, instance, name):
@@ -188,7 +188,7 @@ class NodeManagerService(object):
 	def migrateVm(self, vmId, target, transportCookie):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.MigrateTrans
-		threading.Thread(target=lambda: self.migrateVmHelper(instance, target, transportCookie)).start()
+		threading.Thread(target=self.migrateVmHelper, args=(instance, target, transportCookie)).start()
 		return
 	
 	def receiveVmHelper(self, instance, transportCookie):
@@ -211,7 +211,7 @@ class NodeManagerService(object):
 	@RPC
 	def receiveVm(self, instance, transportCookie):
 		instance.state = InstanceState.MigrateTrans
-		threading.Thread(target=lambda: self.receiveVmHelper(instance, transportCookie)).start()
+		threading.Thread(target=self.receiveVmHelper, args=(instance, transportCookie)).start()
 		return
 	
 	@RPC

@@ -205,7 +205,7 @@ class Qemu(VmControlInterface):
 	def getControlConsole(self, vmId, port):
 		"""Spawn a thread that attaches the control console of a particular Qemu to a TCP port -- used for debugging only"""
 		child = self.getChildFromPid(vmId)
-		threading.Thread(target=(lambda: controlConsole(child, port))).start()
+		threading.Thread(target=controlConsole, args=(child, port)).start()
 		return port
 	
 	def consumeAvailable(self, child):
@@ -568,7 +568,7 @@ class Qemu(VmControlInterface):
 			consolePort = self.consolePort
 			self.consolePort = self.consolePort+1
 			self.consolePortLock.release()
-			threading.Thread(target=lambda: controlConsole(child,consolePort)).start()
+			threading.Thread(target=controlConsole, args=(child,consolePort)).start()
 			return "Control console listenting on %s:%d" % (hostname, consolePort)
 		elif (arg == "list"):
 			return "startVnc\nstopVnc\nchangeCdrom:<image.iso>\nstartConsole"
