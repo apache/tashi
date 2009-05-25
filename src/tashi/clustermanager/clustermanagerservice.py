@@ -29,7 +29,7 @@ from tashi.messaging.thriftmessaging import MessageBrokerThrift
 from tashi.messaging.tashimessaging import TashiLogHandler
 from tashi.services.ttypes import Errors, InstanceState, HostState, TashiException
 from tashi.services import nodemanagerservice
-from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version
+from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
 
 def RPC(oldFunc):
 	return convertExceptions(oldFunc)
@@ -158,9 +158,11 @@ class ClusterManagerService(object):
 			time.sleep(sleepFor)
 	
 	def normalize(self, instance):
+		instance.id = None
 		instance.vmId = None
 		instance.hostId = None
 		instance.decayed = False
+		instance.name = scrubString(instance.name, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.")
 		instance.state = InstanceState.Pending
 		# At some point, check userId
 		if (not self.allowDuplicateNames):
@@ -178,6 +180,9 @@ class ClusterManagerService(object):
 		# Make sure disk spec is valid
 		# Make sure network spec is valid
 		# Ignore hints
+		for hint in instance.hints:
+			if (hint.startswith("__")):
+				del instance.hints[hint]
 		return instance
 	
 	@RPC
