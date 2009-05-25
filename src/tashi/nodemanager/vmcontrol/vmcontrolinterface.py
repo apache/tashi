@@ -83,3 +83,8 @@ class VmControlInterface(object):
 	def getHostInfo(self, service):
 		"""Returns a Host object for the current host"""
 		raise NotImplementedError
+	
+	def getStats(self, vmId):
+		"""Returns a dictionary containing stats about the guest (ie. 
+		   CPU utilization, network utilization, memory usage, etc.)"""
+		raise NotImplementedError

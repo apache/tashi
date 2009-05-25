@@ -29,7 +29,7 @@ import time
 
 from tashi.services.ttypes import *
 from tashi.util import broken, logged, scrubString, boolean
-from tashi import version
+from tashi import version, stringPartition
 from vmcontrolinterface import VmControlInterface
 
 log = logging.getLogger(__file__)
@@ -92,6 +92,7 @@ class Qemu(VmControlInterface):
 		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout"))
 		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout"))
 		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument"))
+		self.statsInterval = float(self.config.get("Qemu", "statsInterval"))
 		self.controlledVMs = {}
 		self.usedPorts = []
 		self.usedPortsLock = threading.Lock()
@@ -100,12 +101,15 @@ class Qemu(VmControlInterface):
 		self.consolePort = 10000
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
+		self.stats = {}
 		try:
 			os.mkdir(self.INFO_DIR)
 		except:
 			pass
 		self.scanInfoDir()
 		threading.Thread(target=self.pollVMsLoop).start()
+		if (self.statsInterval > 0):
+			threading.Thread(target=self.statsThread).start()
 	
 	class anonClass:
 		def __init__(self, **attrs):
@@ -132,6 +136,10 @@ class Qemu(VmControlInterface):
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
 				child = controlledVMs[vmId]
 				del controlledVMs[vmId]
+				try:
+					del self.stats[vmId]
+				except:
+					pass
 				if (child.vncPort >= 0):
 					self.vncPortLock.acquire()
 					self.vncPorts.remove(child.vncPort)
@@ -577,3 +585,65 @@ class Qemu(VmControlInterface):
 	
 	def listVms(self):
 		return self.controlledVMs.keys()
+	
+	def statsThread(self):
+		ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
+		netStats = {}
+		cpuStats = {}
+		last = time.time() - self.statsInterval
+		while True:
+			now = time.time()
+			try:
+				f = open("/proc/net/dev")
+				netData = f.readlines()
+				f.close()
+				for l in netData:
+					if (l.find("tashi") != -1):
+						(dev, sep, ld) = stringPartition(l, ":")
+						dev = dev.strip()
+						ws = ld.split()
+						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = netStats.get(dev, (0.0, 0.0, 0.0, 0.0))
+						recvBytes = float(ws[0])
+						sendBytes = float(ws[8])
+						if (recvBytes < lastRecvBytes):
+							if (lastRecvBytes > 2**32):
+								lastRecvBytes = lastRecvBytes - 2**64
+							else:
+								lastRecvBytes = lastRecvBytes - 2**32
+						if (sendBytes < lastSendBytes):
+							if (lastSendBytes > 2**32):
+								lastSendBytes = lastSendBytes - 2**64
+							else:
+								lastSendBytes = lastSendBytes - 2**32
+						recvMBs = (recvBytes-lastRecvBytes)/(now-last)/1024.0/1024.0
+						sendMBs = (sendBytes-lastSendBytes)/(now-last)/1024.0/1024.0
+						netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
+				for vmId in self.controlledVMs:
+					f = open("/proc/%d/stat" % (vmId))
+					procData = f.read()
+					f.close()
+					ws = procData.strip().split()
+					userTicks = float(ws[13])
+					sysTicks = float(ws[14])
+					myTicks = userTicks + sysTicks
+					vsize = (int(ws[22]))/1024.0/1024.0
+					rss = (int(ws[23])*4096)/1024.0/1024.0
+					cpuSeconds = myTicks/ticksPerSecond
+					lastCpuSeconds = cpuStats.get(vmId, 0.0)
+					cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
+					cpuStats[vmId] = cpuSeconds
+					child = self.controlledVMs[vmId]
+					netDev = "tashi%d" % (child.instance.id)
+					(recvMBs, sendMBs, recvBytes, sendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+					self.stats[vmId] = self.stats.get(vmId, {})
+					self.stats[vmId]['cpuLoad'] = cpuLoad
+					self.stats[vmId]['rss'] = rss
+					self.stats[vmId]['recvMBs'] = sendMBs
+					self.stats[vmId]['sendMBs'] = recvMBs
+			except:
+				log.exception("statsThread threw an exception")
+			last = now
+			time.sleep(self.statsInterval)
+	
+	def getStats(self, vmId):
+		return self.stats.get(vmId, {})
