@@ -210,12 +210,6 @@ class Qemu(VmControlInterface):
 			raise Exception, "Uncontrolled vmId %d" % (pid)
 		return child
 	
-	def getControlConsole(self, vmId, port):
-		"""Spawn a thread that attaches the control console of a particular Qemu to a TCP port -- used for debugging only"""
-		child = self.getChildFromPid(vmId)
-		threading.Thread(target=controlConsole, args=(child, port)).start()
-		return port
-	
 	def consumeAvailable(self, child):
 		"""Consume characters one-by-one until they stop coming"""
 		monitorFd = child.monitorFd
@@ -268,10 +262,6 @@ class Qemu(VmControlInterface):
 			res = self.consumeUntil(child, "(qemu) ", timeout=timeout)
 		return res
 
-	def genTmpFilename(self):
-		"""Create a temporary file name for a fifo used to uncompress a suspended VM"""
-		return "/tmp/Qemu_%d" % (os.getpid())
-	
 	def loadChildInfo(self, vmId):
 		child = self.anonClass(pid=vmId)
 		info = open(self.INFO_DIR + "/%d"%(child.pid), "r")
