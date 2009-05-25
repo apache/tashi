@@ -40,9 +40,9 @@ def main():
 	logging.config.fileConfig(configFiles)
 	log = logging.getLogger(__name__)
 	log.info('Using configuration file(s) %s' % configFiles)
-	dfs = instantiateImplementation(config.get("NodeManager", "Dfs"), config)
-	vmm = instantiateImplementation(config.get("NodeManager", "VmControl"), config, dfs, None)
-	service = instantiateImplementation(config.get("NodeManager", "Service"), config, vmm)
+	dfs = instantiateImplementation(config.get("NodeManager", "dfs"), config)
+	vmm = instantiateImplementation(config.get("NodeManager", "vmm"), config, dfs, None)
+	service = instantiateImplementation(config.get("NodeManager", "service"), config, vmm)
 	vmm.nm = service
 	processor = nodemanagerservice.Processor(service)
 	transport = TServerSocket(int(config.get('NodeManagerService', 'port')))
