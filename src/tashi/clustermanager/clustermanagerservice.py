@@ -37,9 +37,10 @@ def RPC(oldFunc):
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
 	
-	def __init__(self, config, data):
+	def __init__(self, config, data, dfs):
 		self.config = config
 		self.data = data
+		self.dfs = dfs
 		self.proxy = ConnectionManager(nodemanagerservice.Client, int(self.config.get('ClusterManager', 'nodeManagerPort')))
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
@@ -220,25 +221,25 @@ class ClusterManagerService(object):
 		return
 	
 	@RPC
-	def suspendVm(self, instanceId, destination):
+	def suspendVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
 		self.data.releaseInstance(instance)
-		suspendCookie = ""
 		hostname = self.data.getHost(instance.hostId).name
+		destination = "suspend/%d_%s" % (instance.id, instance.name)
 		try:
-			self.proxy[hostname].suspendVm(instance.vmId, destination, suspendCookie)
-		except Exception:
+			self.proxy[hostname].suspendVm(instance.vmId, destination)
+		except:
 			self.log.exception('suspendVm failed for host %s vmId %d' % (hostname, instance.vmId))
-			raise
+			raise TashiException(d={'errno':Errors.UnableToSuspend, 'msg':'Failed to suspend %s' % (instance.name)})
 		return
 	
 	@RPC
-	def resumeVm(self, instance, source):
-		instance.state = InstanceState.Pending
-		instance.decayed = False
+	def resumeVm(self, instanceId):
+		instance = self.data.acquireInstance(instanceId)
+		self.stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
+		source = "suspend/%d_%s" % (instance.id, instance.name)
 		instance.hints['__resume_source'] = source
-		instance = self.data.registerInstance(instance)
 		self.data.releaseInstance(instance)
 		return instance
 	
@@ -419,10 +420,16 @@ class ClusterManagerService(object):
 		if (instance.state == InstanceState.Exited):
 			oldInstance.decayed = False
 			self.updateDecay(self.decayedInstances, oldInstance)
-			self.data.removeInstance(oldInstance)
 			hostname = self.data.getHost(oldInstance.hostId).name
 			if (oldInstance.state not in [InstanceState.ShuttingDown, InstanceState.Destroying, InstanceState.Suspending]):
 				self.log.warning('Unexpected exit on %s of instance %d (vmId %d)' % (hostname, instanceId, oldInstance.vmId))
+			if (oldInstance.state == InstanceState.Suspending):
+				self.stateTransition(oldInstance, InstanceState.Suspending, InstanceState.Suspended)
+				oldInstance.hostId = None
+				oldInstance.vmId = None
+				self.data.releaseInstance(oldInstance)
+			else:
+				self.data.removeInstance(oldInstance)
 		else:
 			if (instance.state):
 				if (oldState and oldInstance.state != oldState):
@@ -451,14 +458,15 @@ class ClusterManagerService(object):
 			raise TashiException(d={'errno':Errors.HostStateError,'msg':"Target host state is not normal"})
 		self.data.releaseHost(dataHost)
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+		if ('__resume_source' in instance.hints):
+			self.stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
+		else:
+			self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
 		instance.hostId = host.id
 		self.data.releaseInstance(instance)
 		try:
 			if ('__resume_source' in instance.hints):
-				resumeVmId = self.proxy[host.name].resumeVm(instance, instance.hints['__resume_source'])
-				vmId = resumeVmId.vmId
-				suspendCookie = resumeVmId.suspendCookie
+				vmId = self.proxy[host.name].resumeVm(instance, instance.hints['__resume_source'])
 			else:
 				vmId = self.proxy[host.name].instantiateVm(instance)
 		except Exception, e:
@@ -473,13 +481,14 @@ class ClusterManagerService(object):
 		instance = self.data.acquireInstance(instanceId)
 		instance.vmId = vmId
 		if (instance.state is InstanceState.Destroying): # Special case for if destroyVm is called during initialization
-			self.data.releaseInstnace(instance)
+			self.data.releaseInstance(instance)
 			try:
 				self.proxy[host.name].destroyVm(vmId)
 			except Exception:
 				self.log.exception('destroyVm failed for host %s vmId %d' % (host.name, instance.vmId))
 				raise
 		else:
-			self.stateTransition(instance, InstanceState.Activating, InstanceState.Running)
+			if ('__resume_source' not in instance.hints):
+				self.stateTransition(instance, InstanceState.Activating, InstanceState.Running)
 			self.data.releaseInstance(instance)
 		return

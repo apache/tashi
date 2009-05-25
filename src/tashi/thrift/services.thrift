@@ -26,7 +26,9 @@ enum Errors {
 	HostNameMismatch = 8,
 	HostNotUp = 9,
 	HostStateError = 10,
-	InvalidInstance = 11
+	InvalidInstance = 11,
+	UnableToResume = 12,
+	UnableToSuspend = 13,
 }
 
 enum InstanceState {
@@ -44,7 +46,8 @@ enum InstanceState {
 	Destroying = 12,	// Beginning exit sequence
 	Orphaned = 13,		// Host is missing
 	Held = 14,		// Activation failed
-	Exited = 15		// VM has exited
+	Exited = 15,		// VM has exited
+	Suspended = 16,		// VM is suspended
 }
 
 enum HostState {
@@ -112,8 +115,8 @@ service clustermanagerservice {
 	void shutdownVm(1:i32 instanceId) throws (1:TashiException e)
 	void destroyVm(1:i32 instanceId) throws (1:TashiException e)
 	
-	void suspendVm(1:i32 instanceId, 2:string destination) throws (1:TashiException e)
-	Instance resumeVm(1:Instance instance, 2:string source) throws (1:TashiException e)
+	void suspendVm(1:i32 instanceId) throws (1:TashiException e)
+	Instance resumeVm(1:i32 instanceId) throws (1:TashiException e)
 	
 	void migrateVm(1:i32 instanceId, 2:i32 targetHostId) throws (1:TashiException e)
 	
@@ -136,12 +139,6 @@ service clustermanagerservice {
 	void activateVm(1:i32 instanceId, 2:Host host) throws (1:TashiException e)
 }
 
-// RPC-specific types
-struct ResumeVmRes {
-	1:i32 vmId,
-	2:string suspendCookie
-}
-
 service nodemanagerservice {
 	// ClusterManager-facing RPCs
 	i32 instantiateVm(1:Instance instance) throws (1:TashiException e)
@@ -149,8 +146,8 @@ service nodemanagerservice {
 	void shutdownVm(1:i32 vmId) throws (1:TashiException e)
 	void destroyVm(1:i32 vmId) throws (1:TashiException e)
 	
-	void suspendVm(1:i32 vmId, 2:string destination, 3:string suspendCookie) throws (1:TashiException e)
-	ResumeVmRes resumeVm(1:Instance instance, 2:string source) throws (1:TashiException e)
+	void suspendVm(1:i32 vmId, 2:string destination) throws (1:TashiException e)
+	i32 resumeVm(1:Instance instance, 2:string source) throws (1:TashiException e)
 	
 	string prepReceiveVm(1:Instance instance, 2:Host source) throws (1:TashiException e)
 	void migrateVm(1:i32 vmId, 2:Host target, 3:string transportCookie) throws (1:TashiException e)

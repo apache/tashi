@@ -41,8 +41,9 @@ def startClusterManager(config):
 	messageHandler = TashiLogHandler(config)
 	log.addHandler(messageHandler)
 
+	dfs = instantiateImplementation(config.get("ClusterManager", "Dfs"), config)
 	data = instantiateImplementation(config.get("ClusterManager", "data"), config)
-	service = instantiateImplementation(config.get("ClusterManager", "service"), config, data)
+	service = instantiateImplementation(config.get("ClusterManager", "service"), config, data, dfs)
 	processor = clustermanagerservice.Processor(service)
 	transport = TServerSocket(int(config.get('ClusterManagerService', 'port')))
 	server = TThreadedServer(processor, transport)

@@ -28,7 +28,7 @@ from vmcontrolinterface import VmControlInterface
 from tashi.services.ttypes import Errors, InstanceState, TashiException
 from tashi.services.ttypes import Instance, Host
 from tashi import boolean, convertExceptions, ConnectionManager, version
-from tashi.util import isolatedRPC
+from tashi.util import isolatedRPC, broken
 
 import tashi.parallel
 from tashi.parallel import synchronized, synchronizedmethod
@@ -268,6 +268,7 @@ extra='xencons=tty'
 	# for susp/res we want the xen save/restore commands, not
 	# suspend/resume.  save/restore allow you to specify the state
 	# file, suspend/resume do not.
+	@broken
 	@synchronizedmethod
 	def suspendVm(self, vmId, target, suspendCookie=None):
 		# FIXME: don't use hardcoded /tmp for temporary data.
@@ -297,6 +298,7 @@ extra='xencons=tty'
 		os.unlink(tmpfile)
 		return vmId
 	
+	@broken
 	@synchronizedmethod
 	def resumeVm(self, source):
 		infofile = source + ".info"

@@ -26,7 +26,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport
 
-from tashi.services.ttypes import ResumeVmRes, Host, HostState, InstanceState, TashiException, Errors, Instance
+from tashi.services.ttypes import Host, HostState, InstanceState, TashiException, Errors, Instance
 from tashi.services import clustermanagerservice
 from tashi.nodemanager import RPC
 from tashi import boolean, vmStates, logged, ConnectionManager, timed
@@ -160,18 +160,37 @@ class NodeManagerService(object):
 		return vmId
 	
 	@RPC
-	def suspendVm(self, vmId, name, suspendCookie):
+	def suspendVm(self, vmId, destination):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Suspending
-		threading.Thread(target=self.vmm.suspendVm, args=(vmId, name, suspendCookie)).start()
+		threading.Thread(target=self.vmm.suspendVm, args=(vmId, destination)).start()
+	
+	def resumeVmHelper(self, instance, name):
+		self.vmm.resumeVmHelper(instance, name)
+		instance.state = InstanceState.Running
+		newInstance = Instance(d={'id':instance.id,'state':instance.state})
+		success = lambda: None
+		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		try:
+			cm.vmUpdate(newInstance.id, newInstance, InstanceState.Resuming)
+		except Exception, e:
+			self.log.exception('vmUpdate failed in resumeVmHelper')
+			self.notifyCM.append((newInstance.id, newInstance, InstanceState.Resuming, success))
+		else:
+			success()
 	
 	@RPC
 	def resumeVm(self, instance, name):
-		(vmId, suspendCookie) = self.vmm.resumeVm(name)
-		instance.vmId = vmId
-		instance.state = InstanceState.Running
-		self.instances[vmId] = instance
-		return ResumeVmRes(d={'vmId':vmId, 'suspendCookie':suspendCookie})
+		instance.state = InstanceState.Resuming
+		instance.hostId = self.id
+                try:
+                        instance.vmId = self.vmm.resumeVm(instance, name)
+                        self.instances[instance.vmId] = instance
+                        threading.Thread(target=self.resumeVmHelper, args=(instance, name)).start()
+                except:
+                        self.log.exception('resumeVm failed')
+                        raise TashiException(d={'errno':Errors.UnableToResume,'msg':"resumeVm failed on the node manager"})
+		return instance.vmId
 	
 	@RPC
 	def prepReceiveVm(self, instance, source):

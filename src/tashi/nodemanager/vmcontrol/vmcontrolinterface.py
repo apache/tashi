@@ -38,9 +38,13 @@ class VmControlInterface(object):
 		   suspendCookie"""
 		raise NotImplementedError
 	
-	def resumeVm(self, source):
-		"""Resumes a vm from the dfs and returns the newly created 
-		   vmId as well as the suspendCookie in a tuple"""
+	def resumeVmHelper(self, instance, source):
+		"""Used to finish up the resume process, it is called outside 
+		   of the original RPC to avoid timeouts, it returns nothing"""
+		raise NotImplementedError
+	
+	def resumeVm(self, instance, source):
+		"""Resumes a vm from the dfs and returns the vmId"""
 		raise NotImplementedError
 	
 	def prepReceiveVm(self, instance, source):

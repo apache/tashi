@@ -343,18 +343,17 @@ class Qemu(VmControlInterface):
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
 		for nic in instance.nics:
-			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, nic.network, nic.network)
-		if (not source):
-			sourceString = ""
-		else:
-			sourceString = "-incoming %s" % (source)
+			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=tashi%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, instance.id, nic.network, nic.network)
 		if (boolean(instance.hints.get("noAcpi", False))):
 			noAcpiString = "-no-acpi"
 		else:
 			noAcpiString = ""
-		cmd = "%s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty %s" % (self.QEMU_BIN, noAcpiString, clockString, diskString, nicString, instance.memory, instance.cores, sourceString)
-		log.info("QEMU command: %s" % (cmd))
-		cmd = cmd.split()
+		strCmd = "%s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, clockString, diskString, nicString, instance.memory, instance.cores)
+		cmd = strCmd.split()
+		if (source):
+			cmd = cmd + ["-incoming", source]
+			strCmd = strCmd + " -incoming %s" % (source)
+		log.info("QEMU command: %s" % (strCmd))
 		(pipe_r, pipe_w) = os.pipe()
 		pid = os.fork()
 		if (pid == 0):
@@ -432,33 +431,33 @@ class Qemu(VmControlInterface):
 		self.saveChildInfo(child)
 		return vmId
 	
-	def suspendVm(self, vmId, target, suspendCookie):
+	def suspendVm(self, vmId, target):
 		child = self.getChildFromPid(vmId)
-		info = self.dfs.open("%s.info" % (target), "w")
-		cPickle.dump((child.instance, suspendCookie), info)
-		info.close()
+		tmpTarget = "/tmp/tashi_qemu_suspend_%d_%d" % (os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
-		vmId = self.stopVm(vmId, "\"exec:gzip -c > /tmp/%s.dat\"" % (target), True)
-		self.dfs.copyTo("/tmp/%s.dat" % (target), "%s.dat" % (target))
+		vmId = self.stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
+		self.dfs.copyTo(tmpTarget, target)
 		return vmId
 	
-	def resumeVm(self, source):
-		# XXX: Read in and unzip directly (or use fifo)
-		self.dfs.copyFrom("%s.dat" % (source), "/tmp/%s.dat" % (source))
-		info = self.dfs.open("%s.info" % (source), "r")
-		(instance, suspendCookie) = cPickle.load(info)
-		info.close()
-		tmpFile = self.genTmpFilename()
-		os.mkfifo(tmpFile)
-		zcat = subprocess.Popen(args=["/bin/bash", "-c", "zcat /tmp/%s.dat > %s" % (source, tmpFile)], executable="/bin/bash", close_fds=True)
-		(vmId, cmd) = self.startVm(instance, "file://%s" % tmpFile)
-		zcat.wait()
-		os.unlink(tmpFile)
+	def resumeVmHelper(self, instance, source):
+		child = self.getChildFromPid(instance.vmId)
+		try:
+			self.getPtyInfo(child, True)
+		except RuntimeError, e:
+			log.error("Failed to get pty info -- VM likely died")
+			child.errorBit = True
+			raise
+		status = "paused"
+		while ("running" not in status):
+			status = self.enterCommand(child, "info status")
+			time.sleep(1)
+	
+	def resumeVm(self, instance, source):
+		fn = self.dfs.getLocalHandle("%s" % (source))
+		(vmId, cmd) = self.startVm(instance, "exec:zcat %s" % (fn))
 		child = self.getChildFromPid(vmId)
-		self.getPtyInfo(child, True)
-		child.suspendCookie = suspendCookie
 		child.cmd = cmd
-		return (vmId, suspendCookie)
+		return vmId
 	
 	def prepReceiveVm(self, instance, source):
 		self.usedPortsLock.acquire()

@@ -103,8 +103,9 @@ class Primitive(object):
 											min = len(load[h.id])
 											minHost = h
 							if (minHost):
-								for hook in self.hooks:
-									hook.preCreate(inst)
+								if (not inst.hints.get("__resume_source", None)):
+									for hook in self.hooks:
+										hook.preCreate(inst)
 								self.log.info("Scheduling instance %s on host %s" % (inst.name, minHost.name))	
 								self.client.activateVm(i, minHost)
 								load[minHost.id] = load[minHost.id] + [i]
