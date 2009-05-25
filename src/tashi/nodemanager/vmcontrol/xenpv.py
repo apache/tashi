@@ -405,4 +405,5 @@ extra='xencons=tty'
 		host.version = version
 		return host
 
-
+	def getStats(self, vmId):
+		return {}
