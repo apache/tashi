@@ -36,6 +36,7 @@ class Primitive(object):
 		self.hooks = []
 		self.log = logging.getLogger(__file__)
 		self.scheduleDelay = float(self.config.get("Primitive", "scheduleDelay"))
+		self.densePack = boolean(self.config.get("Primitive", "densePack"))
 		items = self.config.items("Primitive")
 		items.sort()
 		for item in items:
@@ -79,8 +80,8 @@ class Primitive(object):
 					for i in load[None]:
 						inst = instances[i]
 						try:
-							min = None
-							minHost = None
+							minMax = None
+							minMaxHost = None
 							targetHost = inst.hints.get("targetHost", None)
 							try:
 								allowElsewhere = boolean(inst.hints.get("allowElsewhere", "False"))
@@ -88,27 +89,29 @@ class Primitive(object):
 								allowElsewhere = False
 							if (targetHost != None):
 								for h in hosts.values():
-									if ((str(h.id) == targetHost or h.name == targetHost) and h.up == True and h.state == HostState.Normal):
-										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
-										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
-										if (memUsage <= h.memory and coreUsage <= h.cores):
-											min = len(load[h.id])
-											minHost = h
-							if ((targetHost == None or allowElsewhere) and minHost == None):
+									if ((str(h.id) == targetHost or h.name == targetHost)):
+										if (h.up == True and h.state == HostState.Normal):
+											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+											if (memUsage <= h.memory and coreUsage <= h.cores):
+												minMax = len(load[h.id])
+												minMaxHost = h
+							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
-									if ((min is None or len(load[h.id]) < min) and h.up == True and h.state == HostState.Normal):
-										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
-										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
-										if (memUsage <= h.memory and coreUsage <= h.cores):
-											min = len(load[h.id])
-											minHost = h
-							if (minHost):
+									if (h.up == True and h.state == HostState.Normal):
+										if (minMax is None or (self.densePack and len(load[h.id]) > minMax) or (not self.densePack and len(load[h.id]) < minMax)):
+											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+											if (memUsage <= h.memory and coreUsage <= h.cores):
+												minMax = len(load[h.id])
+												minMaxHost = h
+							if (minMaxHost):
 								if (not inst.hints.get("__resume_source", None)):
 									for hook in self.hooks:
 										hook.preCreate(inst)
-								self.log.info("Scheduling instance %s on host %s" % (inst.name, minHost.name))	
-								self.client.activateVm(i, minHost)
-								load[minHost.id] = load[minHost.id] + [i]
+								self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
+								self.client.activateVm(i, minMaxHost)
+								load[minMaxHost.id] = load[minMaxHost.id] + [i]
 							else:
 								self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
 						except Exception, e:
