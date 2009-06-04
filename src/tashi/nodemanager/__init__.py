@@ -21,4 +21,3 @@ def RPC(oldFunc):
 	return convertExceptions(oldFunc)
 
 from nodemanagerservice import NodeManagerService
-from notification import Notifier

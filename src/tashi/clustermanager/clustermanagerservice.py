@@ -25,8 +25,6 @@ import logging
 import threading
 import time
 
-from tashi.messaging.thriftmessaging import MessageBrokerThrift
-from tashi.messaging.tashimessaging import TashiLogHandler
 from tashi.services.ttypes import Errors, InstanceState, HostState, TashiException
 from tashi.services import nodemanagerservice
 from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
@@ -44,8 +42,6 @@ class ClusterManagerService(object):
 		self.proxy = ConnectionManager(nodemanagerservice.Client, int(self.config.get('ClusterManager', 'nodeManagerPort')))
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
-		self.messageHandler = TashiLogHandler(config)
-		self.log.addHandler(self.messageHandler)
 		self.lastContacted = {}
 		self.decayedHosts = {}
 		self.decayedInstances = {}

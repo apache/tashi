@@ -26,8 +26,7 @@ from thrift.server.TServer import TThreadedServer
 from tashi.util import instantiateImplementation, getConfig, debugConsole, signalHandler
 from tashi.services import nodemanagerservice, clustermanagerservice
 from tashi import ConnectionManager
-
-import notification
+import tashi
 
 @signalHandler(signal.SIGTERM)
 def handleSIGTERM(signalNumber, stackFrame):
@@ -37,6 +36,8 @@ def main():
 	global config, dfs, vmm, service, server, log, notifier
 	
 	(config, configFiles) = getConfig(["NodeManager"])
+	publisher = instantiateImplementation(config.get("NodeManager", "publisher"), config)
+	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)
 	log = logging.getLogger(__name__)
 	log.info('Using configuration file(s) %s' % configFiles)
@@ -49,9 +50,6 @@ def main():
 	server = TThreadedServer(processor, transport)
 	debugConsole(globals())
 	
-	notifier = notification.Notifier(config)
-	log.addHandler(notifier)
-
 	try:
 		server.serve()
 	except KeyboardInterrupt:

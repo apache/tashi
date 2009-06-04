@@ -27,20 +27,13 @@ from ConfigParser import ConfigParser
 from thrift.transport.TSocket import TServerSocket
 from thrift.server.TServer import TThreadedServer
 
-from tashi.messaging.thriftmessaging import MessageBrokerThrift
-from tashi.messaging.tashimessaging import TashiLogHandler
 from tashi.services import clustermanagerservice
 from tashi.util import signalHandler, boolean, instantiateImplementation, getConfig, debugConsole
+import tashi
 
 def startClusterManager(config):
 	global service, data
 	
-	# start the event broker
-	broker = MessageBrokerThrift(int(config.get('MessageBroker', 'port')))
-	broker.ready.wait()
-	messageHandler = TashiLogHandler(config)
-	log.addHandler(messageHandler)
-
 	dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 	data = instantiateImplementation(config.get("ClusterManager", "data"), config)
 	service = instantiateImplementation(config.get("ClusterManager", "service"), config, data, dfs)
@@ -65,6 +58,8 @@ def main():
 	
 	# setup configuration and logging
 	(config, configFiles) = getConfig(["ClusterManager"])
+	publisher = instantiateImplementation(config.get("ClusterManager", "publisher"), config)
+	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)
 	log = logging.getLogger(__file__)
 	log.info('Using configuration file(s) %s' % configFiles)

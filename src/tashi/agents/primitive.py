@@ -27,6 +27,7 @@ import logging.config
 
 from tashi.services.ttypes import *
 from tashi.util import getConfig, createClient, instantiateImplementation, boolean
+import tashi
 
 class Primitive(object):
 	def __init__(self, config, client, transport):
@@ -134,6 +135,8 @@ class Primitive(object):
 
 def main():
 	(config, configFiles) = getConfig(["Agent"])
+	publisher = instantiateImplementation(config.get("Primitive", "publisher"), config)
+	tashi.publisher = publisher
 	(client, transport) = createClient(config)
 	logging.config.fileConfig(configFiles)
 	agent = Primitive(config, client, transport)
