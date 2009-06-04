@@ -591,9 +591,9 @@ class Qemu(VmControlInterface):
 						(dev, sep, ld) = stringPartition(l, ":")
 						dev = dev.strip()
 						ws = ld.split()
-						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = netStats.get(dev, (0.0, 0.0, 0.0, 0.0))
 						recvBytes = float(ws[0])
 						sendBytes = float(ws[8])
+						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = netStats.get(dev, (0.0, 0.0, recvBytes, sendBytes))
 						if (recvBytes < lastRecvBytes):
 							if (lastRecvBytes > 2**32):
 								lastRecvBytes = lastRecvBytes - 2**64
@@ -618,7 +618,7 @@ class Qemu(VmControlInterface):
 					vsize = (int(ws[22]))/1024.0/1024.0
 					rss = (int(ws[23])*4096)/1024.0/1024.0
 					cpuSeconds = myTicks/ticksPerSecond
-					lastCpuSeconds = cpuStats.get(vmId, 0.0)
+					lastCpuSeconds = cpuStats.get(vmId, cpuSeconds)
 					cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
 					cpuStats[vmId] = cpuSeconds
 					child = self.controlledVMs[vmId]
