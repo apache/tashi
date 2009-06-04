@@ -30,6 +30,7 @@ from tashi.services.ttypes import Host, HostState, InstanceState, TashiException
 from tashi.services import clustermanagerservice
 from tashi.nodemanager import RPC
 from tashi import boolean, vmStates, logged, ConnectionManager, timed
+import tashi
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
@@ -46,6 +47,7 @@ class NodeManagerService(object):
 		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
 		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
 		self.infoFile = self.config.get('NodeManagerService', 'infoFile')
+		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
 		self.id = None
 		self.notifyCM = []
 		self.loadVmInfo()
@@ -60,6 +62,7 @@ class NodeManagerService(object):
 				self.vmStateChange(vmId, None, InstanceState.Exited)
 		threading.Thread(target=self.backupVmInfoAndFlushNotifyCM).start()
 		threading.Thread(target=self.registerWithClusterManager).start()
+		threading.Thread(target=self.statsThread).start()
 	
 	def loadVmInfo(self):
 		try:
@@ -272,4 +275,20 @@ class NodeManagerService(object):
 	def listVms(self):
 		return self.instances.keys()
 	
-
+	def statsThread(self):
+		while True:
+			try:
+				publishList = []
+				for vmId in self.instances:
+					try:
+						id = self.instances[vmId].id
+						stats = self.vmm.getStats(vmId)
+						for stat in stats:
+							publishList.append({"vm_%d_%s" % (id, stat):stats[stat]})
+					except:
+						self.log.exception('statsThread threw an exception')
+				if (len(publishList) > 0):
+					tashi.publisher.publishList(publishList)
+			except:
+				self.log.exception('statsThread threw an exception')
+			time.sleep(self.statsInterval)
