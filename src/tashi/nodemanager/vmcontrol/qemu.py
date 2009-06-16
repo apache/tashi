@@ -332,8 +332,9 @@ class Qemu(VmControlInterface):
 				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
-		for nic in instance.nics:
-			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=tashi%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, instance.id, nic.network, nic.network)
+		for i in range(0, len(instance.nics)):
+			nic = instance.nics[i]
+			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=tashi%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, instance.id, i, nic.network, nic.network)
 		if (boolean(instance.hints.get("noAcpi", False))):
 			noAcpiString = "-no-acpi"
 		else:
@@ -622,8 +623,11 @@ class Qemu(VmControlInterface):
 					cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
 					cpuStats[vmId] = cpuSeconds
 					child = self.controlledVMs[vmId]
-					netDev = "tashi%d" % (child.instance.id)
-					(recvMBs, sendMBs, recvBytes, sendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+					(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
+					for i in range(0, len(child.instance.nics)):
+						netDev = "tashi%d.%d" % (child.instance.id, i)
+						(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+						(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
 					self.stats[vmId] = self.stats.get(vmId, {})
 					self.stats[vmId]['cpuLoad'] = cpuLoad
 					self.stats[vmId]['rss'] = rss
