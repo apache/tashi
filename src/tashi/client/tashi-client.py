@@ -76,13 +76,16 @@ def requiredArg(name):
 def randomMac():
 	return ("52:54:00:%2.2x:%2.2x:%2.2x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
 
-def randomNetwork():
+def getDefaultNetwork():
 	fetchNetworks()
 	networkId = 1
 	for network in networks:
 		if (networks[network].name == "default"):
 			networkId = network
-	return [NetworkConfiguration(d={'mac':randomMac(), 'network':networkId})]
+	return networkId
+
+def randomNetwork():
+	return [NetworkConfiguration(d={'mac':randomMac(), 'network':getDefaultNetwork()})]
 
 def parseDisks(arg):
 	try:
@@ -107,10 +110,18 @@ def parseNics(arg):
 		for strNic in strNics:
 			strNic = strNic.strip()
 			(l, s, r) = stringPartition(strNic, ":")
-			l = int(l)
-			if (r==''):
-				r = randomMac()
-			nic = NetworkConfiguration(d={'mac':r, 'network':l})
+			n = l
+			if (n == ''):
+				n = getDefaultNetwork()
+			n = int(n)
+			(l, s, r) = stringPartition(r, ":")
+			ip = l
+			if (ip == ''):
+				ip = None
+			m = r
+			if (m == ''):
+				m = randomMac()
+			nic = NetworkConfiguration(d={'mac':m, 'network':n, 'ip':ip})
 			nics.append(nic)
 		return nics
 	except:
@@ -245,7 +256,7 @@ description = {
 
 # Example use strings
 examples = {
-'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics 2:52:54:00:00:12:34,1:52:54:00:00:56:78 --hints enableDisplay=True'],
+'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics :1.2.3.4,1::52:54:00:00:56:78 --hints enableDisplay=True'],
 'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance foobar'],
 'destroyVm': ['--instance 12345', '--instance foobar'],

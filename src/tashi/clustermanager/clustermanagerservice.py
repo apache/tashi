@@ -440,6 +440,11 @@ class ClusterManagerService(object):
 				oldInstance.vmId = instance.vmId
 			if (instance.hostId):
 				oldInstance.hostId = instance.hostId
+			for nic in instance.nics:
+				if (nic.ip):
+					for oldNic in oldInstance.nics:
+						if (oldNic.mac == nic.mac):
+							oldNic.ip = nic.ip
 			oldInstance.decayed = False
 			self.updateDecay(self.decayedInstances, oldInstance)
 			self.data.releaseInstance(oldInstance)

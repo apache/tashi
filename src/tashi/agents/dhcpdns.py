@@ -19,6 +19,7 @@ import logging
 import os
 import socket
 from instancehook import InstanceHook
+from tashi.services.ttypes import Instance, NetworkConfiguration
 from tashi import boolean
 
 class DhcpDns(InstanceHook):
@@ -61,30 +62,41 @@ class DhcpDns(InstanceHook):
 			self.currentIP[k] = self.ipMin[k]
 		instances = self.client.getInstances()
 		for i in instances:
-			try:
-				ip = socket.gethostbyname(i.name)
-				ipNum = self.strToIp(ip)
-				self.log.info('Added %s->%s during reinitialization' % (i.name, ip))
-				self.usedIPs[ipNum] = ip
-			except Exception, e:
-				pass
+			for nic in i.nics:
+				try:
+					ip = nic.ip
+					ipNum = self.strToIp(ip)
+					self.log.info('Added %s->%s during reinitialization' % (i.name, ip))
+					self.usedIPs[ipNum] = ip
+				except Exception, e:
+					pass
 		
 	def strToIp(self, s):
-		ipNum = reduce(lambda x, y: x*256+y, map(int, s.split(".")))
+		ipNum = -1
+		try:
+			ipNum = reduce(lambda x, y: x*256+y, map(int, s.split(".")))
+		except:
+			pass
 		return ipNum
 	
 	def ipToStr(self, ip):
 		return "%d.%d.%d.%d" % (ip>>24, (ip>>16)%256, (ip>>8)%256, ip%256)
 	
-	def allocateIP(self, network):
-		while (self.currentIP[network] in self.usedIPs or self.currentIP[network] > self.ipMax[network]):
+	def allocateIP(self, nic):
+		network = nic.network
+		allocatedIP = None
+		requestedIP = self.strToIp(nic.ip)
+		if (requestedIP <= self.ipMax[network] and requestedIP >= self.ipMin[network] and (requestedIP not in self.usedIPs)):
+			allocatedIP = requestedIP
+		while (allocatedIP == None):
 			if (self.currentIP[network] > self.ipMax[network]):
 				self.currentIP[network] = self.ipMin[network]
-			else:
+			elif (self.currentIP[network] in self.usedIPs):
 				self.currentIP[network] = self.currentIP[network] + 1
-		ipString = self.ipToStr(self.currentIP[network])
-		self.usedIPs[self.currentIP[network]] = ipString
-		self.currentIP[network] = self.currentIP[network] + 1
+			else:
+				allocatedIP = self.currentIP[network]
+		ipString = self.ipToStr(allocatedIP)
+		self.usedIPs[allocatedIP] = ipString
 		return ipString
 	
 	def addDhcp(self, name, ipaddr, hwaddr):
@@ -118,7 +130,7 @@ class DhcpDns(InstanceHook):
 		stdin.close()
 		output = stdout.read()
 		stdout.close()
-
+	
 	def addDns(self, name, ip):
 		if (self.dnsKeyFile != ""):
 			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
@@ -158,31 +170,54 @@ class DhcpDns(InstanceHook):
 		output = stdout.read()
 		stdout.close()
 	
+	def doUpdate(self, instance):
+		newInstance = Instance()
+		newInstance.id = instance.id
+		newInstance.nics = instance.nics
+		self.client.vmUpdate(instance.id, newInstance, None)
+
 	def preCreate(self, instance):
 		if (len(instance.nics) < 1):
 			return
-		network = instance.nics[0].network
-		ip = self.allocateIP(network)
-		self.log.info("Adding %s:{%s->%s, %s->%s} to DHCP/DNS" % (instance.name, instance.nics[0].mac, ip, instance.name, ip))
-		try:
-			self.addDhcp(instance.name, ip, instance.nics[0].mac)
-			self.addDns(instance.name, ip)
-		except Exception, e:
-			self.log.exception("Failed to add host %s to DHCP/DNS" % (instance.name))
+		for i in range(0, len(instance.nics)):
+			nic = instance.nics[i]
+			ip = self.allocateIP(nic)
+			nic.ip = ip
+			try:
+				if (i == 0):
+					self.log.info("Adding %s:{%s->%s} to DNS" % (instance.name, instance.name, ip))
+					self.addDns(instance.name, ip)
+				if (i == 0):
+					dhcpName = instance.name
+				else:
+					dhcpName = instance.name + "-nic%d" % (i)
+				self.log.info("Adding %s:{%s->%s} to DHCP" % (dhcpName, nic.mac, ip))
+				self.addDhcp(dhcpName, ip, nic.mac)
+			except Exception, e:
+				self.log.exception("Failed to add host %s to DHCP/DNS" % (instance.name))
+		self.doUpdate(instance)
 
 	def postDestroy(self, instance):
 		if (len(instance.nics) < 1):
 			return
-		try:
-			ip = socket.gethostbyname(instance.name)
-			ipNum = self.strToIp(ip)
-			del self.usedIPs[ipNum]
-		except Exception, e:
-			self.log.exception("Failed to remove host %s from pool of usedIPs" % (instance.name))
 		self.log.info("Removing %s from DHCP/DNS" % (instance.name))
+		for i in range(0, len(instance.nics)):
+			nic = instance.nics[i]
+			ip = nic.ip
+			try:
+				ipNum = self.strToIp(ip)
+				del self.usedIPs[ipNum]
+			except Exception, e:
+				self.log.exception("Failed to remove host %s, ip %s from pool of usedIPs" % (instance.name, ip))
+			try:
+				if (i == 0):
+					dhcpName = instance.name
+				else:
+					dhcpName = instance.name + "-nic%d" % (i)
+				self.removeDhcp(dhcpName)
+			except Exception, e:
+				self.log.exception("Failed to remove host %s from DHCP" % (instance.name))
 		try:
 			self.removeDns(instance.name)
-			self.removeDhcp(instance.name)
 		except Exception, e:
-			self.log.exception("Failed to remove host %s from DHCP/DNS" % (instance.name))
-
+			self.log.exception("Failed to remove host %s from DNS" % (instance.name))

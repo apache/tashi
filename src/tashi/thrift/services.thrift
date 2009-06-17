@@ -89,8 +89,9 @@ struct DiskConfiguration {
 }
 
 struct NetworkConfiguration {
-	1:i32 network
-	2:string mac
+	1:i32 network,
+	2:string mac,
+	3:string ip
 }
 
 struct Instance {
