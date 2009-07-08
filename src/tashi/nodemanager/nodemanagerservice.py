@@ -276,6 +276,8 @@ class NodeManagerService(object):
 		return self.instances.keys()
 	
 	def statsThread(self):
+		if (self.statsInterval == 0):
+			return
 		while True:
 			try:
 				publishList = []
