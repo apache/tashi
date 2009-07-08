@@ -319,7 +319,10 @@ def usage(func = None):
 def transformState(obj):
 	if (type(obj) == Instance):
 		fetchUsers()
-		obj.state = vmStates[obj.state]
+		try:
+				obj.state = vmStates[obj.state]
+		except:
+				obj.state = 'Unknown'
 		if (obj.userId in users):
 			obj.user = users[obj.userId].name
 		else:
@@ -328,7 +331,10 @@ def transformState(obj):
 		if (obj.disks[0].persistent):
 			obj.disk += ":True"
 	elif (type(obj) == Host):
-		obj.state = hostStates[obj.state]
+		try:
+			obj.state = hostStates[obj.state]
+		except:
+			obj.state = 'Unknown'
 
 def genKeys(list):
 	keys = {}
