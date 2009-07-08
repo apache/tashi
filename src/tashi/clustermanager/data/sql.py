@@ -67,7 +67,7 @@ class SQL(DataInterface):
 	
 	def verifyStructure(self):
 		self.executeStatement("CREATE TABLE instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL)")
-		self.executeStatement("CREATE TABLE hosts (id int(11) NOT NULL, name varchar(256) NOT NULL, up tinyint(1) NOT NULL, decayed tinyint(1) NOT NULL, state int(11) NOT NULL, memory int(11), cores int(11), version varchar(256))")
+		self.executeStatement("CREATE TABLE hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256))")
 		self.executeStatement("CREATE TABLE networks (id int(11) NOT NULL, name varchar(256) NOT NULL)")
 		self.executeStatement("CREATE TABLE users (id int(11) NOT NULL, name varchar(256) NOT NULL)")
 	
