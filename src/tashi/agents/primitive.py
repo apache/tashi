@@ -135,7 +135,7 @@ class Primitive(object):
 
 def main():
 	(config, configFiles) = getConfig(["Agent"])
-	publisher = instantiateImplementation(config.get("Primitive", "publisher"), config)
+	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
 	(client, transport) = createClient(config)
 	logging.config.fileConfig(configFiles)
