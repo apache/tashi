@@ -48,14 +48,19 @@ class SQL(DataInterface):
 		self.hostLock = threading.Lock()
 		self.hostLocks = {}
 		self.maxInstanceId = 1
+		self.sqlLock = threading.Lock()
 		self.verifyStructure()
 
 	def executeStatement(self, stmt):
-		cur = self.conn.cursor()
+		self.sqlLock.acquire()
 		try:
-			cur.execute(stmt)
-		except:
-			self.log.exception('Exception executing SQL statement')
+			cur = self.conn.cursor()
+			try:
+				cur.execute(stmt)
+			except:
+				self.log.exception('Exception executing SQL statement')
+		finally:
+			self.sqlLock.release()
 		return cur
 		
 	def getNewInstanceId(self):
@@ -66,10 +71,10 @@ class SQL(DataInterface):
 		return instanceId
 	
 	def verifyStructure(self):
-		self.executeStatement("CREATE TABLE instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL)")
-		self.executeStatement("CREATE TABLE hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256))")
-		self.executeStatement("CREATE TABLE networks (id int(11) NOT NULL, name varchar(256) NOT NULL)")
-		self.executeStatement("CREATE TABLE users (id int(11) NOT NULL, name varchar(256) NOT NULL)")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL)")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256))")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS networks (id int(11) NOT NULL, name varchar(256) NOT NULL)")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS users (id int(11) NOT NULL, name varchar(256) NOT NULL)")
 	
 	def sanitizeForSql(self, s):
 		if (s == '"True"'):
@@ -89,7 +94,10 @@ class SQL(DataInterface):
 	def makeListInstance(self, l):
 		i = Instance()
 		for e in range(0, len(self.instanceOrder)):
-			i.__dict__[self.instanceOrder[e]] = l[e]
+			if self.instanceOrder[e] == 'state':
+				i.__dict__[self.instanceOrder[e]] = int(l[e])
+			else:
+				i.__dict__[self.instanceOrder[e]] = l[e]
 		i.decayed = boolean(i.decayed)
 		i.disks = map(lambda x: DiskConfiguration(d=x), eval(i.disks))
 		i.nics = map(lambda x: NetworkConfiguration(d=x), eval(i.nics))
@@ -105,7 +113,10 @@ class SQL(DataInterface):
 	def makeListHost(self, l):
 		h = Host()
 		for e in range(0, len(self.hostOrder)):
-			h.__dict__[self.hostOrder[e]] = l[e]
+			if self.hostOrder[e] == 'state':
+				h.__dict__[self.hostOrder[e]] = int(l[e])
+			else:
+				h.__dict__[self.hostOrder[e]] = l[e]
 		return h
 	
 	def registerInstance(self, instance):
@@ -211,6 +222,8 @@ class SQL(DataInterface):
 	def getInstance(self, id):
 		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (id))
 		r = cur.fetchone()
+		if (not r):
+			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (id)})
 		instance = self.makeListInstance(r)
 		return instance
 	
