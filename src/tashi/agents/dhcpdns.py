@@ -100,8 +100,11 @@ class DhcpDns(InstanceHook):
 		return ipString
 	
 	def addDhcp(self, name, ipaddr, hwaddr):
-		self.removeDhcp(name)
-		self.removeDhcp(name, ipaddr)
+		try:
+			self.removeDhcp(name)
+			self.removeDhcp(name, ipaddr)
+		except:
+			pass
 		cmd = "omshell"
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dhcpServer))
@@ -137,7 +140,10 @@ class DhcpDns(InstanceHook):
 		stdout.close()
 	
 	def addDns(self, name, ip):
-		self.removeDns(name)
+		try:
+			self.removeDns(name)
+		except:
+			pass
 		if (self.dnsKeyFile != ""):
 			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
 		else:
