@@ -152,7 +152,7 @@ class XenPV(VmControlInterface, threading.Thread):
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
-			    image, macAddr, memory, cores, hints):
+	                    image, macAddr, memory, cores, hints, id):
 		fn = os.path.join("/tmp", vmName)
 		vmType = hints.get('vmtype', self.defaultVmType)
 		print 'starting vm with type: ', vmType
@@ -162,11 +162,31 @@ class XenPV(VmControlInterface, threading.Thread):
 			bootstr = '''
 kernel = '/usr/lib/xen/boot/pv-grub-x86_64.gz'
 extra = '(hd0,0)/grub/menu.lst'
-'''
+disk=['tap:qcow:%s,xvda1,w']
+vif = [ 'mac=%s' ]
+memory=%i
+vcpus=%i
+root="/dev/xvda1"
+extra='xencons=tty'
+'''%(image,
+     macAddr,
+     memory,
+     cores)
+	
 		elif vmType == 'pygrub':
 			bootstr = '''
 bootloader="/usr/bin/pygrub"
-'''
+disk=['tap:qcow:%s,xvda1,w']
+vif = [ 'mac=%s' ]
+memory=%i
+vcpus=%i
+root="/dev/xvda1"
+extra='xencons=tty'
+'''%(image,
+     macAddr,
+     memory,
+     cores)
+	
 		elif vmType == 'kernel':
 			kernel = hints.get('kernel', None)
 			ramdisk = hints.get('ramdisk', None)
@@ -175,16 +195,29 @@ bootloader="/usr/bin/pygrub"
 					kernel = self.config.get('XenPV', 'defaultKernel')
 				except:
 					raise Exception, "vmtype=kernel requires kernel= argument"
-			bootstr = "kernel=\"%s\"\n"%kernel
 			if ramdisk == None:
 				try:
 					ramdisk = self.config.get('XenPV', 'defaultRamdisk')
+					ramdisk = "ramdisk = \"%s\""%ramdisk
 				except:
-					ramdisk = None
-			if ramdisk != None:
-				bootstr = bootstr + "ramdisk = \"%s\"\n"%ramdisk
+					ramdisk = ''
+			bootstr = '''
+kernel = "%s"
+%s     # ramdisk string is full command
+
+disk=['tap:qcow:%s,xvda1,w']
+vif = [ 'mac=%s' ]
+memory=%i
+vcpus=%i
+root="/dev/xvda1"
+extra='xencons=tty'
+'''%(kernel, ramdisk,
+     image,
+     macAddr,
+     memory,
+     cores)
+
 		elif vmType == 'hvm':
-			# FIXME: untested, I don't have any hvm domains set up
 			bootstr = '''
 import os, re
 arch = os.uname()[4]
@@ -192,21 +225,36 @@ if re.search('63', arch):
 	arch_libdir = 'lib64'
 else:
 	arch_libdir = 'lib'
-kernel = '/usr/lib/xen/boot/hvmlocader'
+kernel = '/usr/lib/xen/boot/hvmloader'
 builder = 'hvm'
-'''
-		else:
-			raise Exception, "Unknown vmType in hints: %s"%vmType
-		cfgstr = """
-disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'mac=%s' ]
+
+device_model='/usr/lib/xen/bin/qemu-dm'
+
+sdl=0
+vnc=1
+vnclisten='0.0.0.0'
+vncdisplay=%i
+vncpasswd=''
+stdvga=0
+serial='pty'
+usbdevice='tablet'
+
+shadow_memory=8
+disk=['tap:qcow:%s,hda,w']
+vif = [ 'type=ioemu,bridge=xenbr0,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
-"""%(image, macAddr, memory, cores)
+'''%(id,
+     image,
+     macAddr,
+     memory,
+     cores)
+		else:
+			raise Exception, "Unknown vmType in hints: %s"%vmType
 		f = open(fn, "w")
-		f.write(bootstr+cfgstr)
+		f.write(bootstr)
 		f.close()
 		return fn
 	def deleteXenConfig(self, vmName):
@@ -250,7 +298,8 @@ extra='xencons=tty'
 					  instance.nics[0].mac, 
 					  instance.memory,
 					  instance.cores,
-					  instance.hints)
+					  instance.hints,
+					  instance.id)
 		cmd = "xm create %s"%fn
 		r = os.system(cmd)
 #		self.deleteXenConfig(name)
