@@ -15,49 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from thrift.transport.TSocket import TSocket, socket
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
+import rpyc
+from tashi.rpycservices import rpycservices
+from tashi.rpycservices.rpyctypes import *
 
 class ConnectionManager(object):
-	def __init__(self, clientClass, port, timeout=10000.0):
-		self.clientClass = clientClass
+	def __init__(self, username, password, port, timeout=10000.0):
+		self.username = username
+		self.password = password
 		self.timeout = timeout
 		self.port = port
-	
-	class anonClass(object):
-		def __init__(self, clientObject):
-			self.co = clientObject
-		
-		def __getattr__(self, name):
-			if (name.startswith("_")):
-				return self.__dict__[name]
-			def connectWrap(*args, **kw):
-				if (not self.co._iprot.trans.isOpen()):
-					self.co._iprot.trans.open()
-				try:
-					res = getattr(self.co, name)(*args, **kw)
-				except socket.error, e:
-					# Force a close for the case of a "Broken pipe"
-#					print "Forced a socket close"
-					self.co._iprot.trans.close()
-					self.co._iprot.trans.open()
-					res = getattr(self.co, name)(*args, **kw)
-					self.co._iprot.trans.close()
-					raise
-				self.co._iprot.trans.close()
-				return res
-			return connectWrap
 	
 	def __getitem__(self, hostname):
 		port = self.port
 		if len(hostname) == 2:
 			port = hostname[1]
 			hostname = hostname[0]
-		socket = TSocket(hostname, port)
-		socket.setTimeout(self.timeout)
-		transport = TBufferedTransport(socket)
-		protocol = TBinaryProtocol(transport)
-		client = self.clientClass(protocol)
-		client.__transport__ = transport
-		return self.anonClass(client)
+
+		return rpycservices.client(hostname, port, username=self.username, password=self.password)

@@ -25,15 +25,14 @@ import threading
 import time
 import logging.config
 
-from tashi.services.ttypes import *
+from tashi.rpycservices.rpyctypes import *
 from tashi.util import getConfig, createClient, instantiateImplementation, boolean
 import tashi
 
 class Primitive(object):
-	def __init__(self, config, client, transport):
+	def __init__(self, config, client):
 		self.config = config
 		self.client = client
-		self.transport = transport
 		self.hooks = []
 		self.log = logging.getLogger(__file__)
 		self.scheduleDelay = float(self.config.get("Primitive", "scheduleDelay"))
@@ -45,7 +44,7 @@ class Primitive(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, client, transport, False))
+					self.hooks.append(instantiateImplementation(value, config, client, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
 	
@@ -53,9 +52,6 @@ class Primitive(object):
 		oldInstances = {}
 		while True:
 			try:
-				# Make sure transport is open
-				if (not self.transport.isOpen()):
-					self.transport.open()
 				# Generate a list of VMs/host
 				hosts = {}
 				load = {}
@@ -120,26 +116,18 @@ class Primitive(object):
 				time.sleep(self.scheduleDelay)
 			except TashiException, e:
 				self.log.exception("Tashi exception")
-				try:
-					self.transport.close()
-				except Exception, e:
-					self.log.exception("Failed to close the transport")
 				time.sleep(self.scheduleDelay)
 			except Exception, e:
 				self.log.exception("General exception")
-				try:
-					self.transport.close()
-				except Exception, e:
-					self.log.exception("Failed to close the transport")
 				time.sleep(self.scheduleDelay)
 
 def main():
 	(config, configFiles) = getConfig(["Agent"])
 	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
-	(client, transport) = createClient(config)
+	client = createClient(config)
 	logging.config.fileConfig(configFiles)
-	agent = Primitive(config, client, transport)
+	agent = Primitive(config, client)
 	agent.start()
 
 if __name__ == "__main__":

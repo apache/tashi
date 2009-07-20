@@ -21,12 +21,7 @@ import os.path
 import random
 import sys
 import types
-from tashi.services.ttypes import *
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from thrift.transport.TSocket import TSocket
-
-from tashi.services import clustermanagerservice
+from tashi.rpycservices.rpyctypes import *
 from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
 
 users = {}
@@ -46,7 +41,10 @@ def fetchNetworks():
 
 def getUser():
 	fetchUsers()
-	userStr = os.getenv("USER", "unknown")
+	if client.username != None:
+		userStr = client.username
+	else:
+		userStr = os.getenv("USER", "unknown")
 	for user in users:
 		if (users[user].name == userStr):
 			return users[user].id
@@ -66,7 +64,7 @@ def checkIid(instance):
 		raise ValueError("Unknown instance %s" % (str(instance)))
 	for instance in instances:
 		if (instance.id == instanceId):
-			if (instance.userId != userId and instance.userId != None):
+			if (instance.userId != userId and instance.userId != None and userId != 0):
 				raise ValueError("You don't own that VM")
 	return instanceId
 
@@ -461,7 +459,7 @@ def main():
 			usage(function)
 	try:
 		vals = {}
-		(client, transport) = createClient(config)
+		client = createClient(config)
 		for parg in possibleArgs:
 			(parg, conv, default, required) = parg
 			val = None
@@ -498,8 +496,6 @@ def main():
 		print "TashiException:"
 		print e.msg
 		exitCode = e.errno
-	except TTransportException, e:
-		print e
 	except Exception, e:
 		print e
 		usage(function)

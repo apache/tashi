@@ -20,13 +20,15 @@
 import logging.config
 import signal
 import sys
-from thrift.transport.TSocket import TServerSocket
-from thrift.server.TServer import TThreadedServer
 
 from tashi.util import instantiateImplementation, getConfig, debugConsole, signalHandler
-from tashi.services import nodemanagerservice, clustermanagerservice
 from tashi import ConnectionManager
 import tashi
+from tashi import boolean
+
+from tashi.rpycservices import rpycservices
+from rpyc.utils.server import ThreadedServer
+from rpyc.utils.authenticators import VdbAuthenticator
 
 @signalHandler(signal.SIGTERM)
 def handleSIGTERM(signalNumber, stackFrame):
@@ -45,13 +47,22 @@ def main():
 	vmm = instantiateImplementation(config.get("NodeManager", "vmm"), config, dfs, None)
 	service = instantiateImplementation(config.get("NodeManager", "service"), config, vmm)
 	vmm.nm = service
-	processor = nodemanagerservice.Processor(service)
-	transport = TServerSocket(int(config.get('NodeManagerService', 'port')))
-	server = TThreadedServer(processor, transport)
+
+	if boolean(config.get("Security", "authAndEncrypt")):
+		users = {}
+		users[config.get('AllowedUsers', 'clusterManagerUser')] = config.get('AllowedUsers', 'clusterManagerPassword')
+		authenticator = VdbAuthenticator.from_dict(users)
+		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
+	else:
+		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)
+	t.logger.quiet = True
+	t.service.service = service
+	t.service._type = 'NodeManagerService'
+
 	debugConsole(globals())
 	
 	try:
-		server.serve()
+		t.start()
 	except KeyboardInterrupt:
 		handleSIGTERM(signal.SIGTERM, None)
 	except Exception, e:

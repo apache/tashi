@@ -23,7 +23,7 @@ from tashi.services.ttypes import Instance, NetworkConfiguration
 from tashi import boolean
 
 class DhcpDns(InstanceHook):
-	def __init__(self, config, client, transport, post=False):
+	def __init__(self, config, client, post=False):
 		InstanceHook.__init__(self, config, client, post)
 		self.dnsKeyFile = self.config.get('DhcpDns', 'dnsKeyFile')
 		self.dnsServer = self.config.get('DhcpDns', 'dnsServer')

@@ -22,15 +22,12 @@ import socket
 import sys
 import threading
 import time
-from thrift.transport.TSocket import TSocket
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
 
-from tashi.services.ttypes import Host, HostState, InstanceState, TashiException, Errors, Instance
-from tashi.services import clustermanagerservice
+from tashi.rpycservices.rpyctypes import Host, HostState, InstanceState, TashiException, Errors, Instance
 from tashi.nodemanager import RPC
 from tashi import boolean, vmStates, logged, ConnectionManager, timed
 import tashi
+
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
@@ -43,6 +40,13 @@ class NodeManagerService(object):
 		self.vmm = vmm
 		self.cmHost = config.get("NodeManagerService", "clusterManagerHost")
 		self.cmPort = int(config.get("NodeManagerService", "clusterManagerPort"))
+		self.authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+		if self.authAndEncrypt:
+			self.username = config.get('AccessClusterManager', 'username')
+			self.password = config.get('AccessClusterManager', 'password')
+		else:
+			self.username = None
+			self.password = None
 		self.log = logging.getLogger(__file__)
 		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
 		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
@@ -84,7 +88,7 @@ class NodeManagerService(object):
 			self.log.exception('Failed to save VM info to %s' % (self.infoFile))
 	
 	def vmStateChange(self, vmId, old, cur):
-		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		instance = self.getInstance(vmId)
 		if (old and instance.state != old):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
@@ -103,7 +107,7 @@ class NodeManagerService(object):
 		return True
 	
 	def backupVmInfoAndFlushNotifyCM(self):
-		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		while True:
 			start = time.time()
 			try:
@@ -135,7 +139,7 @@ class NodeManagerService(object):
 				time.sleep(toSleep)
 	
 	def registerWithClusterManager(self):
-		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		while True:
 			start = time.time()
 			try:
@@ -154,7 +158,6 @@ class NodeManagerService(object):
 			raise TashiException(d={'errno':Errors.NoSuchVmId,'msg':"There is no vmId %d on this host" % (vmId)})
 		return instance
 	
-	@RPC
 	def instantiateVm(self, instance):
 		vmId = self.vmm.instantiateVm(instance)
 		instance.vmId = vmId
@@ -162,7 +165,6 @@ class NodeManagerService(object):
 		self.instances[vmId] = instance
 		return vmId
 	
-	@RPC
 	def suspendVm(self, vmId, destination):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Suspending
@@ -173,7 +175,7 @@ class NodeManagerService(object):
 		instance.state = InstanceState.Running
 		newInstance = Instance(d={'id':instance.id,'state':instance.state})
 		success = lambda: None
-		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		try:
 			cm.vmUpdate(newInstance.id, newInstance, InstanceState.Resuming)
 		except Exception, e:
@@ -182,7 +184,6 @@ class NodeManagerService(object):
 		else:
 			success()
 	
-	@RPC
 	def resumeVm(self, instance, name):
 		instance.state = InstanceState.Resuming
 		instance.hostId = self.id
@@ -195,7 +196,6 @@ class NodeManagerService(object):
 			raise TashiException(d={'errno':Errors.UnableToResume,'msg':"resumeVm failed on the node manager"})
 		return instance.vmId
 	
-	@RPC
 	def prepReceiveVm(self, instance, source):
 		instance.state = InstanceState.MigratePrep
 		instance.vmId = -1
@@ -206,7 +206,6 @@ class NodeManagerService(object):
 		self.vmm.migrateVm(instance.vmId, target.name, transportCookie)
 		del self.instances[instance.vmId]
 		
-	@RPC
 	def migrateVm(self, vmId, target, transportCookie):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.MigrateTrans
@@ -214,7 +213,7 @@ class NodeManagerService(object):
 		return
 	
 	def receiveVmHelper(self, instance, transportCookie):
-		cm = ConnectionManager(clustermanagerservice.Client, self.cmPort)[self.cmHost]
+		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		vmId = self.vmm.receiveVm(transportCookie)
 		instance.state = InstanceState.Running
 		instance.hostId = self.id
@@ -230,48 +229,40 @@ class NodeManagerService(object):
 		else:
 			success()
 	
-	@RPC
 	def receiveVm(self, instance, transportCookie):
 		instance.state = InstanceState.MigrateTrans
 		threading.Thread(target=self.receiveVmHelper, args=(instance, transportCookie)).start()
 		return
 	
-	@RPC
 	def pauseVm(self, vmId):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Pausing
 		self.vmm.pauseVm(vmId)
 		instance.state = InstanceState.Paused
 	
-	@RPC
 	def unpauseVm(self, vmId):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Unpausing
 		self.vmm.unpauseVm(vmId)
 		instance.state = InstanceState.Running
 	
-	@RPC
 	def shutdownVm(self, vmId):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.ShuttingDown
 		self.vmm.shutdownVm(vmId)
 	
-	@RPC
 	def destroyVm(self, vmId):
 		instance = self.getInstance(vmId)
 		instance.state = InstanceState.Destroying
 		self.vmm.destroyVm(vmId)
 	
-	@RPC
 	def getVmInfo(self, vmId):
 		instance = self.getInstance(vmId)
 		return instance
 	
-	@RPC
 	def vmmSpecificCall(self, vmId, arg):
 		return self.vmm.vmmSpecificCall(vmId, arg)
 	
-	@RPC
 	def listVms(self):
 		return self.instances.keys()
 	

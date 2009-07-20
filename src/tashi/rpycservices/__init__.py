@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,16 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-class InstanceHook(object):
-	def __init__(self, config, client, post=False):
-		if (self.__class__ is InstanceHook):
-			raise NotImplementedError
-		self.config = config
-		self.client = client
-		self.post = post
-	
-	def preCreate(self, instance):
-		raise NotImplementedError
-	
-	def postDestroy(self, instance):
-		raise NotImplementedError
+import rpyc

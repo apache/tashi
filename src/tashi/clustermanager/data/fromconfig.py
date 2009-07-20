@@ -17,7 +17,7 @@
 
 import threading
 
-from tashi.services.ttypes import *
+from tashi.rpycservices.rpyctypes import *
 from tashi.clustermanager.data import DataInterface
 
 class FromConfig(DataInterface):
@@ -128,7 +128,7 @@ class FromConfig(DataInterface):
 			self.releaseLock(host._lock)
 	
 	def getHosts(self):
-		return self.hosts
+		return self.cleanHosts()
 	
 	def getHost(self, id):
 		host = self.hosts.get(id, None)

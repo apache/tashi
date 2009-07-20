@@ -27,7 +27,7 @@ import subprocess
 import sys
 import time
 
-from tashi.services.ttypes import *
+from tashi.rpycservices.rpyctypes import *
 from tashi.util import broken, logged, scrubString, boolean
 from tashi import version, stringPartition
 from vmcontrolinterface import VmControlInterface

@@ -26,13 +26,11 @@ import threading
 import time
 import traceback
 import types
+import getpass
 
-from thrift.transport.TSocket import TServerSocket, TSocket
-from thrift.server.TServer import TThreadedServer
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
-from tashi.services import clustermanagerservice
-from tashi.services.ttypes import TashiException, Errors, InstanceState, HostState
+import rpyc
+from tashi.rpycservices import rpycservices
+from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
 
 def broken(oldFunc):
 	"""Decorator that is used to mark a function as temporarily broken"""
@@ -269,14 +267,19 @@ def createClient(config):
 	host = os.getenv('TASHI_CM_HOST', cfgHost)
 	port = os.getenv('TASHI_CM_PORT', cfgPort)
 	timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
-	socket = TSocket(host, int(port))
-	socket.setTimeout(timeout)
-	transport = TBufferedTransport(socket)
-	protocol = TBinaryProtocol(transport)
-	client = clustermanagerservice.Client(protocol)
-	transport.open()
-	client._transport = transport
-	return (client, transport)
+
+	authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+	if authAndEncrypt:
+		username = config.get('AccessClusterManager', 'username')
+		if username == '':
+			username = raw_input('Enter Username:')
+		password = config.get('AccessClusterManager', 'password')
+		if password == '':
+			password = getpass.getpass('Enter Password:')
+		client = rpycservices.client(host, port, username=username, password=password)
+	else:
+		client = rpycservices.client(host, port)
+	return client
 
 def enumToStringDict(cls):
 	d = {}

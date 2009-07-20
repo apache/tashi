@@ -25,8 +25,8 @@ import logging
 import socket
 
 from vmcontrolinterface import VmControlInterface
-from tashi.services.ttypes import Errors, InstanceState, TashiException
-from tashi.services.ttypes import Instance, Host
+from tashi.rpycservices.rpyctypes import Errors, InstanceState, TashiException
+from tashi.rpycservices.rpyctypes import Instance, Host
 from tashi import boolean, convertExceptions, ConnectionManager, version
 from tashi.util import isolatedRPC, broken
 

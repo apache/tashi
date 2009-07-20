@@ -24,12 +24,13 @@ import signal
 import logging.config
 from getopt import getopt, GetoptError
 from ConfigParser import ConfigParser
-from thrift.transport.TSocket import TServerSocket
-from thrift.server.TServer import TThreadedServer
 
-from tashi.services import clustermanagerservice
 from tashi.util import signalHandler, boolean, instantiateImplementation, getConfig, debugConsole
 import tashi
+
+from tashi.rpycservices import rpycservices
+from rpyc.utils.server import ThreadedServer
+from rpyc.utils.authenticators import VdbAuthenticator
 
 def startClusterManager(config):
 	global service, data
@@ -37,14 +38,27 @@ def startClusterManager(config):
 	dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 	data = instantiateImplementation(config.get("ClusterManager", "data"), config)
 	service = instantiateImplementation(config.get("ClusterManager", "service"), config, data, dfs)
-	processor = clustermanagerservice.Processor(service)
-	transport = TServerSocket(int(config.get('ClusterManagerService', 'port')))
-	server = TThreadedServer(processor, transport)
-	
+
+	if boolean(config.get("Security", "authAndEncrypt")):
+		users = {}
+		userDatabase = data.getUsers()
+		for user in userDatabase.values():
+			if user.passwd != None:
+				users[user.name] = user.passwd
+		users[config.get('AllowedUsers', 'nodeManagerUser')] = config.get('AllowedUsers', 'nodeManagerPassword')
+		users[config.get('AllowedUsers', 'agentUser')] = config.get('AllowedUsers', 'agentPassword')
+		authenticator = VdbAuthenticator.from_dict(users)
+		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False, authenticator=authenticator)
+	else:
+		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False)
+	t.logger.quiet = True
+	t.service.service = service
+	t.service._type = 'ClusterManagerService'
+
 	debugConsole(globals())
 	
 	try:
-		server.serve()
+		t.start()
 	except KeyboardInterrupt:
 		handleSIGTERM(signal.SIGTERM, None)
 

@@ -17,7 +17,7 @@
 
 import subprocess
 import time
-from tashi.services.ttypes import User
+from tashi.rpycservices.rpyctypes import User
 from tashi.clustermanager.data import DataInterface
 from tashi.util import instantiateImplementation
 

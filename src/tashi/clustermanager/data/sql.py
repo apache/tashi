@@ -19,7 +19,7 @@ import logging
 import threading
 import time
 import types
-from tashi.services.ttypes import *
+from tashi.rpycservices.rpyctypes import *
 from tashi.clustermanager.data.datainterface import DataInterface
 from tashi.util import stringPartition, boolean
 
@@ -74,7 +74,7 @@ class SQL(DataInterface):
 		self.executeStatement("CREATE TABLE IF NOT EXISTS instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL)")
 		self.executeStatement("CREATE TABLE IF NOT EXISTS hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256))")
 		self.executeStatement("CREATE TABLE IF NOT EXISTS networks (id int(11) NOT NULL, name varchar(256) NOT NULL)")
-		self.executeStatement("CREATE TABLE IF NOT EXISTS users (id int(11) NOT NULL, name varchar(256) NOT NULL)")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS users (id int(11) NOT NULL, name varchar(256) NOT NULL, passwd varchar(256))")
 	
 	def sanitizeForSql(self, s):
 		if (s == '"True"'):
@@ -247,12 +247,12 @@ class SQL(DataInterface):
 		res = cur.fetchall()
 		users = {}
 		for r in res:
-			user = User(d={'id':r[0], 'name':r[1]})
+			user = User(d={'id':r[0], 'name':r[1], 'passwd':r[2]})
 			users[user.id] = user
 		return users
 	
 	def getUser(self, id):
 		cur = self.executeStatement("SELECT * FROM users WHERE id = %d" % (id))
 		r = cur.fetchone()
-		user = User(d={'id':r[0], 'name':r[1]})
+		user = User(d={'id':r[0], 'name':r[1], 'passwd':r[2]})
 		return user

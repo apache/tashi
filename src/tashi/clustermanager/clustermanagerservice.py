@@ -18,19 +18,12 @@
 from datetime import datetime
 from random import randint
 from socket import gethostname
-from thrift.transport.TSocket import TSocket
-from thrift.protocol.TBinaryProtocol import TBinaryProtocol
-from thrift.transport.TTransport import TBufferedTransport
 import logging
 import threading
 import time
 
-from tashi.services.ttypes import Errors, InstanceState, HostState, TashiException
-from tashi.services import nodemanagerservice
+from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
 from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
-
-def RPC(oldFunc):
-	return convertExceptions(oldFunc)
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -38,8 +31,15 @@ class ClusterManagerService(object):
 	def __init__(self, config, data, dfs):
 		self.config = config
 		self.data = data
+		self.authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+		if self.authAndEncrypt:
+			self.username = config.get('AccessNodeManager', 'username')
+			self.password = config.get('AccessNodeManager', 'password')
+		else:
+			self.username = None
+			self.password = None
+		self.proxy = ConnectionManager(self.username, self.password, int(self.config.get('ClusterManager', 'nodeManagerPort')))
 		self.dfs = dfs
-		self.proxy = ConnectionManager(nodemanagerservice.Client, int(self.config.get('ClusterManager', 'nodeManagerPort')))
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
 		self.lastContacted = {}
@@ -181,7 +181,6 @@ class ClusterManagerService(object):
 				del instance.hints[hint]
 		return instance
 	
-	@RPC
 	def createVm(self, instance):
 		"""Function to add a VM to the list of pending VMs"""
 		instance = self.normalize(instance)
@@ -189,7 +188,6 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return instance
 	
-	@RPC
 	def shutdownVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Running, InstanceState.ShuttingDown)
@@ -202,7 +200,6 @@ class ClusterManagerService(object):
 			raise
 		return
 	
-	@RPC
 	def destroyVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		if (instance.state is InstanceState.Pending or instance.state is InstanceState.Held):
@@ -221,7 +218,6 @@ class ClusterManagerService(object):
 				raise
 		return
 	
-	@RPC
 	def suspendVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
@@ -235,7 +231,6 @@ class ClusterManagerService(object):
 			raise TashiException(d={'errno':Errors.UnableToSuspend, 'msg':'Failed to suspend %s' % (instance.name)})
 		return
 	
-	@RPC
 	def resumeVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
@@ -244,7 +239,6 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return instance
 	
-	@RPC
 	def migrateVm(self, instanceId, targetHostId):
 		instance = self.data.acquireInstance(instanceId)
 		try:
@@ -285,7 +279,6 @@ class ClusterManagerService(object):
 			raise
 		return
 	
-	@RPC
 	def pauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Running, InstanceState.Pausing)
@@ -301,7 +294,6 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return
 
-	@RPC
 	def unpauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.stateTransition(instance, InstanceState.Paused, InstanceState.Unpausing)
@@ -317,23 +309,18 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return
 	
-	@RPC
 	def getHosts(self):
 		return self.data.getHosts().values()
 	
-	@RPC
 	def getNetworks(self):
 		return self.data.getNetworks().values()
 	
-	@RPC
 	def getUsers(self):
 		return self.data.getUsers().values()
 	
-	@RPC
 	def getInstances(self):
 		return self.data.getInstances().values()
 	
-	@RPC
 	def vmmSpecificCall(self, instanceId, arg):
 		instance = self.data.getInstance(instanceId)
 		hostname = self.data.getHost(instance.hostId).name
@@ -345,7 +332,6 @@ class ClusterManagerService(object):
 		return res
 	
 #	@timed
-	@RPC
 	def registerNodeManager(self, host, instances):
 		"""Called by the NM every so often as a keep-alive/state polling -- state changes here are NOT AUTHORITATIVE"""
 		if (host.id == None):
@@ -408,7 +394,6 @@ class ClusterManagerService(object):
 			self.data.releaseHost(oldHost)
 		return host.id
 	
-	@RPC
 	def vmUpdate(self, instanceId, instance, oldState):
 		try:
 			oldInstance = self.data.acquireInstance(instanceId)
@@ -451,7 +436,6 @@ class ClusterManagerService(object):
 			self.data.releaseInstance(oldInstance)
 		return
 	
-	@RPC
 	def activateVm(self, instanceId, host):
 		dataHost = self.data.acquireHost(host.id)
 		if (dataHost.name != host.name):
