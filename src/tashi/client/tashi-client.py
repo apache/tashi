@@ -347,6 +347,14 @@ def genKeys(list):
 	return keys
 
 def makeTable(list, keys=None):
+	(consoleWidth, consoleHeight) = (9999, 9999)
+	try:
+		stdout = os.popen("stty size")
+		r = stdout.read()
+		stdout.close()
+		(consoleHeight, consoleWidth) = map(lambda x: int(x.strip()), r.split())
+	except:
+		pass
 	for obj in list:
 		transformState(obj)
 	if (keys == None):
@@ -371,9 +379,19 @@ def makeTable(list, keys=None):
 				maxWidth[k] = max(maxWidth[k], len(str(row.__dict__[k])))
 	if (keys == []):
 		return
+	totalWidth = reduce(lambda x, y: x + y + 1, maxWidth.values(), 0)
+	while (totalWidth > consoleWidth):
+		widths = maxWidth.items()
+		widths.sort(cmp=lambda x, y: cmp(x[1], y[1]))
+		widths.reverse()
+		maxWidth[widths[0][0]] = widths[0][1]-1
+		totalWidth = reduce(lambda x, y: x + y + 1, maxWidth.values(), 0)
 	line = ""
 	for k in keys:
-		line += (" %-" + str(maxWidth[k]) + "." + str(maxWidth[k]) + "s") % (k)
+		if (len(str(k)) > maxWidth[k]):
+			line += (" %-" + str(maxWidth[k]-3) + "." + str(maxWidth[k]-3) + "s...") % (k)
+		else:
+			line += (" %-" + str(maxWidth[k]) + "." + str(maxWidth[k]) + "s") % (k)
 	print line
 	line = ""
 	for k in keys:
@@ -393,7 +411,10 @@ def makeTable(list, keys=None):
 		line = ""
 		for k in keys:
 			row.__dict__[k] = row.__dict__.get(k, "")
-			line += (" %-" + str(maxWidth[k]) + "." + str(maxWidth[k]) + "s") % (str(row.__dict__[k]))
+			if (len(str(row.__dict__[k])) > maxWidth[k]):
+				line += (" %-" + str(maxWidth[k]-3) + "." + str(maxWidth[k]-3) + "s...") % (str(row.__dict__[k]))
+			else:
+				line += (" %-" + str(maxWidth[k]) + "." + str(maxWidth[k]) + "s") % (str(row.__dict__[k]))
 		print line
 		
 def simpleType(obj):
@@ -490,6 +511,8 @@ def main():
 					makeTable(res, keys)
 				else:
 					pprint(res)
+			except IOError:
+				pass
 			except Exception, e:
 				print e
 	except TashiException, e:
