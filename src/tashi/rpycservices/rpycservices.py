@@ -24,7 +24,7 @@ def clean(args):
 		return user
 	return args
 
-class client():
+class client:
 	def __init__(self, host, port, username=None, password=None):
 		"""Client for ManagerService. If username and password are provided, rpyc.tls_connect will be used to connect, else rpyc.connect will be used."""
 		self.host = host
