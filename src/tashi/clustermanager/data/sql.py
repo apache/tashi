@@ -94,10 +94,8 @@ class SQL(DataInterface):
 	def makeListInstance(self, l):
 		i = Instance()
 		for e in range(0, len(self.instanceOrder)):
-			if self.instanceOrder[e] == 'state':
-				i.__dict__[self.instanceOrder[e]] = int(l[e])
-			else:
-				i.__dict__[self.instanceOrder[e]] = l[e]
+			i.__dict__[self.instanceOrder[e]] = l[e]
+		i.state = int(i.state)
 		i.decayed = boolean(i.decayed)
 		i.disks = map(lambda x: DiskConfiguration(d=x), eval(i.disks))
 		i.nics = map(lambda x: NetworkConfiguration(d=x), eval(i.nics))
@@ -113,16 +111,14 @@ class SQL(DataInterface):
 	def makeListHost(self, l):
 		h = Host()
 		for e in range(0, len(self.hostOrder)):
-			if self.hostOrder[e] == 'state':
-				h.__dict__[self.hostOrder[e]] = int(l[e])
-			else:
-				h.__dict__[self.hostOrder[e]] = l[e]
+			h.__dict__[self.hostOrder[e]] = l[e]
+		h.state = int(h.state)
 		return h
 	
 	def registerInstance(self, instance):
 		self.instanceLock.acquire()
 		try:
-			if (instance.id is not None and instance.id not in self.instances):
+			if (instance.id is not None and instance.id not in self.getInstances()):
 				self.instanceIdLock.acquire()
 				if (instance.id >= self.maxInstanceId):
 					self.maxInstanceId = instance.id + 1
@@ -143,6 +139,8 @@ class SQL(DataInterface):
 		try:
 			cur = self.executeStatement("SELECT * from instances WHERE id = %d" % (instanceId))
 			l = cur.fetchone()
+			if (not l):
+				raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (instanceId)})
 			instance = self.makeListInstance(l)
 			self.instanceLocks[instance.id] = self.instanceLocks.get(instance.id, threading.Lock())
 			instance._lock = self.instanceLocks[instance.id]
