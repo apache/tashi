@@ -24,18 +24,32 @@
 default: src/tashi/services bin src/utils/nmd
 	@echo Done
 
-all: src/tashi/services bin src/utils/nmd src/tags doc/html
+all: src/tashi/services bin src/utils/nmd src/tags doc/html aws
 	@echo Done
 
 doc: rmdoc doc/html
 	@echo Done
 
-clean: rmnmd rmbin rmtags rmservices rmdoc
+clean: rmnmd rmbin rmtags rmservices rmdoc rmaws
 	if [ `find . -name "*.pyc" | wc -l` -gt 0 ]; then echo Removing python byte-code...; rm `find . -name "*.pyc"`; fi
 	@echo Done
 
 version:
 	sed -i "s/version = .*/version = \"`date`\"/" src/tashi/version.py
+
+aws: src/tashi/aws/wsdl/AmazonEC2_services_types.py src/tashi/aws/wsdl/AmazonEC2_services_server.py
+
+src/tashi/aws/wsdl/AmazonEC2_services_types.py: src/tashi/aws/wsdl/2009-04-04.ec2.wsdl
+	(cd src/tashi/aws/wsdl; wsdl2py -b --file ./2009-04-04.ec2.wsdl)
+
+src/tashi/aws/wsdl/AmazonEC2_services_server.py: src/tashi/aws/wsdl/2009-04-04.ec2.wsdl
+	(cd src/tashi/aws/wsdl; wsdl2dispatch --file ./2009-04-04.ec2.wsdl)
+
+src/tashi/aws/wsdl/2009-04-04.ec2.wsdl:
+	wget -O src/tashi/aws/wsdl/2009-04-04.ec2.wsdl http://s3.amazonaws.com/ec2-downloads/2009-04-04.ec2.wsdl
+
+rmaws:
+	if test -e src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; then echo Removing aws...; rm -f src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; rm -f src/tashi/aws/wsdl/AmazonEC2_*.py; fi
 
 # Implicit builds
 src/utils/nmd: src/utils/Makefile src/utils/nmd.c
