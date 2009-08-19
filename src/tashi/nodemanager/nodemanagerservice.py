@@ -272,9 +272,12 @@ class NodeManagerService(object):
 		while True:
 			try:
 				publishList = []
-				for vmId in self.instances:
+				for vmId in self.instances.keys():
 					try:
-						id = self.instances[vmId].id
+						instance = self.instances.get(vmId, None)
+						if (not instance):
+							continue
+						id = instance.id
 						stats = self.vmm.getStats(vmId)
 						for stat in stats:
 							publishList.append({"vm_%d_%s" % (id, stat):stats[stat]})
