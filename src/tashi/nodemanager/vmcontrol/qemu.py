@@ -628,6 +628,17 @@ class Qemu(VmControlInterface):
 						(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
 						(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
 					self.stats[vmId] = self.stats.get(vmId, {})
+					child = self.controlledVMs.get(vmId, None)
+					if (child):
+						res = self.enterCommand(child, "info blockstats")
+						for l in res.split("\n"):
+							(device, sep, data) = stringPartition(l, ": ")
+							if (data != ""):
+								for field in data.split(" "):
+									(label, sep, val) = stringPartition(field, "=")
+									if (val != ""):
+										self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
+										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
 					self.stats[vmId]['cpuLoad'] = cpuLoad
 					self.stats[vmId]['rss'] = rss
 					self.stats[vmId]['recvMBs'] = sendMBs
