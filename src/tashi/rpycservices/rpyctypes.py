@@ -68,6 +68,7 @@ class Host(object):
 		self.memory = None
 		self.cores = None
 		self.version = None
+		self.notes = None
 		if isinstance(d, dict):
 			if 'id' in d:
 				self.id = d['id']
@@ -85,6 +86,8 @@ class Host(object):
 				self.cores = d['cores']
 			if 'version' in d:
 				self.version = d['version']
+			if 'notes' in d:
+				self.notes = d['notes']
 
 	def __str__(self): 
 		return str(self.__dict__)
