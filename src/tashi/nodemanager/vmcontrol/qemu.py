@@ -514,9 +514,8 @@ class Qemu(VmControlInterface):
 		child = self.getChildFromPid(vmId)
 		self.enterCommand(child, "c")
 	
-	@broken
 	def shutdownVm(self, vmId):
-		"""'system_powerdown' doesn't seem to actually shutdown the VM"""
+		"""'system_powerdown' doesn't seem to actually shutdown the VM on some versions of KVM with some versions of Linux"""
 		child = self.getChildFromPid(vmId)
 		self.enterCommand(child, "system_powerdown")
 	
