@@ -50,6 +50,7 @@ class Primitive(object):
 	
 	def start(self):
 		oldInstances = {}
+		muffle = {}
 		while True:
 			try:
 				# Generate a list of VMs/host
@@ -109,8 +110,11 @@ class Primitive(object):
 								self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
 								self.client.activateVm(i, minMaxHost)
 								load[minMaxHost.id] = load[minMaxHost.id] + [i]
+								muffle.clear()
 							else:
-								self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
+								if (inst.name not in muffle):
+									self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
+									muffle[inst.name] = True
 						except Exception, e:
 							self.log.exception("Failed to schedule or activate %s" % (inst.name))
 				time.sleep(self.scheduleDelay)
