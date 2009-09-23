@@ -49,8 +49,8 @@ if __name__ == '__main__':
 	shutil.copytree(os.path.join('gen-py', 'messagingthrift'),
 			os.path.join('..', 'messaging', 'messagingthrift'))
 
-        print 'Generating Python code for \'layoutlocality.thrift\'...'
-        os.system('thrift --gen py:new_style layoutlocality.thrift')
+	print 'Generating Python code for \'layoutlocality.thrift\'...'
+	os.system('thrift --gen py:new_style layoutlocality.thrift')
  
-        print 'Copying generated code to \'tashi.services\' package...'
-        shutil.copytree('gen-py/layoutlocality', '../services/layoutlocality')
+	print 'Copying generated code to \'tashi.services\' package...'
+	shutil.copytree('gen-py/layoutlocality', '../services/layoutlocality')

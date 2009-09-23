@@ -318,9 +318,9 @@ def transformState(obj):
 	if (type(obj) == Instance):
 		fetchUsers()
 		try:
-				obj.state = vmStates[obj.state]
+			obj.state = vmStates[obj.state]
 		except:
-				obj.state = 'Unknown'
+			obj.state = 'Unknown'
 		if (obj.userId in users):
 			obj.user = users[obj.userId].name
 		else:
