@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.aws.util import *
+from tashi.rpycservices.rpyctypes import *
 
 def CreateVolume():
 	raise NotImplementedError

@@ -15,10 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.aws.util import *
 
-def MonitorInstances():
-	raise NotImplementedError
+def MonitorInstances(instancesSet):
+	# Not sure whether the returned information is correct.
+	res = MonitorInstancesResponseMsg()
+	res.requestId = genRequestId()
+	res.instancesSet = res.new_instancesSet()
+	item = res.instancesSet.new_item()
+	item.instanceId = instancesSet['item']['instanceId']
+	item.monitoring = item.new_monitoring()
+	item.monitoring.state = 'Normal'
+	res.instancesSet.item = [item]
+	return res
 
 def UnmonitorInstances():
 	raise NotImplementedError

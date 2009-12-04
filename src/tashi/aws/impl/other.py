@@ -15,9 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.aws.util import *
 
-def ConfirmProductInstance():
-	raise NotImplementedError
+def ConfirmProductInstance(productCode, instanceId):
+	res = ConfirmProductInstanceResponseMsg()
+	res.requestId = genRequestId()
+	res.__dict__['return'] = True
+	for i in client.getInstances():
+		if i.id == int(instanceId):
+			res.ownerId = i.userId
+			break
+	else:
+		res.__dict__['return'] = False
+	return res
 
 functions = ['ConfirmProductInstance']

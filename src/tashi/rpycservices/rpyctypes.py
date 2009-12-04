@@ -210,6 +210,7 @@ class Instance(object):
 		#Quick fix so self.nics is not None
 		self.nics = []
 		self.hints = None
+		self.groupName = None
 		if isinstance(d, dict):
 			if 'id' in d:
 				self.id = d['id']
@@ -235,6 +236,8 @@ class Instance(object):
 				self.nics = d['nics']
 			if 'hints' in d:
 				self.hints = d['hints']
+			if 'groupName' in d:
+				self.groupName = d['groupName']
 
 	def __str__(self): 
 		return str(self.__dict__)
@@ -248,3 +251,178 @@ class Instance(object):
 	def __ne__(self, other):
 		return not (self == other)
 
+class Key(object):
+	def __init__(self, d=None):
+		self.userId = None
+		self.keyName = None
+		self.fingerprint = None
+		self.pubkey = None
+		self.privkey = None
+		if isinstance(d, dict):
+			if 'userId' in d:
+				self.userId = d['userId']
+			if 'keyName' in d:
+				self.keyName = d['keyName']
+			if 'fingerprint' in d:
+				self.fingerprint = d['fingerprint']
+			if 'pubkey' in d:
+				self.pubkey = d['pubkey']
+			if 'privkey' in d:
+				self.privkey = d['privkey']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.userId == other.userId and self.keyName == other.keyName
+
+	def __ne__(self, other):
+		return not (self == other)
+
+class Group(object):
+	def __init__(self, d=None):
+		self.userId = None
+		self.groupName = None
+		self.groupDescription = None
+		self.ipPermissions = []
+		if isinstance(d, dict):
+			if 'userId' in d:
+				self.userId = d['userId']
+			if 'groupName' in d:
+				self.groupName = d['groupName']
+			if 'groupDescription' in d:
+				self.groupDescription = d['groupDescription']
+			if 'ipPermissions' in d:
+				self.ipPermissions = d['ipPermissions']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.userId == other.userId and self.groupName == other.groupName
+
+	def __ne__(self, other):
+		return not (self == other)
+
+class GroupPermission(object):
+	def __init__(self, d=None):
+		self.targetUserId = None
+		self.groupName = None
+		if isinstance(d, dict):
+			if 'targetUserId' in d:
+				self.targetUserId = d['targetUserId']
+			if 'groupName' in d:
+				self.groupName = d['groupName']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+	def __ne__(self, other):
+		return not (self == other)
+
+class IpPermission(object):
+	def __init__(self, d=None):
+		self.userId = None
+		self.groupName = None
+		self.ipProtocol = None
+		self.fromPort = None
+		self.toPort = None
+		self.cidrIp = None
+		self.groupPermissions = []
+		if isinstance(d, dict):
+			if 'userId' in d:
+				self.userId = d['userId']
+			if 'groupName' in d:
+				self.groupName = d['groupName']
+			if 'ipProtocol' in d:
+				self.ipProtocol = d['ipProtocol']
+			if 'fromPort' in d:
+				self.fromPort = d['fromPort']
+			if 'toPort' in d:
+				self.toPort = d['toPort']
+			if 'cidrIp' in d:
+				self.cidrIp = d['cidrIp']
+			if 'groupPermissions' in d:
+				self.groupPermissions = d['groupPermissions']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.groupName == other.groupName and self.userId == other.userId and self.ipProtocol == other.ipProtocol and self.fromPort == other.fromPort and self.toPort == other.toPort and self.cidrIp == other.cidrIp
+
+	def __ne__(self, other):
+		return not (self == other)
+
+class Image(object):
+	def __init__(self, d=None):
+		self.userId = None
+		self.imageId = None
+		self.isPublic = False
+		self.explicitUserIds = []
+		self.s3path = None
+		self.productCode = ''
+		if isinstance(d, dict):
+			if 'userId' in d:
+				self.userId = d['userId']
+			if 'imageId' in d:
+				self.imageId = d['imageId']
+			if 'isPublic' in d:
+				self.isPublic = d['isPublic']
+			if 'explicitUserIds' in d:
+				self.explicitUserIds = d['explicitUserIds']
+			if 's3path' in d:
+				self.s3path = d['s3path']
+			if 'productCode' in d:
+				self.productCode = d['productCode']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.imageId == other.imageId and self.userId == other.userId
+
+	def __ne__(self, other):
+		return not (self == other)
+
+class Address(object):
+	def __init__(self, d=None):
+		self.userId = None
+		self.publicIp = None
+		self.instanceId = None
+		if 'userId' in d:
+			self.userId = d['userId']
+		if 'publicIp' in d:
+			self.publicIp = d['publicIp']
+		if 'instanceId' in d:
+			self.instanceId = d['instanceId']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.userId == other.userId and self.publicIp == other.publicIp
+
+	def __ne__(self, other):
+		return not (self == other)

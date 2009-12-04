@@ -16,13 +16,14 @@
 # under the License.    
 
 import sys
+import tashi
+import tashi.aws.data
 import traceback
 import types
 import uuid
+import trans
 from xml.dom import minidom
 from ZSI import SoapWriter
-import tashi
-import trans
 
 sizes = {'m1.small': (int(1.7*1024), 1),
          'm1.large': (int(7.5*1024), 4),
@@ -39,7 +40,7 @@ def fixObject(obj):
 		return obj
 	try:
 		if (getattr(obj, "__dict__", None)):
-			for k in obj.__dict__.keys():
+			for k in obj.__dict__:
 				if (not k.startswith("_")):
 					setattr(obj, "_%s" % (k), fixObject(getattr(obj, k)))
 		else:
@@ -91,6 +92,9 @@ class Lazy(object):
 		return getattr(obj, name)
 
 client = Lazy("tashi.createClient(tashi.getConfig()[0])")
+global awsdata
+awsdata = tashi.aws.data.Pickled(tashi.getConfig()[0])
+awsdir = '/tmp/'
 
 users = {}
 def userIdToName(id):
@@ -114,10 +118,9 @@ def userNameToId(name):
 		return users[name]
 	else:
 		return -1
-	
-vars = {}
 
 def genRequestId():
 	return str(uuid.uuid1())
-
+	
+vars = {}
 authorizedUser = "UNKNOWN"

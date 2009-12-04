@@ -21,16 +21,16 @@
 .SILENT:
 
 # Explicit builds
-default: src/tashi/services bin src/utils/nmd
+default: bin src/utils/nmd
 	@echo Done
 
-all: src/tashi/services bin src/utils/nmd src/tags doc/html aws
+all: bin src/utils/nmd src/tags doc/html aws
 	@echo Done
 
 doc: rmdoc doc/html
 	@echo Done
 
-clean: rmnmd rmbin rmtags rmservices rmdoc rmaws
+clean: rmnmd rmbin rmtags rmdoc rmaws
 	if [ `find . -name "*.pyc" | wc -l` -gt 0 ]; then echo Removing python byte-code...; rm `find . -name "*.pyc"`; fi
 	@echo Done
 
@@ -55,29 +55,20 @@ rmaws:
 src/utils/nmd: src/utils/Makefile src/utils/nmd.c
 	@echo Building nmd...
 	(cd src/utils; make)
-	ln -s src/utils/nmd/nmd ./bin/nmd
+	ln -s ../src/utils/nmd ./bin/nmd
 
 rmnmd:
 	if test -e src/utils/nmd; then echo Removing nmd...; (cd src/utils; make clean); rm -f bin/nmd; fi
-
-src/tashi/services: src/tashi/thrift/services.thrift
-	@echo Building tashi.services...
-	(cd src/tashi/thrift; ./build.py)
-
-rmservices:
-	if test -d src/tashi/services; then echo Removing tashi.services...; rm -rf src/tashi/services; fi
-	if test -d src/tashi/thrift/gen-py; then echo Removing tashi.thrift.gen-py...; rm -rf src/tashi/thrift/gen-py; fi
-	if test -d src/tashi/messaging/messagingthrift; then echo Removing tashi.messaging.messagingthrift; rm -rf src/tashi/messaging/messagingthrift; fi
 
 bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py
 bindir:
 	if test ! -d bin; then mkdir bin; fi
 rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive
 	if test -d bin; then rmdir bin; fi
-bin/getInstances: src/tashi/services
+bin/getInstances: 
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
 rmclients:
-	if test -e bin/getInstances; then (echo Removing client symlinks...; make src/tashi/services; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --rmsyms; cd ..); fi
+	if test -e bin/getInstances; then (echo Removing client symlinks...; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --rmsyms; cd ..); fi
 bin/clustermanager.py: src/tashi/clustermanager/clustermanager.py
 	@echo Symlinking in clustermanager...
 	(cd bin; ln -s ../src/tashi/clustermanager/clustermanager.py .)
@@ -106,7 +97,7 @@ rmtags:
 
 doc/html:
 	@echo Generating HTML docs...
-	epydoc --html -o doc/html --include-log --name=tashi --graph=all --exclude=tashi.services --exclude=tashi.messaging.messagingthrift ./src/tashi
+	epydoc --html -o doc/html --include-log --name=tashi --graph=all --exclude=tashi.messaging.messagingthrift ./src/tashi
 rmdoc:
 	if test -d doc/html; then echo Removing HTML docs...; rm -rf ./doc/html; fi
 

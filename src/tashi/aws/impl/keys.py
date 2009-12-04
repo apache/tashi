@@ -17,21 +17,63 @@
 
 from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.aws.util import *
+from tashi.rpycservices.rpyctypes import *
+import os
+import re
 
-def CreateKeyPair():
-	raise NotImplementedError
+def CreateKeyPair(keyName):
+	res = CreateKeyPairResponseMsg()
+	res.requestId = genRequestId()
+	res.keyName = keyName
+	privkeyfile = awsdir + 'id_rsa.tmp'
+	pubkeyfile = awsdir + 'id_rsa.tmp.pub'
+	fingerprintfile = awsdir + 'fingerprint.tmp'
+	try:
+		os.remove(privkeyfile)
+	except:
+		pass
+	os.system('ssh-keygen -t rsa -b 2048 -f ' + privkeyfile + ' -P "" > ' + fingerprintfile)
+	infile = open(privkeyfile, 'r')
+	privkey = infile.read()
+	infile.close()
+	infile = open(pubkeyfile, 'r')
+	pubkey = infile.read()
+	infile.close()
+	infile = open(fingerprintfile, 'r')
+	fingerprint = infile.read()
+	infile.close()
+	fingerprint = re.findall('The key fingerprint is:\s+(\S+)\s+', fingerprint)[0]
+	res.keyFingerprint = fingerprint
+	res.keyMaterial = privkey
+	os.remove(privkeyfile)
+	os.remove(pubkeyfile)
+	os.remove(fingerprintfile)
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	awsdata.registerKey(Key({'userId':userId,'keyName':keyName,'fingerprint':fingerprint,'pubkey':pubkey,'privkey':privkey}))
+	return res
 
-def DescribeKeyPairs():
+def DescribeKeyPairs(keySet={}):
 	res = DescribeKeyPairsResponseMsg()
 	res.requestId = genRequestId()
 	res.keySet = res.new_keySet()
-	item = res.keySet.new_item()
-	item.keyName = "fake"
-	item.keyFingerprint = "missing"
-	res.keySet.item = [item]
+	res.keySet.item = []
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	for key in awsdata.getKeys(userId):
+		item = res.keySet.new_item()
+		item.keyName = key.keyName
+		item.keyFingerprint = key.fingerprint
+		res.keySet.item.append(item)
 	return res
 
-def DeleteKeyPair():
-	raise NotImplementedError
+def DeleteKeyPair(keyName):
+	res = DeleteKeyPairResponseMsg()
+	res.requestId = genRequestId()
+	res.__dict__['return'] = True
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	try:
+		awsdata.removeKey(userId, keyName)
+	except:
+		res.__dict__['return'] = False
+	return res
 
 functions = ['CreateKeyPair', 'DescribeKeyPairs', 'DeleteKeyPair']

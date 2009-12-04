@@ -15,21 +15,70 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.aws.util import *
+from tashi.rpycservices.rpyctypes import *
 
 def AllocateAddress():
-	raise NotImplementedError
+	res = AllocateAddressResponseMsg()
+	res.requestId = genRequestId()
+	# To Do, reserve an available ip address.
+	# client.getAddress()
+	res.publicIp = '0.0.0.0'
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	awsdata.registerAddress(Address({'userId':userId,'publicIp':res.publicIp}))
+	return res
 
-def ReleaseAddress():
-	raise NotImplementedError
+def ReleaseAddress(publicIp):
+	res = ReleaseAddressResponseMsg()
+	res.requestId = genRequestId()
+	# To Do, release a reserved ip address.
+	# client.releaseAddress()
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	res.__dict__['return'] = True
+	try:
+		awsdata.removeAddress(userId, publicIp)
+	except:
+		res.__dict__['return'] = False
+	return res
 
-def DescribeAddresses():
-	raise NotImplementedError
+def DescribeAddresses(publicIpsSet={}):
+	res = DescribeAddressesResponseMsg()
+	res.requestId = genRequestId()
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	res.addressesSet = res.new_addressesSet()
+	res.addressesSet.item = []
+	for address in awsdata.getAddresses(userId):
+		addressItem = res.addressesSet.new_item()
+		addressItem.publicIp = address.publicIp
+		addressItem.instanceId = address.instanceId
+		res.addressesSet.item.append(addressItem)
+	return res
 
-def AssociateAddress():
-	raise NotImplementedError
+def AssociateAddress(instanceId, publicIp):
+	res = AssociateAddressResponseMsg()
+	res.requestId = genRequestId()
+	res.__dict__['return'] = True
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	try:
+		awsdata.associateAddress(userId, instanceId, publicIp)
+		# To Do, associate an Address
+		#client.associateAddress()
+	except:
+		res.__dict__['return'] = False
+	return res
 
-def DisassociateAddress():
-	raise NotImplementedError
+def DisassociateAddress(publicIp):
+	res = DisassociateAddressResponseMsg()
+	res.requestId = genRequestId()
+	res.__dict__['return'] = True
+	userId = userNameToId(tashi.aws.util.authorizedUser)
+	try:
+		awsdata.dissociateAddress(userId, publicIp)
+		# To Do, associate an Address
+		#client.dissociateAddress()
+	except:
+		res.__dict__['return'] = False
+	return res
 
 functions = ['AllocateAddress', 'ReleaseAddress', 'DescribeAddresses', 'AssociateAddress', 'DisassociateAddress']

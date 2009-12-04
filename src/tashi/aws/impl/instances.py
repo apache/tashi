@@ -23,6 +23,7 @@ from tashi.aws.wsdl.AmazonEC2_services_server import *
 from tashi.rpycservices.rpyctypes import *
 from tashi.aws.util import *
 import tashi.aws.util
+import tashi
 
 def getImages():
 	IMGDIR="/mnt/merkabah/tashi/images/"
@@ -97,8 +98,6 @@ def RunInstances(imageId, minCount, maxCount, instanceType='m1.small', groupSet=
 	inst.hints = {}
 	oldInst = inst
 	inst = client.createVm(oldInst)
-	res = RunInstancesResponseMsg()
-	res.requestId = genRequestId()
 	res.reservationId = 'r-12345678'
 	res.ownerId = 'UYY3TLBUXIEON5NQVUUX6OMPWBZIQNFM'
 	res.groupSet = res.new_groupSet()
@@ -157,6 +156,8 @@ def DescribeInstances(instancesSet={}):
 		if (userName == tashi.aws.util.authorizedUser):
 			instanceItem = makeTashiInstanceEC2Instance(inst)
 			item.instancesSet.item.append(instanceItem)
+	# For some reason, if item.instancesSet is empty,
+	# "Server: Processing Failure is printed out on the command line.
 	item.requesterId = '1234'
 	res.reservationSet.item = [item]
 	return res
