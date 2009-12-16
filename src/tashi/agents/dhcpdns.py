@@ -89,11 +89,15 @@ class DhcpDns(InstanceHook):
 		network = nic.network
 		allocatedIP = None
 		requestedIP = self.strToIp(nic.ip)
+		wrapToMinAlready = False
 		if (requestedIP <= self.ipMax[network] and requestedIP >= self.ipMin[network] and (requestedIP not in self.usedIPs)):
 			allocatedIP = requestedIP
 		while (allocatedIP == None):
+			if (self.currentIP[network] > self.ipMax[network] and wrapToMinAlready):
+				raise UserWarning("No available IP addresses for network %d" % (network))
 			if (self.currentIP[network] > self.ipMax[network]):
 				self.currentIP[network] = self.ipMin[network]
+				wrapToMinAlready = True
 			elif (self.currentIP[network] in self.usedIPs):
 				self.currentIP[network] = self.currentIP[network] + 1
 			else:
