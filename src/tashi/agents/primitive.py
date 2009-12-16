@@ -69,12 +69,13 @@ class Primitive(object):
 						load[i.hostId] = load[i.hostId] + [i.id]
 				# Check for VMs that have exited
 				for i in oldInstances:
-					if (i not in instances):
+					if (i not in instances and oldInstances[i].state != InstanceState.Pending):
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
 				# Schedule new VMs
 				oldInstances = instances
 				if (len(load.get(None, [])) > 0):
+					load[None].sort()
 					for i in load[None]:
 						inst = instances[i]
 						try:
@@ -116,7 +117,9 @@ class Primitive(object):
 									self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
 									muffle[inst.name] = True
 						except Exception, e:
-							self.log.exception("Failed to schedule or activate %s" % (inst.name))
+							if (inst.name not in muffle):
+								self.log.exception("Failed to schedule or activate %s" % (inst.name))
+								muffle[inst.name] = True
 				time.sleep(self.scheduleDelay)
 			except TashiException, e:
 				self.log.exception("Tashi exception")
