@@ -152,7 +152,7 @@ class XenPV(VmControlInterface, threading.Thread):
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
-	                    image, macAddr, memory, cores, hints, id):
+	                    image, macAddr, bridge, memory, cores, hints, id):
 		fn = os.path.join("/tmp", vmName)
 		vmType = hints.get('vmtype', self.defaultVmType)
 		print 'starting vm with type: ', vmType
@@ -163,12 +163,13 @@ class XenPV(VmControlInterface, threading.Thread):
 kernel = '/usr/lib/xen/boot/pv-grub-x86_64.gz'
 extra = '(hd0,0)/grub/menu.lst'
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'mac=%s' ]
+vif = [ 'bridge=%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
 '''%(image,
+     bridge,
      macAddr,
      memory,
      cores)
@@ -177,12 +178,13 @@ extra='xencons=tty'
 			bootstr = '''
 bootloader="/usr/bin/pygrub"
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'mac=%s' ]
+vif = [ 'bridge=%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
 '''%(image,
+     bridge,
      macAddr,
      memory,
      cores)
@@ -206,13 +208,14 @@ kernel = "%s"
 %s     # ramdisk string is full command
 
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'mac=%s' ]
+vif = [ 'bridge=%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
 '''%(kernel, ramdisk,
      image,
+     bridge,
      macAddr,
      memory,
      cores)
@@ -241,13 +244,14 @@ usbdevice='tablet'
 
 shadow_memory=8
 disk=['tap:qcow:%s,hda,w']
-vif = [ 'type=ioemu,bridge=xenbr0,mac=%s' ]
+vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
 extra='xencons=tty'
 '''%(id,
      image,
+     bridge,
      macAddr,
      memory,
      cores)
@@ -296,6 +300,7 @@ extra='xencons=tty'
 		fn = self.createXenConfig(name, 
 					  instance.disks[0].local, 
 					  instance.nics[0].mac, 
+					  instance.nics[0].network,
 					  instance.memory,
 					  instance.cores,
 					  instance.hints,
