@@ -30,6 +30,10 @@
 #define TASHI_PATH "/usr/local/tashi/"
 #define LOG_FILE "/var/log/nodemanager.log"
 
+/* This function changes (on Linux!) its oom scoring, to make it
+ * unattractive to kill
+ */
+
 void make_invincible()
 {
 	int oom_adj_fd;
@@ -43,6 +47,8 @@ void make_invincible()
 
 }
 
+/* This function resets (on Linux!) its oom scoring to default
+ */
 void make_vulnerable()
 {
 	int oom_adj_fd;
@@ -62,12 +68,16 @@ int main(int argc, char **argv)
 	DIR* d;
 	int pid;
 	int lfd;
-	int forground=0;
+	int foreground=0;
 
+/* If first argument is "-f", run in foreground */
 	if ((argc > 1) && (strncmp(argv[1], "-f", 3)==0)) {
-		forground=1;
+		foreground=1;
 	}
-	if (!forground) {
+/* If not running in foreground, fork off and exit the parent.
+ * The child closes its default file descriptors.
+ */
+	if (!foreground) {
 		pid = fork();
 		if (pid != 0) {
 			exit(0);
@@ -76,27 +86,38 @@ int main(int argc, char **argv)
 		close(1);
 		close(2);
 	}
+/* Adjust OOM preference */
 	make_invincible();
+/* Configure environment of children */
 	env[0] = "PYTHONPATH="TASHI_PATH"/src/";
 	env[1] = NULL;
 	while (1) {
 		pid = fork();
 		if (pid == 0) {
+			/* child */
+			/* nodemanagers are vulnerable. Not the supervisor. */
 			make_vulnerable();
-			if (!forground) {
+			if (!foreground) {
+				/* If not running fg, open log file */
 				lfd = open(LOG_FILE, O_WRONLY|O_APPEND|O_CREAT);
 				if (lfd < 0) {
+					/* If this failed, open something? */
 					lfd = open("/dev/null", O_WRONLY);
 				}
+				/* Make this fd stdout and stderr */
 				dup2(lfd, 2);
 				dup2(lfd, 1);
+				/* close stdin */
 				close(0);
 			}
 			chdir(TASHI_PATH);
+			/* start node manager with python environment */
 			execle("./bin/nodemanager.py", "./bin/nodemanager.py", NULL, env);
 			exit(-1);
 		}
+		/* sleep before checking for child's status */
 		sleep(SLEEP_INTERVAL);
+		/* catch child exiting and go through loop again */
 		waitpid(pid, &status, 0);
-	}	
+	}	 /* while (1) */
 }
