@@ -52,13 +52,18 @@ rmaws:
 	if test -e src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; then echo Removing aws...; rm -f src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; rm -f src/tashi/aws/wsdl/AmazonEC2_*.py; fi
 
 # Implicit builds
-src/utils/nmd: src/utils/Makefile src/utils/nmd.c
-	@echo Building nmd...
-	(cd src/utils; make)
-	ln -s ../src/utils/nmd ./bin/nmd
+# src/utils/nmd: src/utils/Makefile src/utils/nmd.c
+#	@echo Building nmd...
+#	(cd src/utils; make)
+#	ln -s ../src/utils/nmd ./bin/nmd
 
+src/utils/nmd: src/utils/nmd.py
+	ln -s ../src/utils/nmd.py ./bin/nmd.py
+
+#rmnmd:
+#	if test -e src/utils/nmd; then echo Removing nmd...; (cd src/utils; make clean); rm -f bin/nmd; fi
 rmnmd:
-	if test -e src/utils/nmd; then echo Removing nmd...; (cd src/utils; make clean); rm -f bin/nmd; fi
+	echo Removing nmd...; rm -f bin/nmd.py
 
 bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py
 bindir:
