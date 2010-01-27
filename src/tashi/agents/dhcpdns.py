@@ -22,7 +22,7 @@ import socket
 import subprocess
 import time
 from instancehook import InstanceHook
-from tashi.services.ttypes import Instance, NetworkConfiguration
+from tashi.rpycservices.rpyctypes import Instance, NetworkConfiguration
 from tashi import boolean
 
 class DhcpDns(InstanceHook):
