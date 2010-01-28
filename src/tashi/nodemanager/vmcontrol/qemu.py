@@ -293,15 +293,16 @@ class Qemu(VmControlInterface):
 		host = Host()
 		host.id = service.id
 		host.name = socket.gethostname()
-		memoryStr = os.popen2("head -n 1 /proc/meminfo | awk '{print $2 \" \" $3}'")[1].read().strip()
-		if (memoryStr[-2:] == "kB"):
-			host.memory = int(memoryStr[:-2])/1024
-		elif (memoryStr[-2:] == "mB"):
-			host.memory = int(memoryStr[:-2])
-		elif (memoryStr[-2:] == "gB"):
-			host.memory = int(memoryStr[:-2])*1024
-		elif (memoryStr[-2:] == " B"):
-			host.memory = int(memoryStr[:-2])/(1024*1024)
+		cmd = "head -n 1 /proc/meminfo"		
+		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
+		if (memoryStr[2] == "kB"):
+			host.memory = int(memoryStr[1])/1024
+		elif (memoryStr[2] == "mB"):
+			host.memory = int(memoryStr[1])
+		elif (memoryStr[2] == "gB"):
+			host.memory = int(memoryStr[1])*1024
+		elif (memoryStr[2] == " B"):
+			host.memory = int(memoryStr[1])/(1024*1024)
 		else:
 			log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0
