@@ -89,15 +89,26 @@ class Primitive(object):
 							if (targetHost != None):
 								for h in hosts.values():
 									if ((str(h.id) == targetHost or h.name == targetHost)):
-										if (h.up == True and h.state == HostState.Normal):
+										#  make sure that host is up, in a normal state and is not reserved
+										if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
 											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
 											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
 											if (memUsage <= h.memory and coreUsage <= h.cores):
 												minMax = len(load[h.id])
 												minMaxHost = h
+								
+										#  If a host machine is reserved, only allow if userid is in reserved list
+										if ((len(h.reserved) > 0) and inst.userId in h.reserved):
+											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+											if (memUsage <= h.memory and coreUsage <= h.cores):
+												minMax = len(load[h.id])
+												minMaxHost = h
+
+
 							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
-									if (h.up == True and h.state == HostState.Normal):
+									if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
 										if (minMax is None or (self.densePack and len(load[h.id]) > minMax) or (not self.densePack and len(load[h.id]) < minMax)):
 											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
 											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
