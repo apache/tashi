@@ -83,7 +83,7 @@ class DhcpDns(InstanceHook):
 		return ipNum
 	
 	def ipToStr(self, ip):
-		return "%d.%d.%d.%d" % (ip>>24, (ip>>16)%256, (ip>>8)%256, ip%256)
+		return "%d.%d.%d.%d" % ((ip>>24)&0xff, (ip>>16)&0xff, (ip>>8)&0xff, ip&0xff)
 	
 	def allocateIP(self, nic):
 		network = nic.network
