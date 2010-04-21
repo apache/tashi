@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+# implementation of dfs interface functions
+
+import shutil
 import os
 import os.path
 from dfsinterface import DfsInterface
@@ -23,19 +26,24 @@ class Vfs(DfsInterface):
 	def __init__(self, config):
 		DfsInterface.__init__(self, config)
 		self.prefix = self.config.get("Vfs", "prefix")
-	
+
+# why do these three need to be separate?	
 	def copyTo(self, localSrc, dst):
-		(si, so, se) = os.popen3("cp %s %s" % (localSrc, 
-						       os.path.join(self.prefix, dst)))
-		so.readlines()
+		shutil.copy(localSrc, os.path.join(self.prefix, dst))
+# just assuming this works
 		return None
 	
 	def copyFrom(self, src, localDst):
-		(si, so, se) = os.popen3("cp %s %s" % (os.path.join(self.prefix, src),
-						       localDst))
-		so.readlines()
+		shutil.copy(os.path.join(self.prefix, src), localDst)
+# just assuming this works
 		return None
 
+	def copy(self, src, dst):
+		shutil.copy(os.path.join(self.prefix, src),
+			    os.path.join(self.prefix, dst))
+# just assuming this works
+		return None
+	
 	def list(self, path):
 		try:
 			return os.listdir(os.path.join(self.prefix, path))
@@ -49,15 +57,9 @@ class Vfs(DfsInterface):
 		return os.stat(os.path.join(self.prefix, path))
 	
 	def move(self, src, dst):
-		(si, so, se) = os.popen3("mv %s %s" % (os.path.join(self.prefix, src), 
-						       os.path.join(self.prefix, dst)))
-		so.readlines()
-		return None
-	
-	def copy(self, src, dst):
-		(si, so, se) = os.popen3("cp %s %s" % (os.path.join(self.prefix, src), 
-						       os.path.join(self.prefix, dst)))
-		so.readlines()
+		shutil.move(os.path.join(self.prefix, src), 
+			    os.path.join(self.prefix, dst))
+# just assuming this works
 		return None
 	
 	def mkdir(self, path):

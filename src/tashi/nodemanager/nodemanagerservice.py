@@ -75,6 +75,7 @@ class NodeManagerService(object):
 			f.close()
 			self.instances = cPickle.loads(data)
 		except Exception, e:
+# this fails reasonably often. should probably not be a verbose exception
 			self.log.exception('Failed to load VM info from %s' % (self.infoFile))
 			self.instances = {}
 	
