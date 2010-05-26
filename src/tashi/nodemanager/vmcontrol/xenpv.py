@@ -163,7 +163,7 @@ class XenPV(VmControlInterface, threading.Thread):
 kernel = '/usr/lib/xen/boot/pv-grub-x86_64.gz'
 extra = '(hd0,0)/grub/menu.lst'
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=%s,mac=%s' ]
+vif = [ 'bridge=br%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
@@ -178,7 +178,7 @@ extra='xencons=tty'
 			bootstr = '''
 bootloader="/usr/lib/xen-default/bin/pygrub"
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=%s,mac=%s' ]
+vif = [ 'bridge=br%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
@@ -208,7 +208,7 @@ kernel = "%s"
 %s     # ramdisk string is full command
 
 disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=%s,mac=%s' ]
+vif = [ 'bridge=br%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
@@ -244,7 +244,7 @@ usbdevice='tablet'
 
 shadow_memory=8
 disk=['tap:qcow:%s,hda,w']
-vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
+vif = [ 'type=ioemu,bridge=br%s,mac=%s' ]
 memory=%i
 vcpus=%i
 root="/dev/xvda1"
@@ -291,7 +291,7 @@ extra='xencons=tty'
 			instance.disks[i].local = imageLocal
 			if instance.disks[i].persistent == False:
 				newdisk = self.transientDisk(instance.id, i)
-				cmd = 'qcow-create 0 %s %s' % (newdisk, imageLocal)
+				cmd = '/usr/lib/xen-default/bin/qcow-create 0 %s %s' % (newdisk, imageLocal)
 				print 'creating new disk with "%s"' % cmd
 				os.system(cmd)
 				instance.disks[i].local = newdisk
