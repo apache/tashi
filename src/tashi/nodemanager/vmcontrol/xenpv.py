@@ -176,7 +176,7 @@ extra='xencons=tty'
 	
 		elif vmType == 'pygrub':
 			bootstr = '''
-bootloader="/usr/bin/pygrub"
+bootloader="/usr/lib/xen-default/bin/pygrub"
 disk=['tap:qcow:%s,xvda1,w']
 vif = [ 'bridge=%s,mac=%s' ]
 memory=%i
