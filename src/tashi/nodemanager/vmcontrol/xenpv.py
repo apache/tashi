@@ -37,12 +37,14 @@ log = logging.getLogger(__file__)
 
 # FIXME: these should throw errors on failure
 def domIdToName(domid):
+# XXXpipe: get domain name from id
 	f = os.popen("xm domname %i"%domid)
 	name = f.readline().strip()
 	f.close()
 	return name
 
 def domNameToId(domname):
+# XXXpipe: get domain id from name
 	f = os.popen("xm domid %s"%domname)
 	name = f.readline().strip()
 	f.close()

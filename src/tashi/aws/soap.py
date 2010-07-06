@@ -64,6 +64,7 @@ class ValidateParsedSoap(ParsedSoap):
 		f2 = open(ofile, "w")
 		f2.write(output)
 		f2.close()
+# XXXpipe: what are we doing here?
 		(stdin, stdout) = os.popen4("xmlsec1 --verify --id-attr:Id Timestamp --id-attr:Id Body --pubkey-cert-pem /var/lib/tashi-ec2/%s.crt --print-debug %s" % (CERT_DIGEST, ofile))
 		stdin.close()
 		res = stdout.read()

@@ -50,6 +50,7 @@ class GangliaPublisher(object):
 			except:
 				pass
 			cmd = 'gmetric -n "%s" -v "%s" -t "%s" -d "%d"' % (metricName, metricValue, metricType, self.dmax)
+# XXXpipe: send a datum to ganglia
 			(stdin, stdout) = os.popen4(cmd)
 			stdin.close()
 			res = stdout.read()

@@ -349,6 +349,7 @@ def genKeys(list):
 def makeTable(list, keys=None):
 	(consoleWidth, consoleHeight) = (9999, 9999)
 	try:
+# XXXpipe: get number of rows and column on current window
 		stdout = os.popen("stty size")
 		r = stdout.read()
 		stdout.close()

@@ -33,6 +33,8 @@ from tashi.util import getConfig
 
 def makeHTMLTable(list):
 	(stdin_r, stdin_w) = os.pipe()
+
+# XXXpipe: find number of columns in current window
 	pipe = os.popen("tput cols")
 	columns = pipe.read().strip()
 	keys = {}

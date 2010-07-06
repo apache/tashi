@@ -113,6 +113,7 @@ class DhcpDns(InstanceHook):
 		except:
 			pass
 		cmd = "omshell"
+# XXXpipe: open omshell session
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dhcpServer))
 		if (self.dhcpSecretKey != ""):
@@ -130,6 +131,7 @@ class DhcpDns(InstanceHook):
 
 	def removeDhcp(self, name, ipaddr=None):
 		cmd = "omshell"
+# XXXpipe: open omshell session
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dhcpServer))
 		if (self.dhcpSecretKey != ""):

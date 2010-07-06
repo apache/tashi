@@ -226,6 +226,7 @@ def debugConsole(globalDict):
 			import atexit
 			from IPython.Shell import IPShellEmbed
 			def resetConsole():
+# XXXpipe: make input window sane
 				(stdin, stdout) = os.popen2("reset")
 				stdout.read()
 			dbgshell = IPShellEmbed()

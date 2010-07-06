@@ -467,6 +467,7 @@ class Qemu(VmControlInterface):
 		# XXX: Cleanly wait until the port is open
 		lc = 0
 		while (lc < 1):
+# XXXpipe: find whether something is listening yet on the port
 			(stdin, stdout) = os.popen2("netstat -ln | grep 0.0.0.0:%d | wc -l" % (port))
 			stdin.close()
 			r = stdout.read()
