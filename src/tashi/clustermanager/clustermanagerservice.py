@@ -351,6 +351,8 @@ class ClusterManagerService(object):
 				oldHost.cores = host.cores
 				oldHost.up = True
 				oldHost.decayed = False
+
+# compare whether CM / NM versions are acceptable
 				if (host.version != version and not self.allowMismatchedVersions):
 					oldHost.state = HostState.VersionMismatch
 				if (host.version == version and oldHost.state == HostState.VersionMismatch):

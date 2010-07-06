@@ -201,7 +201,7 @@ class SQL(DataInterface):
 		return hosts
 	
 	def getHost(self, id):
-		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % (id))
+		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % (int(id)))
 		r = cur.fetchone()
 		if (r == None):
 			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (id)})

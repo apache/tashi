@@ -244,10 +244,10 @@ shadow_memory=8
 '''
 			diskconfig = '''
 disk=['%s:%s,ioemu:%s,w']
-'''(disk0, image, diskU)
+'''%(disk0, image, diskU)
 			netconfig = '''
 vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
-'''(bridge, macAddr)
+'''%(bridge, macAddr)
 
 		else:
 			raise Exception, "Unknown vmType in hints: %s"%vmType
@@ -256,22 +256,22 @@ vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
 		if diskconfig is None:
 			diskconfig = '''
 disk = ['%s:%s,%s,w']
-'''(disk0, image, diskU)
+'''%(disk0, image, diskU)
 
 		if netconfig is None:
 			netconfig = '''
 vif = [ 'bridge=%s,mac=%s' ]
-'''(bridge, macAddr)
+'''%(bridge, macAddr)
 
 		if memconfig is None:
 			memconfig = '''
 memory=%i
-'''(memory)
+'''%(memory)
 
 		if cpuconfig is None:
 			cpuconfig = '''
 vcpus=%i
-'''(cores)
+'''%(cores)
 
 		if extraconfig is None:
 			extraconfig = '''
@@ -333,7 +333,7 @@ extra='xencons=tty'
 				if disktype == 'qcow':
 					cmd = '/usr/lib/xen-default/bin/qcow-create 0 %s %s' % (newdisk, imageLocal)
 				elif disktype == 'vhd':
-					cmd = '/usr/lib/xen-default/bin/vhd-tool create 0 %s %s' % (newdisk, imageLocal)
+					cmd = '/usr/lib/xen-default/bin/vhd-util snapshot -n %s -p %s' % (newdisk, imageLocal)
 				else:
 					raise Exception, "Unknown disktype in configuration: %s"%disktype
 
@@ -499,7 +499,7 @@ extra='xencons=tty'
 					shell = True,
 					stdout = subprocess.PIPE)
 
-		for line in infopipe.stdout.readline():
+		for line in infopipe.stdout.readlines():
 
 			if line.startswith("total_memory"):
 				host.memory = int((line.split(':'))[1])
