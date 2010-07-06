@@ -38,14 +38,14 @@ log = logging.getLogger(__file__)
 # FIXME: these should throw errors on failure
 def domIdToName(domid):
 # XXXpipe: get domain name from id
-	f = os.popen("xm domname %i"%domid)
+	f = os.popen("/usr/sbin/xm domname %i"%domid)
 	name = f.readline().strip()
 	f.close()
 	return name
 
 def domNameToId(domname):
 # XXXpipe: get domain id from name
-	f = os.popen("xm domid %s"%domname)
+	f = os.popen("/usr/sbin/xm domid %s"%domname)
 	name = f.readline().strip()
 	f.close()
 	return int(name)
@@ -110,7 +110,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		self.vmNamePrefix = self.config.get("XenPV", "vmNamePrefix")
 		self.transientDir = self.config.get('XenPV', 'transientDir')
 		self.defaultVmType = self.config.get('XenPV', 'defaultVmType') 
-
+		self.disktype = self.config.get('XenPV', 'defaultDiskType')
 		self.newvms = listVms(self.vmNamePrefix)
 		self.hostId = -1
 		self.sleeptime = 5
@@ -133,7 +133,7 @@ class XenPV(VmControlInterface, threading.Thread):
 				# If the vm had transient disks, delete them
 				for i in range(len(a.disks)):
 					if a.disks[i].persistent == False:
-						diskname = self.transientDisk(a.id, i)
+						diskname = self.transientDisk(a.id, i, disktype)
 						try:
 							os.unlink(diskname)
 						except:
@@ -154,42 +154,45 @@ class XenPV(VmControlInterface, threading.Thread):
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
-	                    image, macAddr, bridge, memory, cores, hints, id):
+	                    image, macAddr, netID, memory, cores, hints, id):
+		bootstr = None
+		diskconfig = None
+		netconfig = None
+		memconfig = None
+		cpuconfig = None
+		extraconfig = None
+
 		fn = os.path.join("/tmp", vmName)
 		vmType = hints.get('vmtype', self.defaultVmType)
 		print 'starting vm with type: ', vmType
-		bootstr = ''
+
+                try:
+                   disktype = self.config.get('XenPV', 'defaultDiskType')
+                except:
+                   disktype = 'vhd'
+
+                disk0 = 'tap:%s'%disktype
+		diskU = 'xvda1'
+
+		try:
+			bridgeformat = self.config.get('XenPV', 'defaultBridgeFormat')
+		except:
+			bridgeformat = 'br%s'
+
+		bridge = bridgeformat % netID
+
+
 		if vmType == 'pvgrub':
 			# FIXME: untested, requires Xen 3.3
 			bootstr = '''
-kernel = '/usr/lib/xen/boot/pv-grub-x86_64.gz'
+kernel = '/usr/lib/xen-default/boot/pv-grub-x86_64.gz'
 extra = '(hd0,0)/grub/menu.lst'
-disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=br%s,mac=%s' ]
-memory=%i
-vcpus=%i
-root="/dev/xvda1"
-extra='xencons=tty'
-'''%(image,
-     bridge,
-     macAddr,
-     memory,
-     cores)
+'''
 	
 		elif vmType == 'pygrub':
 			bootstr = '''
 bootloader="/usr/lib/xen-default/bin/pygrub"
-disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=br%s,mac=%s' ]
-memory=%i
-vcpus=%i
-root="/dev/xvda1"
-extra='xencons=tty'
-'''%(image,
-     bridge,
-     macAddr,
-     memory,
-     cores)
+'''
 	
 		elif vmType == 'kernel':
 			kernel = hints.get('kernel', None)
@@ -208,21 +211,14 @@ extra='xencons=tty'
 			bootstr = '''
 kernel = "%s"
 %s     # ramdisk string is full command
-
-disk=['tap:qcow:%s,xvda1,w']
-vif = [ 'bridge=br%s,mac=%s' ]
-memory=%i
-vcpus=%i
-root="/dev/xvda1"
-extra='xencons=tty'
-'''%(kernel, ramdisk,
-     image,
-     bridge,
-     macAddr,
-     memory,
-     cores)
+'''%(kernel,
+     ramdisk)
 
 		elif vmType == 'hvm':
+			disk0 = 'tap:%s'%disktype
+			diskU = 'hda1'
+
+
 			bootstr = '''
 import os, re
 arch = os.uname()[4]
@@ -230,10 +226,10 @@ if re.search('63', arch):
 	arch_libdir = 'lib64'
 else:
 	arch_libdir = 'lib'
-kernel = '/usr/lib/xen/boot/hvmloader'
+kernel = '/usr/lib/xen-default/boot/hvmloader'
 builder = 'hvm'
 
-device_model='/usr/lib/xen/bin/qemu-dm'
+device_model='/usr/lib/xen-default/bin/qemu-dm'
 
 sdl=0
 vnc=1
@@ -245,22 +241,54 @@ serial='pty'
 usbdevice='tablet'
 
 shadow_memory=8
-disk=['tap:qcow:%s,hda,w']
-vif = [ 'type=ioemu,bridge=br%s,mac=%s' ]
-memory=%i
-vcpus=%i
-root="/dev/xvda1"
-extra='xencons=tty'
-'''%(id,
-     image,
-     bridge,
-     macAddr,
-     memory,
-     cores)
+'''
+			diskconfig = '''
+disk=['%s:%s,ioemu:%s,w']
+'''(disk0, image, diskU)
+			netconfig = '''
+vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
+'''(bridge, macAddr)
+
 		else:
 			raise Exception, "Unknown vmType in hints: %s"%vmType
+
+
+		if diskconfig is None:
+			diskconfig = '''
+disk = ['%s:%s,%s,w']
+'''(disk0, image, diskU)
+
+		if netconfig is None:
+			netconfig = '''
+vif = [ 'bridge=%s,mac=%s' ]
+'''(bridge, macAddr)
+
+		if memconfig is None:
+			memconfig = '''
+memory=%i
+'''(memory)
+
+		if cpuconfig is None:
+			cpuconfig = '''
+vcpus=%i
+'''(cores)
+
+		if extraconfig is None:
+			extraconfig = '''
+extra='xencons=tty'
+'''
+
+
+#build the configuration file
+#(bootloader, (kernel, extra), (kernel, ramdisk)), disk, vif, memory, vcpus, root, extra
 		f = open(fn, "w")
 		f.write(bootstr)
+		f.write(diskconfig)
+		f.write(netconfig)
+		f.write(memconfig)
+		f.write(cpuconfig)
+# is root necessary?
+		f.write(extraconfig)
 		f.close()
 		return fn
 	def deleteXenConfig(self, vmName):
@@ -270,14 +298,22 @@ extra='xencons=tty'
 
 	def vmName(self, instanceId):
 		return "%s-%i"%(self.vmNamePrefix, int(instanceId))
-	def transientDisk(self, instanceId, disknum):
+
+	def transientDisk(self, instanceId, disknum, disktype):
+
 		newdisk = os.path.join(self.transientDir,
-				       'tashi-%i-%i.qcow' %(instanceId, disknum))
+				       'tashi-%i-%i.%s' %(instanceId, disknum, disktype))
 		return newdisk
 		
 
 	@synchronizedmethod
 	def instantiateVm(self, instance):
+
+                try:
+                   disktype = self.config.get('XenPV', 'defaultDiskType')
+                except:
+                   disktype = 'vhd'
+
 		# FIXME: this is NOT the right way to get out hostId
 		self.hostId = instance.hostId
 
@@ -292,8 +328,15 @@ extra='xencons=tty'
 			imageLocal = self.dfs.getLocalHandle(instance.disks[i].uri)
 			instance.disks[i].local = imageLocal
 			if instance.disks[i].persistent == False:
-				newdisk = self.transientDisk(instance.id, i)
-				cmd = '/usr/lib/xen-default/bin/qcow-create 0 %s %s' % (newdisk, imageLocal)
+				newdisk = self.transientDisk(instance.id, i, disktype)
+
+				if disktype == 'qcow':
+					cmd = '/usr/lib/xen-default/bin/qcow-create 0 %s %s' % (newdisk, imageLocal)
+				elif disktype == 'vhd':
+					cmd = '/usr/lib/xen-default/bin/vhd-tool create 0 %s %s' % (newdisk, imageLocal)
+				else:
+					raise Exception, "Unknown disktype in configuration: %s"%disktype
+
 				print 'creating new disk with "%s"' % cmd
 				os.system(cmd)
 				instance.disks[i].local = newdisk
@@ -307,7 +350,7 @@ extra='xencons=tty'
 					  instance.cores,
 					  instance.hints,
 					  instance.id)
-		cmd = "xm create %s"%fn
+		cmd = "/usr/sbin/xm create %s"%fn
 		r = os.system(cmd)
 #		self.deleteXenConfig(name)
 		if r != 0:
@@ -344,7 +387,7 @@ extra='xencons=tty'
 		
 
 		# FIXME: handle errors
-		cmd = "xm save %i %s"%(vmId, tmpfile)
+		cmd = "/usr/sbin/xm save %i %s"%(vmId, tmpfile)
 		r = os.system(cmd)
 		if r !=0 :
 			print "xm save failed!"
@@ -367,7 +410,7 @@ extra='xencons=tty'
 		self.dfs.unlink(infofile)
 
 		self.dfs.copyFrom(source, tmpfile)
-		r = os.system("xm restore %s"%(tmpfile))
+		r = os.system("/usr/sbin/xm restore %s"%(tmpfile))
 		os.unlink(tmpfile)
 		
 		# FIXME: if the vmName function changes, suspended vms will become invalid
@@ -381,7 +424,7 @@ extra='xencons=tty'
 		return cPickle.dumps(instance)
 	@synchronizedmethod
 	def migrateVm(self, vmId, target, transportCookie):
-		cmd = "xm migrate -l %i %s"%(vmId, target)
+		cmd = "/usr/sbin/xm migrate -l %i %s"%(vmId, target)
 		r = os.system(cmd)
 		if r != 0:
 			# FIXME: throw exception
@@ -400,7 +443,7 @@ extra='xencons=tty'
 	
 	@synchronizedmethod
 	def pauseVm(self, vmId):
-		r = os.system("xm pause %i"%vmId)
+		r = os.system("/usr/sbin/xm pause %i"%vmId)
 		if r != 0:
 			print "xm pause failed for VM %i"%vmId
 			raise Exception,  "xm pause failed for VM %i"%vmId
@@ -409,7 +452,7 @@ extra='xencons=tty'
 
 	@synchronizedmethod
 	def unpauseVm(self, vmId):
-		r = os.system("xm unpause %i"%vmId)
+		r = os.system("/usr/sbin/xm unpause %i"%vmId)
 		if r != 0:
 			print "xm unpause failed for VM %i"%vmId
 			raise Exception,  "xm unpause failed for VM %i"%vmId
@@ -418,7 +461,7 @@ extra='xencons=tty'
 
 	@synchronizedmethod
 	def shutdownVm(self, vmId):
-		r = os.system("xm shutdown %i"%vmId)
+		r = os.system("/usr/sbin/xm shutdown %i"%vmId)
 		if r != 0:
 			print "xm shutdown failed for VM %i"%vmId
 			raise Exception,  "xm shutdown failed for VM %i"%vmId
@@ -426,7 +469,7 @@ extra='xencons=tty'
 
 	@synchronizedmethod
 	def destroyVm(self, vmId):
-		r = os.system("xm destroy %i"%vmId)
+		r = os.system("/usr/sbin/xm destroy %i"%vmId)
 		if r != 0:
 			print "xm destroy failed for VM %i"%vmId
 			raise Exception,  "xm destroy failed for VM %i"%vmId
@@ -445,19 +488,24 @@ extra='xencons=tty'
 
 	@synchronizedmethod
 	def getHostInfo(self, service):
+# collect information from the physical host:
+# total memory in host
+# number of CPU cores in host
+
 		host = Host()
 		host.id = service.id
 		host.name = socket.gethostname()
-		memp = subprocess.Popen("xm info | awk '/^total_memory/ { print $3 }' ",
+		infopipe = subprocess.Popen("/usr/sbin/xm info",
 					shell = True,
 					stdout = subprocess.PIPE)
-		mems = memp.stdout.readline()
-		host.memory = int(mems)
-		corep = subprocess.Popen("xm info | awk '/^nr_cpus/ { print $3 }' ",
-					shell = True,
-					stdout = subprocess.PIPE)
-		cores = corep.stdout.readline()
-		host.cores = int(cores)
+
+		for line in infopipe.stdout.readline():
+
+			if line.startswith("total_memory"):
+				host.memory = int((line.split(':'))[1])
+			if line.startswith("nr_cpus"):
+				host.cores = int((line.split(':'))[1])
+
 		host.up = True
 		host.decayed = False
 		host.version = version
