@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-version = "Wed Feb  4 15:20:15 EST 2009"
+version = "HEAD"
