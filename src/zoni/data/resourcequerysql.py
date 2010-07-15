@@ -28,27 +28,8 @@ import traceback
 import usermanagement
 
 from zoni.data.infostore import InfoStore
-from zoni.extra.util import logit
+from zoni.extra.util import logit, checkSuper
 from zoni.agents.dhcpdns import DhcpDns
-
-def timeF(f):
-    def myF(*args, **kw):
-        start = time.time()
-        res = f(*args, **kw)
-        end = time.time()
-        print "%s took %f" % (f.__name__, end-start)
-        return res
-    myF.__name__ = f.__name__
-    return myF
-
-def checkSuper(f):
-	def myF(*args, **kw):
-		if os.getuid() != 0:
-			print "Please use sudo!"
-			exit()
-		res = f(*args, **kw)
-		return res
-	return myF
 
 class ResourceQuerySql(InfoStore):
 	def __init__(self, config, verbose=None):
@@ -83,16 +64,6 @@ class ResourceQuerySql(InfoStore):
 			else:
 				print "ERROR : ", e
 				exit(1)
-			#traceback.print_exc(sys.exc_info())
-		#cursor.execute ("SELECT VERSION()")
-		#print "server version:", row[0]
-		#mysql -Dirp-cluster -hrodimus -u reader -e "select * from hostinfo;"
-
-	#def gethost(self, host):
-		#obj = {}
-		#self.conn
-		#createConn()
-		#
 
 	def __create_queryopts(self, cmdargs, extra=None):
 		cmdlen = len(cmdargs)

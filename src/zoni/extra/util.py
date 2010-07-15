@@ -92,3 +92,25 @@ def logit(logfile, mesg):
 	fd.close
 
 
+
+
+def checkSuper(f):
+    def myF(*args, **kw):
+        if os.getuid() != 0:
+            print "Please use sudo!"
+            exit()
+        res = f(*args, **kw)
+        return res
+    return myF 
+
+
+def timeF(f):
+    def myF(*args, **kw):
+        start = time.time()
+        res = f(*args, **kw)
+        end = time.time()
+        print "%s took %f" % (f.__name__, end-start)
+        return res
+    myF.__name__ = f.__name__
+    return myF
+
