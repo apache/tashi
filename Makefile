@@ -65,10 +65,10 @@ src/utils/nmd: src/utils/nmd.py
 rmnmd:
 	echo Removing nmd...; rm -f bin/nmd.py
 
-bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py
+bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py bin/zoni-cli.py
 bindir:
 	if test ! -d bin; then mkdir bin; fi
-rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive
+rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive rmzoni-cli
 	if test -d bin; then rmdir bin; fi
 bin/getInstances: 
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
@@ -105,6 +105,13 @@ doc/html:
 	epydoc --html -o doc/html --include-log --name=tashi --graph=all --exclude=tashi.messaging.messagingthrift ./src/tashi
 rmdoc:
 	if test -d doc/html; then echo Removing HTML docs...; rm -rf ./doc/html; fi
+
+#  Zoni 
+bin/zoni-cli.py:
+	@echo Symlinking in zoni-cli...
+	(cd bin; ln -s ../src/zoni/client/zoni-cli.py .)
+rmzoni-cli:
+	if test -e bin/zoni-cli.py; then echo Removing zoni-cli symlink...; rm bin/zoni-cli.py; fi
 
 ## for now only print warnings having to do with bad indentation. pylint doesn't make it easy to enable only 1,2 checks
 disabled_warnings=$(shell pylint --list-msgs|grep :W0| awk -F: '{ORS=","; if ($$2 != "W0311" && $$2 != "W0312"){ print $$2}}')
