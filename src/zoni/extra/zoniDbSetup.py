@@ -58,6 +58,7 @@ def CreateZoniDb(self, config, adminUser, adminPassword):
 	adminUser = adminUser
 	adminPassword = adminPassword
 	passwd = config['dbPassword']
+	#db = "`" + config['dbInst'] + "`"
 	db = config['dbInst']
 
 	if config['dbPort'] == "":
@@ -111,7 +112,7 @@ def createTables(conn):
 	'''  Create Tables  '''
 	#  Create sysinfo 
 	sys.stdout.write("    Creating sysinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(8) NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `service_tag` char(64) default NULL, 'express_service_code' char(64) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default CURRENT_TIMESTAMP, PRIMARY KEY  (`sys_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(8) NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `service_tag` char(64) default NULL, `express_service_code` char(64) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default CURRENT_TIMESTAMP, PRIMARY KEY  (`sys_id`))")
 	sys.stdout.write("Success\n")
 
 	#  Create hardwareinfo

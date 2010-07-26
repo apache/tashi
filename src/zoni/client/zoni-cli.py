@@ -58,7 +58,7 @@ def main():
 	rev = revision
 
 	configFile = getConfig()
-	#logit(configFile['logFile'], "Starting prs_client")
+	#logit(configFile['logFile'], "Starting Zoni client")
 	#logit(configFile['logFile'], "Loading config file")
 
 	parser = optparse.OptionParser(usage="%prog [-n] [-u] [--uid] [-v]", version="%prog " + ver + " " + rev)
@@ -97,7 +97,7 @@ def main():
 	parser.add_option_group(group)
 	#parser.add_option("-p", "--printResources", dest="printResources", help="Print available resources to choose from", action="store_true", default=False)
 
-	#  Admin INterface
+	#  Admin Interface
 	group = optparse.OptionGroup(parser, "Admin Interface", "Administration Interface:")
 	group.add_option("--admin", dest="ADMIN", help="Enter Admin mode", action="store_true", default=False)
 	group.add_option("--addPxeImage", "--addpxeimage", dest="imageName", help="Add PXE image to database", action="store_true", default=False)
@@ -126,7 +126,7 @@ def main():
 	#  Allocation Interface
 	group = optparse.OptionGroup(parser, "Allocation Interface", "Change current systems allocations:")
 	#group.add_option("-a", "--allocateResources", dest="allocateResources", help="Allocate resource", action="store_true", default=False)
-	group.add_option("--addImage", "--addimage", dest="addImage", help="Add image to PRS - amd64-image:dist:dist_ver")
+	group.add_option("--addImage", "--addimage", dest="addImage", help="Add image to Zoni - amd64-image:dist:dist_ver")
 	group.add_option("--delImage", "--delimage", dest="delImage", help="Delete PXE image")
 	group.add_option("--assignImage", "--assignimage", dest="assignImage", help="Assign image to resource")
 
@@ -432,7 +432,7 @@ def main():
 		query.delImage(options.delImage)
 
 	#  Admin Interface
-	#  snmpwalk -v2c -c prs-domain sw0-r1r1 .1.3.6.1.2.1.17.7.1.4.3.1.5    
+	#  snmpwalk -v2c -c zoni-domain sw0-r1r1 .1.3.6.1.2.1.17.7.1.4.3.1.5    
 	if (options.ADMIN):
 
 		if not options.nodeName and not  options.createVlanId and not options.removeVlanId and not options.switchPort and not options.interactiveSwitchConfig:
