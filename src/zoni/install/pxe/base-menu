@@ -1,0 +1,18 @@
+DISPLAY boot-screens/boot.txt
+
+LABEL zoni-register-64
+	kernel builds/amd64/zoni-reg/linux
+	append initrd=builds/amd64/zoni-reg/initrd.gz pxeserver=192.168.0.5 imageserver=192.168.0.254 defaultimage=amd64-tashi_nm registerfile=register_node mode=register console=tty1 rw --
+
+LABEL zoni-register-64-interactive
+	kernel builds/amd64/zoni-reg/linux
+	append initrd=builds/amd64/zoni-reg/initrd_zoni_interactive.gz pxeserver=192.168.0.5 imageserver=192.168.0.254 defaultimage=amd64-tashi_nm registerfile=register_node mode=register verbose=1 console=tty1 rw --
+
+LABEL localdisk
+    LOCALBOOT 0
+LABEL rescue
+	kernel ubuntu-installer/hardy/i386/linux
+	append vga=normal initrd=ubuntu-installer/hardy/i386/initrd.gz  rescue/enable=true --
+
+PROMPT 1
+TIMEOUT 100

@@ -48,10 +48,10 @@ def main():
 
 	configFile = getConfig()
 
-	CreateZoniDb(configFile, configFile, options.userName, options.password)
+	CreateZoniDb(configFile, options.userName, options.password)
 
 
-def CreateZoniDb(self, config, adminUser, adminPassword):
+def CreateZoniDb(config, adminUser, adminPassword):
 	config = config
 	host = config['dbHost']
 	user = config['dbUser']
@@ -72,6 +72,7 @@ def CreateZoniDb(self, config, adminUser, adminPassword):
 	conn.close()
 	conn = connectDb(host, port, adminUser, adminPassword, db)
 	createTables(conn)
+	createRegistration(conn, config)
 	sys.stdout.write("Finished\n")
 
 def connectDb (host, port, user, passwd, db=None):
@@ -125,7 +126,7 @@ def createTables(conn):
 	sys.stdout.write("Success\n")
 	#  Create imageinfo
 	sys.stdout.write("    Creating imageinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imageinfo` ( `image_id` int(11) unsigned NOT NULL auto_increment, `image_name` varchar(256) NOT NULL, `dist` varchar(128) NOT NULL, `dist_ver` varchar(128) NOT NULL, PRIMARY KEY  (`image_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imageinfo` ( `image_id` int(11) unsigned NOT NULL auto_increment, `image_name` varchar(256) NOT NULL, `dist` varchar(128) NOT NULL, `dist_ver` varchar(128) NOT NULL, `kernel_id` int(11), `initrd_id` int(11), PRIMARY KEY  (`image_id`))")
 	sys.stdout.write("Success\n")
 	#  Create imagemap
 	sys.stdout.write("    Creating imagemap...")
@@ -147,14 +148,72 @@ def createTables(conn):
 	sys.stdout.write("    Creating allocationarchive...")
 	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationarchive` ( `ar_id` smallint(8) NOT NULL auto_increment, `node_id` int(8) NOT NULL, `ip_addr` varchar(64) NOT NULL, `hostname` varchar(64) NOT NULL, `vlan_id` int(11) NOT NULL, `user_id` int(8) NOT NULL, `cur_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP, `reservation_type` varchar(64) NOT NULL, `notes` tinytext, PRIMARY KEY  (`ar_id`))")
 	sys.stdout.write("Success\n")
+	#  Create kernelinfo 
+	sys.stdout.write("    Creating kernelinfo...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `kernelinfo` ( `kernel_id` int(11) unsigned NOT NULL auto_increment, `kernel_name` varchar(256) NOT NULL, `kernel_release` varchar(128) NOT NULL, `kernel_arch` varchar(128) NOT NULL, PRIMARY KEY  (`kernel_id`))")
+	sys.stdout.write("Success\n")
+	#  Create initrdinfo
+	sys.stdout.write("    Creating initrdinfo...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `initrdinfo` ( `initrd_id` int(11) unsigned NOT NULL auto_increment, `initrd_name` varchar(256) NOT NULL, `initrd_arch` varchar(128) NOT NULL, `initrd_options` varchar(1024) NOT NULL, PRIMARY KEY  (`initrd_id`))")
+	sys.stdout.write("Success\n")
+
+def createRegistration(conn, config):
+
+	sys.stdout.write("Inserting initial Registration info into DB...\n")
+
+	#  Check if already there...
+	checkVal =  entryExists(conn, "kernelinfo", "kernel_name", "linux-2.6.24-19-server")
+	if checkVal:
+		sys.stdout.write("    Kernel already exists in DB...\n")
+		#  Get the kernel_id
+		kernelId = str(checkVal[1][0][0])
+	else:
+		r = execQuery(conn, "INSERT into `kernelinfo` (kernel_name, kernel_release, kernel_arch) values ('linux-2.6.24-19-server', '2.6.24-19-server', 'x86_64' )")
+		kernelId = str(r.lastrowid)
+		sys.stdout.write("Success\n")
+
+	#  Initrd
+	checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64")
+	sys.stdout.write("    Checking existence of initrd...")
+	if not checkVal:
+		sys.stdout.write("No\n") 
+		optionList = "initrd=" + config['initrdRoot'] + "/x86_64/zoni-register-64.gz pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register" 
+		sys.stdout.write("    Inserting default register image into DB...")
+		r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64','x86_64', '" + optionList + "')")
+		initrdId = str(r.lastrowid)
+		sys.stdout.write("Success\n")
+	else:
+		sys.stdout.write("Yes\n")    
+		initrdId = str(checkVal[1][0][0])
+		
+	#  Interactive Registration
+	checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64-interactive")
+	sys.stdout.write("    Checking existence of interactive initrd...")
+	if not checkVal:
+		sys.stdout.write("No\n") 
+		sys.stdout.write("    Inserting default register-interactive image into DB...")
+		optionList = "initrd=" + config['initrdRoot'] + "/x86_64/zoni-register-64-interactive.gz pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register verbose=1" 
+		r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64-interactive','x86_64', '" + optionList + "')")
+		initrdIdInteractive = str(r.lastrowid)
+		sys.stdout.write("Success\n")
+	else:
+		sys.stdout.write("Yes\n")    
+		initrdIdInteractive = str(checkVal[1][0][0])
+
+	#  Link initrd and kernel to image
+	sys.stdout.write("    Registering initrd and kernel to registration image...")
+	query = "select * from imageinfo where image_name = 'zoni-register-64' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
+	r = execQuery(conn, query)
+	if len(r.fetchall()) < 1:
+		execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdId + ")")
+
+	query = "select * from imageinfo where image_name = 'zoni-register-64-interactive' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
+	r = execQuery(conn, query)
+	if len(r.fetchall()) < 1:
+		execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64-interactive', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdIdInteractive + ")")
+	sys.stdout.write("Success\n")
 
 
-def __queryDb(self, query):
-	cursor = conn.cursor()
-	cursor.execute (query)
-	row = cursor.fetchall()
-	desc = cursor.description
-	return row
 
 def execQuery(conn, query):
 	cursor = conn.cursor()
@@ -171,42 +230,15 @@ def execQuery(conn, query):
 		exit()
 	return cursor
 
-def __selectDb(self, query):
-	cursor = conn.cursor()
-	try:
-		cursor.execute (query)
-	#except Exception:
-		#traceback.print_exc(sys.exc_info())
-	except MySQLdb.OperationalError, e:
-		msg = "ERROR: " + e[1]
-		sys.stderr.write(msg)
-		#traceback.print_exc(sys.exc_info())
-		exit()
-	return cursor
+def entryExists(conn, table, col, checkVal):
+	query = "select * from " + table + " where " + col + " = '" + checkVal + "'"
+ 	r = execQuery(conn, query)
+	res = r.fetchall()
+	if len(res) > 0:
+		return (1, res)
 
-def __updateDb(self, query):
-	cursor = conn.cursor()
-	try:
-		cursor.execute (query)
-	except MySQLdb.OperationalError, e:
-		msg = "ERROR: " + e[1]
-		sys.stderr.write(msg)
-		#logit(logFile, msg)
-		#traceback.print_exc(sys.exc_info())
-		exit()
+	return 0
 
-def __insertDb(self, query):
-	cursor = conn.cursor()
-	try:
-		cursor.execute (query)
-	#except Exception:
-		#traceback.print_exc(sys.exc_info())
-	except MySQLdb.OperationalError, e:
-		msg = "ERROR: " + e[1]
-		sys.stderr.write(msg)
-		#logit(logFile, msg)
-		#traceback.print_exc(sys.exc_info())
-		exit()
 
 if __name__ == "__main__":
     main()

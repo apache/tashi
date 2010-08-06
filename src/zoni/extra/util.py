@@ -26,6 +26,9 @@ def loadConfigFile(parser):
 	#parser = ConfigParser.ConfigParser()
 	#parser.read(filename)
 	config = {}
+	#  Install dir
+	config['installBaseDir'] = parser.get("home", "INSTALL_BASE_DIR").split()[0]
+
 	#  Logging
 	config['logFile'] = parser.get("logging", "LOG_FILE").split()[0]
 	
@@ -38,13 +41,18 @@ def loadConfigFile(parser):
 	config['dbPort'] = int(parser.get("dbConnection", "DB_PORT").split()[0])
 	config['dbInst'] = parser.get("dbConnection", "DB_INST").split()[0]
 
-	#  TFTP info
-	config['tftpRootDir'] = parser.get("tftp", "TFTP_ROOT_DIR").split()[0]
-	config['tftpImageDir'] = parser.get("tftp", "TFTP_IMAGE_DIR").split()[0]
-	config['tftpBootOptionsDir'] = parser.get("tftp", "TFTP_BOOT_OPTIONS_DIR").split()[0]
-	config['tftpUpdateFile'] = parser.get("tftp", "TFTP_UPDATE_FILE").split()[0]
-	config['tftpBaseFile'] = parser.get("tftp", "TFTP_BASE_FILE").split()[0]
-	config['tftpBaseMenuFile'] = parser.get("tftp", "TFTP_BASE_MENU_FILE").split()[0]
+	#  PXE info
+	config['tftpRootDir'] = parser.get("pxe", "TFTP_ROOT_DIR").split()[0]
+	config['tftpImageDir'] = parser.get("pxe", "TFTP_IMAGE_DIR").split()[0]
+	config['tftpBootOptionsDir'] = parser.get("pxe", "TFTP_BOOT_OPTIONS_DIR").split()[0]
+	config['tftpUpdateFile'] = parser.get("pxe", "TFTP_UPDATE_FILE").split()[0]
+	config['tftpBaseFile'] = parser.get("pxe", "TFTP_BASE_FILE").split()[0]
+	config['tftpBaseMenuFile'] = parser.get("pxe", "TFTP_BASE_MENU_FILE").split()[0]
+	config['pxeServerIP'] = parser.get("pxe", "PXE_SERVER_IP").split()[0]
+	config['initrdRoot'] = parser.get("pxe", "INITRD_ROOT").split()[0]
+
+	#  Image store
+	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP").split()[0]
 	
 	#  SNMP
 	config['snmpCommunity'] = parser.get("snmp", "SNMP_COMMUNITY").split()[0]

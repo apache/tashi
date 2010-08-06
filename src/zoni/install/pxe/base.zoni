@@ -1,0 +1,9 @@
+DISPLAY boot-screens/boot.txt
+
+DEFAULT vesamenu.c32
+PROMPT 0
+MENU BACKGROUND boot-screens/zoni_pxe.jpg
+#MENU BACKGROUND boot-screens/intel-logo2.jpg
+MENU COLOR border 49;37 #00FFFFFF #00FFFFFF none
+MENU INCLUDE pxelinux.cfg/boot_options_zoni/MAGIC1-menu
+

@@ -20,8 +20,12 @@
 
 import sys
 import os 
+import warnings
+warnings.filterwarnings("ignore")
+
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from pysnmp.proto import rfc1902
+
 
 #import netsnmp
 
