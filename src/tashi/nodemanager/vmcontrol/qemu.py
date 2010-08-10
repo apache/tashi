@@ -314,9 +314,22 @@ class Qemu(VmControlInterface):
 	
 	def startVm(self, instance, source):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
+
+		
+		#  Capture startVm Hints
+		#  CPU hints
+		cpuModel = instance.hints.get("cpumodel")
+		cpuString = ""
+		if cpuModel:
+			cpuString = "-cpu " + cpuModel 
+
+		#  Clock hints
 		clockString = instance.hints.get("clock", "dynticks")
+
+		#  Disk hints
 		diskInterface = instance.hints.get("diskInterface", "ide")
 		diskString = ""
+
 		for index in range(0, len(instance.disks)):
 			disk = instance.disks[index]
 			uri = scrubString(disk.uri)
@@ -331,16 +344,21 @@ class Qemu(VmControlInterface):
 				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,migrate=%s,media=disk " % (imageLocal, diskInterface, index, snapshot, migrate)
 			else:
 				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
+		#  Nic hints
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
 		for i in range(0, len(instance.nics)):
 			nic = instance.nics[i]
 			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=tashi%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, instance.id, i, nic.network, nic.network)
+
+		#  ACPI
 		if (boolean(instance.hints.get("noAcpi", False))):
 			noAcpiString = "-no-acpi"
 		else:
 			noAcpiString = ""
-		strCmd = "%s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, clockString, diskString, nicString, instance.memory, instance.cores)
+
+		#  Construct the qemu command
+		strCmd = "%s %s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, cpuString, clockString, diskString, nicString, instance.memory, instance.cores)
 		cmd = strCmd.split()
 		if (source):
 			cmd = cmd + ["-incoming", source]
@@ -366,7 +384,7 @@ class Qemu(VmControlInterface):
 			os.execl(self.QEMU_BIN, *cmd)
 			sys.exit(-1)
 		os.close(pipe_w)
-		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = False, OSchild = True)
+		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = True, OSchild = True)
 		child.ptyFile = None
 		child.vncPort = -1
 		self.saveChildInfo(child)
