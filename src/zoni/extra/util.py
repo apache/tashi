@@ -53,6 +53,11 @@ def loadConfigFile(parser):
 
 	#  Image store
 	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP").split()[0]
+	config['fsImagesBaseDir'] = parser.get("imageStore", "FS_IMAGES_BASE_DIR").split()[0]
+
+	#  WWW
+	config['wwwDocumentRoot'] = parser.get("www", "WWW_DOCUMENT_ROOT").split()[0]
+	config['registrationBaseDir'] = parser.get("www", "REGISTRATION_BASE_DIR").split()[0]
 	
 	#  SNMP
 	config['snmpCommunity'] = parser.get("snmp", "SNMP_COMMUNITY").split()[0]
