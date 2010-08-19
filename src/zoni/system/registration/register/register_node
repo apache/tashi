@@ -38,11 +38,16 @@ for x in $(cat /proc/cmdline); do
     defaultimage=*)
         DEFAULTIMAGE=${x#defaultimage=}
         ;;
+    image_root=*)
+        IMAGE_ROOT=${x#image_root=}
+        ;;
     verbose=*)
         VERBOSE=${x#verbose=}
         ;;
 	esac
 done
+
+IMAGE_URL="${PXESERVER}/${IMAGE_ROOT}/"
 
 #  Scrape system for specs
 /sbin/getSystemId > /tmp/sysinfo
@@ -89,8 +94,8 @@ SUBNET=$(cat /tmp/sysinfo | grep "inet addr"| awk '{print $2}' | cut -d ":" -f 2
 #disk_size=$(cat /tmp/sysinfo | grep "Disk"| awk '{print $5}');
 
 #  Register sysinfo to DB
-DEUBG 'running cmd - wget -O- "http://${PXESERVER}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"'
-wget -O- "http://${PXESERVER}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"
+DEBUG 'running cmd - wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"'
+wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"
 
 #  Get more info either from cheat file or from user entered info
 ec=1
@@ -155,18 +160,18 @@ if [[ $ec -ne 0 ]]; then
 	#  Update IP_ADDR
 	if [ $ip_addr ];then 
 		DEBUG "Update ip $ip_addr"
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
 	fi
 	if [ $location ];then 
 		DEBUG "Set location"
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
 	fi
 	#  If we set the imagename, register it
 	if [ $daimage ];then
 		DEBUG "setting image name"
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$daimage&location=$location"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$daimage&location=$location"
 	#else
-		#wget -O- "http://${PXESERVER}/zoni-register.php?action=bootopt&machine_type=generic&mac=$MAC&image_name=$DEFAULTIMAGE"
+		#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=bootopt&machine_type=generic&mac=$MAC&image_name=$DEFAULTIMAGE"
 	fi
 #############################
 ##  USE REGISTER_AUTOMATE  ##
@@ -177,27 +182,27 @@ else
 	bootopt=$(/register_automate $SERVICE_TAG bootopt)
 	ec=$?
 	if [[ $ec -eq 0 ]]; then
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$bootopt&location=$location"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$bootopt&location=$location"
 	fi 
 	DEBUG "about to update ip $ip_addr in automate"
 	if [ $ip_addr ];then 
-		echo wget -O- "http://${PXESERVER}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
+		echo wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
 	fi
 	if [ $location ];then 
-		wget -O- "http://${PXESERVER}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
+		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
 	fi
 fi
 if [ $switchport ];then 
-	wget -O- "http://${PXESERVER}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${switch}&switchport=${switchport}"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${switch}&switchport=${switchport}"
 fi
 
 if [ $pduport ];then 
-	wget -O- "http://${PXESERVER}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${pdu_name}&switchport=${pduport}"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${pdu_name}&switchport=${pduport}"
 fi
 
 #  Add IPMI info 
-wget -O/outfile.txt "http://${PXESERVER}/zoni-register.php?action=add_ipmi&mac=$MAC&location=$location"
+wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&mac=$MAC&location=$location"
 IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
 IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $4}')
 
@@ -217,13 +222,13 @@ ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
 ipmitool user enable 2
 
 #  Add dns and dhcp
-wget -O- "http://${PXESERVER}/zoni-register.php?action=updatednsdhcp&mac=${MAC}&location=$location&ip_addr=$ip_addr&ipmi_addr=$IPMI_ADDR"
+wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&mac=${MAC}&location=$location&ip_addr=$ip_addr&ipmi_addr=$IPMI_ADDR"
 
 
 #  If default image is set as kernel opt, override automate file
 DEBUG "def image is $DEFAULTIMAGE "
 if [ $DEFAULTIMAGE ] ; then 
-	wget -O- "http://${PXESERVER}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$DEFAULTIMAGE&location=$location"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$DEFAULTIMAGE&location=$location"
 fi
 #else
 	#echo "Interactive mode canceled due to no keyboard input"
