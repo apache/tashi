@@ -30,9 +30,11 @@ class SQL(DataInterface):
 		self.log = logging.getLogger(__name__)
 		if (self.uri.startswith("sqlite://")):
 			import sqlite
+			self.dbengine = "sqlite"
 			self.conn = sqlite.connect(self.uri[9:], autocommit=1)
 		elif (self.uri.startswith("mysql://")):
 			import MySQLdb
+			self.dbengine = "mysql"
 			uri = self.uri[8:]
 			(user, _, hostdb) = stringPartition(uri, '@')
 			(host, _, db) = stringPartition(hostdb, '/')
@@ -113,6 +115,8 @@ class SQL(DataInterface):
 		for e in range(0, len(self.hostOrder)):
 			h.__dict__[self.hostOrder[e]] = l[e]
 		h.state = int(h.state)
+		h.up = boolean(h.up)
+		h.decayed = boolean(h.decayed)
 		return h
 	
 	def registerInstance(self, instance):
