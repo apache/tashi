@@ -358,7 +358,7 @@ class Qemu(VmControlInterface):
 			noAcpiString = ""
 
 		#  Construct the qemu command
-		strCmd = "%s %s %s -clock %s %s %s -m %d -smp %d -serial none -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, cpuString, clockString, diskString, nicString, instance.memory, instance.cores)
+		strCmd = "%s %s %s -clock %s %s %s -m %d -smp %d -serial null -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, cpuString, clockString, diskString, nicString, instance.memory, instance.cores)
 		cmd = strCmd.split()
 		if (source):
 			cmd = cmd + ["-incoming", source]
