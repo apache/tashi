@@ -47,6 +47,10 @@ class raritanDominionPx(SystemManagementInterface):
 		self.oid_name = ",2"
 		self.oid_set = ",3"
 		self.oid_status = ",3"
+
+		if self.getOffset():
+			self.port = host['pdu_port'] - 1
+
 		#  this works
 		#errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd(cmdgen.CommunityData('my-agent', 'public', 0), cmdgen.UdpTransportTarget(('pdu0-r1r1', 161)), (1,3,6,1,4,1,13742,4,1,2,2,1,3,2))
 
@@ -55,14 +59,10 @@ class raritanDominionPx(SystemManagementInterface):
 		#result = netsnmp.snmpwalk(oid, Version = 2,DestHost="localhost",Community="public")
 		#print result
 
-
-
-
-
 		#var = netsnmp.Varbind('sysDescr.0')
 		#res = netsnmp.snmpget(var, ...:Version=1,...:DestHost = 'pdu0-r1r1',...: Community = 'prs-domain')
 		#print res
-		
+
 		#print cmdgen
 		#set snmp = /usr/bin/snmpset -v 2c -c intel pdu .1.3.6.1.4.1.13742.4.1.2.2.1.3.$outletnumber i $state
 		#name snmp = /usr/bin/snmpset -v 2c -c intel pdu .1.3.6.1.4.1.13742.4.1.2.2.1.2.$outletnumber i $state
@@ -70,6 +70,23 @@ class raritanDominionPx(SystemManagementInterface):
 		#self.snmp_status_oid = ".1.3.6.1.4.1.13742.4.1.2.2.1.1."
 		#self.powerStatus = None
 		#print self.__dict__
+
+	''' 
+	Just discovered that some PDUs start numbering ports in the SNMP mib
+	with 0.  Adding a check to update the port number to match the labels on the
+	physical plugs which start numbering with 1.
+	'''
+	def getOffset(self):
+		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(0))
+		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		cmdgen.CommunityData('my-agent', self.user, 0), \
+		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
+		output = varBinds[0][1]
+		if output == -1:
+			return 0
+		else:
+			return 1
+
 
 	def getPowerStatus(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port))
