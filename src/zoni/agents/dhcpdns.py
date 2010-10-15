@@ -32,13 +32,15 @@ import time
 class DhcpDns():
 	def __init__(self, config, verbose=None):
 		self.verbose = verbose
-		self.dnsKeyFile = config['dnsKeyFile']
+		self.dnsKeyName = config['dnsKeyName']
+		self.dnsSecretKey = config['dnsSecretKey']
 		self.dnsServer = config['dnsServer']
 		self.dnsDomain = config['dnsDomain']
 		self.dnsExpire = int(config['dnsExpire'])
 		self.dhcpServer = config['dhcpServer']
 		self.dhcpKeyName = config['dhcpKeyName']
 		self.dhcpSecretKey = config['dhcpSecretKey']
+		self.error = ""
 
 		self.reverseDns = True
 
@@ -90,7 +92,6 @@ class DhcpDns():
 		stdin.write("create\n")
 		stdin.close()
 		output = stdout.read()
-		print output
 		stdout.close()
 
 	def removeDhcp(self, name, ipaddr=None):
@@ -109,7 +110,6 @@ class DhcpDns():
 		stdin.write("remove\n")
 		stdin.close()
 		output = stdout.read()
-		print output
 		stdout.close()
 	
 	def addDns(self, name, ip):
@@ -117,17 +117,13 @@ class DhcpDns():
 			self.removeDns(name)
 		except Exception,  e:
 			pass
-			#print "Removal of DNS entry failed.  Did you use sudo? "
-			#return 1
 
-		if (self.dnsKeyFile != ""):
-			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
-		else:
-			cmd = "nsupdate"
+		cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
+			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
 			stdin.write("update add %s.%s %d A %s\n" % (name, self.dnsDomain, self.dnsExpire, ip))
 			stdin.write("\n")
 			if (self.reverseDns):
@@ -139,6 +135,8 @@ class DhcpDns():
 			stdin.close()
 			output = stdout.read()
 			stdout.close()
+		except Exception, e:
+			self.error = e
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
 			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
@@ -148,14 +146,14 @@ class DhcpDns():
 				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
 	
 	def removeDns(self, name):
-		if (self.dnsKeyFile != ""):
-			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
-		else:
-			cmd = "nsupdate"
+		cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
+			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
+			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
+			stdin.write("\n")
 			if (self.reverseDns):
 				ip = socket.gethostbyname(name)
 				ipSegments = map(int, ip.split("."))
@@ -163,11 +161,11 @@ class DhcpDns():
 				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
 				stdin.write("update delete %s IN PTR\n" % (reverseIpStr))
 				stdin.write("\n")
-			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
-			stdin.write("\n")
 			stdin.close()
 			output = stdout.read()
 			stdout.close()
+		except Exception, e:
+			self.error = e
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
 			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
@@ -175,7 +173,55 @@ class DhcpDns():
 				time.sleep(0.5)
 				os.kill(child.pid, signal.SIGTERM)
 				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
-	
+
+	def addCname(self, name, origName):
+		cmd = "nsupdate"
+		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		try:
+			#  Check for existance of hostname
+			ip = socket.gethostbyname(origName)
+			(stdin, stdout) = (child.stdin, child.stdout)
+			stdin.write("server %s\n" % (self.dnsServer))
+			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
+			stdin.write("update add %s.%s %d CNAME %s.%s\n" % (name, self.dnsDomain, self.dnsExpire, origName, self.dnsDomain))
+			stdin.write("\n")
+			stdin.close()
+			output = stdout.read()
+			stdout.close()
+
+		except Exception, e:
+			self.error = e
+
+		finally:
+			os.kill(child.pid, signal.SIGTERM)
+			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+			while (pid == 0): 
+				time.sleep(0.5)
+				os.kill(child.pid, signal.SIGTERM)
+				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+
+	def removeCname(self, name):
+		cmd = "nsupdate"
+		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		try:
+			(stdin, stdout) = (child.stdin, child.stdout)
+			stdin.write("server %s\n" % (self.dnsServer))
+			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
+			stdin.write("update delete %s.%s CNAME\n" % (name, self.dnsDomain))
+			stdin.write("\n")
+			stdin.close()
+			output = stdout.read()
+			stdout.close()
+		except Exception, e:
+			self.error = e
+		finally:
+			os.kill(child.pid, signal.SIGTERM)
+			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+			while (pid == 0): 
+				time.sleep(0.5)
+				os.kill(child.pid, signal.SIGTERM)
+				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+
 	def doUpdate(self, instance):
 		newInstance = Instance()
 		newInstance.id = instance.id
