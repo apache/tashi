@@ -21,6 +21,8 @@
 import os
 import ConfigParser
 import time
+import shutil
+import re
 
 def loadConfigFile(parser):
 	#parser = ConfigParser.ConfigParser()
@@ -63,14 +65,22 @@ def loadConfigFile(parser):
 	config['snmpCommunity'] = parser.get("snmp", "SNMP_COMMUNITY").split()[0]
 
 	#  VLAN
-	config['vlan_reserved'] = parser.get("vlan", "VLAN_RESERVED")
+	#config['vlan_reserved'] = parser.get("vlan", "VLAN_RESERVED")
 	config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
+
+	#  Domain
+	config['zoniHomeDomain'] = parser.get("domain", "ZONI_HOME_DOMAIN").split()[0]
+	config['zoniHomeNetwork'] = parser.get("domain", "ZONI_HOME_NETWORK").split()[0]
+	config['zoniIpmiNetwork'] = parser.get("domain", "ZONI_IPMI_NETWORK").split()[0]
+	#config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
 
 	#  HARDWARE CONTROL
 	config['hardware_control'] = parser.get("hardware", "HARDWARE_CONTROL")
 
 	#  DHCP/DNS
-	config['dnsKeyFile'] = parser.get("DhcpDns", "dnsKeyfile")
+	#config['dnsKeyFile'] = parser.get("DhcpDns", "dnsKeyfile")
+	config['dnsKeyName'] = parser.get("DhcpDns", "dnsKeyName")
+	config['dnsSecretKey'] = parser.get("DhcpDns", "dnsSecretKey")
 	config['dnsServer'] = parser.get("DhcpDns", "dnsServer")
 	config['dnsDomain'] = parser.get("DhcpDns", "dnsDomain")
 	config['dnsExpire'] = parser.get("DhcpDns", "dnsExpire")
@@ -108,22 +118,59 @@ def logit(logfile, mesg):
 
 
 def checkSuper(f):
-    def myF(*args, **kw):
-        if os.getuid() != 0:
-            print "Please use sudo!"
-            exit()
-        res = f(*args, **kw)
-        return res
-    return myF 
+	def myF(*args, **kw):
+		if os.getuid() != 0:
+			print "Please use sudo!"
+			exit()
+		return res
+	myF.__name__ = f.__name__
+	return myF
 
 
 def timeF(f):
-    def myF(*args, **kw):
-        start = time.time()
-        res = f(*args, **kw)
-        end = time.time()
-        print "%s took %f" % (f.__name__, end-start)
-        return res
-    myF.__name__ = f.__name__
-    return myF
+	def myF(*args, **kw):
+		start = time.time()
+		res = f(*args, **kw)
+		end = time.time()
+		print "%s took %f" % (f.__name__, end-start)
+		return res
+	myF.__name__ = f.__name__
+	return myF
+
+
+def createDir(dirName, checkexists=None):
+	if checkexists and os.path.exists(dirName):
+		Bak = os.path.join(dirName + ".bak." + str(int(time.time())))
+		shutil.move(dirName, Bak)
+
+	try:
+		os.mkdir(dirName, 0755)
+		print "	Creating directory " + dirName
+	except (OSError, Exception), e:
+		if e.errno == 17:
+			print "	" + e.args[1] + ": " + dirName
+		else:
+			print "	" + e.args[1] + ": " + dirName
+
+
+def validIp(ip):
+	if len(ip.split(".")) != 4:
+		return 0
+	for i in ip.split("."):
+		try: 
+			if not 0 <= int(i) <= 255:
+				return 0
+		except ValueError, e:
+			print "ERROR:  " + str(e)
+			return 0
+	return 1
+
+def validMac(mac):
+	reg = '([a-fA-F0-9]{2}[:|\\-]?){6}'
+	val = re.compile(reg).search(mac)
+	if val:
+		return 1
+	return 0
+
+
 
