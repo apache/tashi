@@ -63,3 +63,6 @@ class HwSwitchInterface(object):
 	def isolateNetwork(self):
 		raise NotImplementedError
 
+	def registerToZoni(self):
+		raise NotImplementedError
+

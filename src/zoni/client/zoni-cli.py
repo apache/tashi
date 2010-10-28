@@ -23,6 +23,8 @@
 import os
 import sys
 import optparse
+import socket
+import getpass
 
 
 
@@ -40,9 +42,11 @@ from zoni.bootstrap.pxe import Pxe
 from zoni.hardware.systemmanagementinterface import SystemManagementInterface
 from zoni.hardware.ipmi import Ipmi
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
-from zoni.hardware.hwswitch import HwDellSwitch
+from zoni.hardware.dellswitch import HwDellSwitch
 from zoni.hardware.raritanpdu import raritanDominionPx
 from zoni.hardware.delldrac import dellDrac
+from zoni.agents.dhcpdns import DhcpDns
+
 
 from zoni.extra.util import * 
 from zoni.version import *
@@ -114,7 +118,9 @@ def main():
 	group.add_option("--sendSwitchCommand", "--sendswitchcommand", dest="sendSwitchCommand", help="Send Raw Switch Command, VERY DANGEROUS.  config;interface switchport ethernet g14;etc")
 	group.add_option("--interactiveSwitchConfig", "--interactiveswitchconfig", dest="interactiveSwitchConfig", help="Interactively configure a switch.  switchhname")
 	group.add_option("--showSwitchConfig", "--showswitchconfig", dest="showSwitchConfig", help="Show switch config for node", action="store_true", default=False)
+	group.add_option("--register", dest="register", help="Register hardware to Zoni", action="store_true", default=False)
 	parser.add_option_group(group)
+
 
 	#  Switch
 	#group = optparse.OptionGroup(parser, "Switch Interface", "Switch Interface:")
@@ -146,6 +152,16 @@ def main():
 	group.add_option("--delReservation", "--delreservation", dest="delReservation", help="Delete Reservation")
 	#group.add_option("-a", "--allocateResources", dest="allocateResources", help="Allocate resource", action="store_true", default=False)
 	group.add_option("--rgasstest", dest="rgasstest", help="Debug testing function", action="store_true", default=False)
+	parser.add_option_group(group)
+
+	#  Zoni Helpers
+	group = optparse.OptionGroup(parser, "Zoni Helpers", "Helper functions:")
+	group.add_option("--addDns", dest="addDns", help="Add a DNS entry", action="store_true", default=False)
+	group.add_option("--removeDns", dest="removeDns", help="Remove a DNS entry", action="store_true", default=False)
+	group.add_option("--addCname", dest="addCname", help="Add a DNS Cname entry", action="store_true", default=False)
+	group.add_option("--removeCname", dest="removeCname", help="Remove a DNS Cname entry", action="store_true", default=False)
+	group.add_option("--addDhcp", dest="addDhcp", help="Add a DHCP entry", action="store_true", default=False)
+	group.add_option("--removeDhcp", dest="removeDhcp", help="Remove a DHCP entry", action="store_true", default=False)
 	parser.add_option_group(group)
 
 	(options, args) = parser.parse_args()
@@ -486,8 +502,153 @@ def main():
 			hwswitch.interactiveSwitchConfig()
 		if options.showSwitchConfig and (options.nodeName or options.switchPort):
 			hwswitch.showInterfaceConfig()
+		
+	#  Register hardware
+	if options.register: 
 
+		supported_hardware = ['dell', 'raritan']
+		if len(args) < 3:
+			mesg = "ERROR:  Expecting username and ip address of hardware to be registered\n"
+			mesg += os.path.basename(sys.argv[0]) + " --register HARDWARE username ipaddr\n"
+			mesg += "Supported hardware " + str(supported_hardware) + "\n"
+			sys.stderr.write(mesg)
+		else:
+			if string.lower(args[0]) == "dell":
+				HwSwitch = HwDellSwitch
+				hw = HwSwitch(configFile)
+			elif string.lower(args[0]) == "raritan":
+				hw = raritanDominionPx()
+			else:
+				mesg = "Undefined hardware type\nSupported Hardware" + str(supported_hardware) + "\n"
+				sys.stderr.write(mesg)
+				exit()
+				
+			if options.verbosity:
+				hw.setVerbose(True)
 
+			print args
+			password = getpass.getpass()
+			data = hw.registerToZoni(args[1], password, args[2])
+
+			#  Register to DB
+			query.registerHardware(data)
+			
+	#  Zoni Helper
+	if options.addDns or options.removeDns or options.addDhcp or options.removeDhcp or options.addCname or options.removeCname:
+		if options.addDns:
+			thisone = "--addDns"
+		if options.removeDns:
+			thisone = "--removeDns"
+		if options.removeDhcp:
+			thisone = "--removeDhcp"
+		if options.addDhcp:
+			thisone = "--addDhcp"
+		if options.addCname:
+			thisone = "--addCname"
+		if options.removeCname:
+			thisone = "--removeCname"
+
+		if options.addDns:
+			if len(args) < 2:
+				mesg = "ERROR:  Incorrect number of arguments\n"
+				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname IP_Address\n"
+				print mesg
+				exit()
+			
+			hostName = args[0]
+			ip = args[1]
+			if validIp(ip):
+				mesg = "Adding DNS entry: %s (%s) " % (hostName, ip)
+				sys.stdout.write(mesg)
+				dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+				dhcpdns.addDns(hostName, ip)
+				try:
+					socket.gethostbyname(hostName)
+					sys.stdout.write("[Success]\n")
+				except Exception, e:
+					sys.stdout.write("[Fail]\n")
+			else:
+				mesg = "ERROR:  Malformed IP Address\n"
+				mesg += "Use the dotted quad notation, e.g. 10.0.0.10\n"
+				print mesg
+				exit()
+
+		if options.removeDns or options.removeDhcp or options.removeCname:
+			if len(args) < 1:
+				mesg = "ERROR:  Incorrect number of arguments\n"
+				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname\n"
+				sys.stdout.write(mesg)
+				exit()
+			hostName = args[0]
+			dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+			if options.removeDns:	
+				mesg = "Removing DNS entry: %s " % (hostName)
+				sys.stdout.write(mesg)
+				dhcpdns.removeDns(hostName)
+				try:
+					socket.gethostbyname(hostName)
+					sys.stdout.write("[Fail]\n")
+				except Exception, e:
+					sys.stdout.write("[Success]\n")
+			if options.removeDhcp:	
+				dhcpdns.removeDhcp(hostName)
+			if options.removeCname:	
+				mesg = "Removing DNS CNAME entry: %s  " % (hostName)
+				sys.stdout.write(mesg)
+				dhcpdns.removeCname(hostName)
+				if dhcpdns.error:
+					mesg = "[FAIL]  " + str(dhcpdns.error) + "\n"
+					sys.stdout.write(mesg)
+				else:
+					mesg = "[SUCCESS]" + "\n"
+					sys.stdout.write(mesg)
+					
+
+		if options.addDhcp:
+			if len(args) < 3:
+				mesg = "ERROR:  Incorrect number of arguments\n"
+				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname IP_Address Mac_Address\n"
+				print mesg
+				exit()
+			
+			hostName = args[0]
+			ip = args[1]
+			mac = args[2]
+			if validIp(ip) and validMac(mac):
+				dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+				dhcpdns.addDhcp(hostName, ip, mac)
+				if dhcpdns.error:
+					mesg = "ERROR:  Add DHCP Error " + dhcpdns.error + "\n"
+			else:
+				if not validIp(ip):
+					mesg = "ERROR:  Malformed IP Address\n"
+					mesg += "Use the dotted quad notation, e.g. 10.0.0.10\n"
+					print mesg
+					exit()
+				if not validMac(mac):
+					mesg = "ERROR:  Malformed MAC Address\n"
+					mesg += "Example 10:20:30:40:50:60\n"
+					print mesg
+					exit()
+		
+		if options.addCname:
+			if len(args) < 2:
+				mesg = "ERROR:  Incorrect number of arguments\n"
+				mesg += "Example:  " + sys.argv[0] + " " + thisone + "cname existing_name"
+				print mesg
+				exit()
+			hostName = args[1]
+			cname = args[0]
+			mesg = "Adding DNS CNAME entry: %s -> %s  " % (cname, hostName)
+			sys.stdout.write(mesg)
+			dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+			dhcpdns.addCname(cname, hostName)
+			if dhcpdns.error: 
+				mesg = "[FAIL]  \n" + str(dhcpdns.error) + "\n" 
+				sys.stdout.write(mesg) 
+			else: 
+				mesg = "[SUCCESS]" + "\n" 
+				sys.stdout.write(mesg) 
 
 if __name__ == "__main__":
 	main()

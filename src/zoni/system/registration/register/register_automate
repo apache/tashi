@@ -1,0 +1,48 @@
+#! /bin/sh
+#
+#  $Id:$
+#
+# This program takes two args:
+# register_automate <svg_tag|mac_addr> <"location"|"switchinfo"|"pduinfo"">
+#
+# Based on the the service tag or the mac address of the machine, it returns 
+# the intented location, hostname, or IP address of the machine, respectively.
+# It is intented to short-circuit the question phase of registration.
+#
+
+#  Example Chassis r2r1c1 : note, the line must begin with a "#"
+#  tag|mac|uuid location switchname:portnum pduname:portnum
+#  hostname is set to the location of the physical machine.  Your naming convention may differ.
+#  r2r1c1b9 - row 2, rack 1, chassis 1, blade 9
+
+#  XXX  Don't FORGET!!!  the line must begin with a "#"
+
+#XXXXXXX r2r1c1b9 sw0-r2r1c1:1 drac-r2r1c1:1 x86_64-tashi_nm
+#XXXXXX1 r1r2u29 sw0-r1r2:16 pdu1-r1r2:9 x86_64-default
+
+#6h30lm1 r1r2u29 sw0-r1r2:16 pdu1-r1r2:9 zoni-register-64
+#8q0nfk1 rgass-desk sw0-r1r2:17 pdu1-r1r2:15 zoni-register-64
+
+
+
+SVC_TAG=$1
+REQUEST=$2
+
+res=""
+if [[ "$REQUEST" == "location" ]]; then
+    res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $2}'`
+elif [[ "$REQUEST" == "switchinfo" ]]; then
+    res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $3}'`
+elif [[ "$REQUEST" == "pduinfo" ]]; then
+    res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $4}'`
+elif [[ "$REQUEST" == "image" ]]; then
+    res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $5}'`
+fi
+
+if [[ `echo -n $res | wc -c` -gt 1 ]]; then
+    echo $res
+    exit 0
+else
+    echo "No entry found" >&2
+    exit 1
+fi

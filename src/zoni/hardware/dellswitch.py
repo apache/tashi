@@ -22,7 +22,12 @@ import os
 import sys
 import pexpect
 import datetime
+import time
 import thread
+import string
+import getpass
+import socket
+import tempfile
 
 
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
@@ -47,31 +52,40 @@ class HwDellSwitch(HwSwitchInterface):
 		
 		switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
 		child = pexpect.spawn(switchIp)
-		opt = child.expect(['Name:', 'password:', pexpect.EOF, pexpect.TIMEOUT])
-		print "opt is ", opt
-		#XXX  Doesn't seem to do what I want:(
-		child.setecho(False)
-		if opt == 0:
-			child.sendline(self.host['hw_userid'])
-		#i=child.expect(['test','password:','Password:', pexpect.EOF, pexpect.TIMEOUT])
 
 		#  Be Verbose and print everything
 		if self.verbose:
 			child.logfile = sys.stdout
 
-		child.sendline(self.host['hw_password'])
-		i=child.expect(['console','sw', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
-		if i == 2:
-			mesg = "ERROR:  Login failed\n"
-			logit(self.logFile, mesg)
+		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+		#XXX  Doesn't seem to do what I want:(
+		child.setecho(False)
 
-			sys.stderr.write()
-			exit(1)
-		#  on the 6448 dell, need to send enable
+		#  Send a yes to register authenticity of host for ssh
+		if opt == 2:
+			child.sendline("yes")
+			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+			
+		if opt == 0:
+			child.sendline(self.host['hw_userid'])
+			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
+			child.sendline(self.host['hw_password'])
+			i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			if i == 2:
+				mesg = "ERROR:  Login failed\n"
+				logit(self.logFile, mesg)
+				sys.stderr.write(mesg)
+				exit(1)
+
 		if opt == 1:
+			#  the 6448 doesn't prompt for username
+			child.sendline(self.host['hw_password'])
+			i=child.expect(['console','>', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			#  on the 6448 dell, need to send enable, just send to all
 			child.sendline('enable')
 			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
-		
+
+
 		return child
 
 	def __getPrsLabel(self):
@@ -198,8 +212,8 @@ class HwDellSwitch(HwSwitchInterface):
 		for cmd in cmds.split(";"):
 			child.sendline(cmd)
 			try:
-				i=child.expect(['console','sw', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
-				i=child.expect(['console','sw', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
+				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
+				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				
 			except EOF:
 				print "EOF", i
@@ -341,8 +355,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.logfile = sys.stdout
 		cmd = "show interface switchport ethernet g" + str(self.host['hw_port'])
 		child.sendline(cmd)
-		i = child.expect(['sw(.*)', pexpect.EOF, pexpect.TIMEOUT])
-		i = child.expect(['sw(.*)', pexpect.EOF, pexpect.TIMEOUT])
+		i = child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()
 
 	def interactiveSwitchConfig(self):
@@ -355,5 +368,109 @@ class HwDellSwitch(HwSwitchInterface):
 		#child.logfile = sys.stdout
 		child.sendline(self.host['hw_password'])
 		child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
+	
+	def registerToZoni(self, user, password, host):
+		host = string.strip(str(host))
+		#  Get hostname of the switch
+		if len(host.split(".")) == 4:
+			ip = host
+			try:
+				host = string.strip(socket.gethostbyaddr(ip)[0].split(".")[0])
+			except Exception, e:
+				mesg = "WARNING:  Host (" + host + ") not registered in DNS " + str(e)
+				logit(self.logFile,mesg)
+		else:
+			#  Maybe a hostname was entered...
+			try:
+				ip = socket.gethostbyname(host)
+			except Exception, e:
+				mesg = "ERROR:  Host (" + host + ") not registered in DNS " + str(e)
+				logit(self.logFile,mesg)
+				mesg = "Unable to resolve hostname"
+				logit(self.logFile,mesg)
+				exit()
+
+		switchIp = "ssh " + user + "@" + ip
+		child = pexpect.spawn(switchIp)
+		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+		#XXX  Doesn't seem to do what I want:(
+		child.setecho(False)
+
+		#  Send a yes to register authenticity of host for ssh
+		if opt == 2:
+			child.sendline("yes")
+			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+			
+		if opt == 0:
+			child.sendline(user)
+			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
+			child.sendline(password)
+			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			if i == 2:
+				mesg = "ERROR:  Login failed\n"
+				logit(self.logFile, mesg)
+
+				sys.stderr.write(mesg)
+				exit(1)
+
+		if opt == 1:
+			child.sendline(password)
+			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			#  on the 6448 dell, need to send enable, just send to all
+			child.sendline('enable')
+			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
+
+		fout = tempfile.TemporaryFile()
+		child.logfile = fout
+
+		cmd = "show system"
+		child.sendline(cmd)
+		val = host + "#"
+		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+		cmd = "show version"
+		child.sendline(cmd)
+		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+
+		fout.seek(0)
+		a={}
+		for i in fout.readlines():
+			if "System Location:" in i:
+				datime = time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
+				val = "Registered by Zoni on : " + datime
+				a['hw_notes'] = val + "; " + string.strip(i.split(':', 1)[1])
+			if "System MAC" in i:
+				a['hw_mac'] = string.strip(i.split(':', 1)[1])
+			if "SW version" in i:
+				a['hw_version_sw'] = string.strip(i.split('   ')[1].split()[0])
+			if "HW version" in i:
+				a['hw_version_fw'] = string.strip(i.split('   ')[1].split()[0])
+				
+		a['hw_type'] = "switch"
+		a['hw_make'] = "dell"
+		a['hw_name'] = host
+		a['hw_ipaddr'] = ip
+		a['hw_userid'] = user
+		a['hw_password'] = password
+		child.sendline('exit')
+		child.sendline('exit')
+		child.terminate()
+
+		#  Try to get more info via snmp
+		from pysnmp.entity.rfc3413.oneliner import cmdgen
+		from pysnmp.proto import rfc1902
+
+		user = "public"
+		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,1,0")
+		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		cmdgen.CommunityData('my-agent', user, 0), \
+		cmdgen.UdpTransportTarget((host, 161)), oid)
+		a['hw_model'] = str(varBinds[0][1])
+		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,3,0")
+		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		cmdgen.CommunityData('my-agent', user, 0), \
+		cmdgen.UdpTransportTarget((host, 161)), oid)
+		a['hw_make'] = str(varBinds[0][1])
+
+		return a
 
 

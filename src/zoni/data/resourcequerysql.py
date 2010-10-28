@@ -52,7 +52,7 @@ class ResourceQuerySql(InfoStore):
 		self.port = config['dbPort']
 
 		self.vlan_max = config['vlan_max']
-		self.vlan_reserved = config['vlan_reserved']
+		#self.vlan_reserved = config['vlan_reserved']
 		
 		#  Connect to DB
 		try:
@@ -64,6 +64,15 @@ class ResourceQuerySql(InfoStore):
 			else:
 				print "ERROR : ", e
 				exit(1)
+
+	def __checkDup (self, table, colname, value, colname2=None, value2=None):
+		cond = "where %s = '%s' " % (colname, value)
+		if (colname2 != None and value2 != None):
+			cond += " and %s = '%s'" % (colname2, value2)
+		query = "select * from %s %s" % (table, cond)
+		result = self.__selectDb(query)
+		#j$val = $this->set_num_rows ($result);
+		return result.fetchall()
 
 	def __create_queryopts(self, cmdargs, extra=None):
 		cmdlen = len(cmdargs)
@@ -89,7 +98,7 @@ class ResourceQuerySql(InfoStore):
 					queryopt += k + " = " + v + " "
 				if k == "cpu_flags":
 					queryopt += k + " like \"%" + v + "%\" "
-				if k == "node_id":
+				if k == "sys_id":
 					queryopt += " location = " + "\'" + v + "\' "
 
 				if num > 1:
@@ -160,7 +169,7 @@ class ResourceQuerySql(InfoStore):
 			switchList.append(switch[0])
 
 		#  Use static list until we get all switches installed
-		switchList =  ['sw1-r1r2', 'sw0-r1r1', 'sw0-r1r2', 'sw0-r1r3', 'sw0-r1r4', 'sw0-r2r3', 'sw0-r3r3', 'sw0-r3r2', 'sw0-r2r1c3', 'sw2-r1r2']
+		#switchList =  ['sw1-r1r2', 'sw0-r1r1', 'sw0-r1r2', 'sw0-r1r3', 'sw0-r1r4', 'sw0-r2r3', 'sw0-r3r3', 'sw0-r3r2', 'sw0-r2r1c3', 'sw2-r1r2']
 		#switchList =  ['sw2-r1r2']
 		#switchList =  ['sw1-r1r2']
 
@@ -262,7 +271,7 @@ class ResourceQuerySql(InfoStore):
 				from allocationinfo a, sysinfo s, reservationinfo r, vlaninfo v, imageinfo i, imagemap m where \
 				s.mac_addr = m.mac_addr and \
 				m.image_id = i.image_id and \
-				s.sys_id = a.node_id  and \
+				s.sys_id = a.sys_id  and \
 				v.vlan_id = a.vlan_id and \
 				r.reservation_id = a.reservation_id "
 		if userId:
@@ -416,11 +425,11 @@ class ResourceQuerySql(InfoStore):
 
 	def getHostInfo(self, node):
 		host = {}
-		query = "select * from sysinfo where location = \"" + node + "\"" 
+		query = "select sys_id, mac_addr, num_procs, num_cores, mem_total, clock_speed, sys_vendor, sys_model, proc_vendor, proc_model, proc_cache, cpu_flags, bios_rev, location, system_serial_number, ip_addr from sysinfo where location = \"" + node + "\"" 
 		#print "query is ", query
 		result = self.__selectDb(query)
 		if result.rowcount > 1:
-			print "Mulitple entries for system exist.  Please correct"
+			print "Multiple entries for system exist.  Please correct"
 			exit()
 		if result.rowcount < 1:
 			mesg = "node does not exist :" + str(node) + "\n"
@@ -429,37 +438,37 @@ class ResourceQuerySql(InfoStore):
 		
 		for i in result.fetchall():
 			host['mac_addr'] = host.get("mac_addr", "")
-			host['node_id'] = int(i[0])
+			host['sys_id'] = int(i[0])
 			host['mac_addr'] = i[1]
 			host['num_procs'] = int(i[2])
 			host['num_cores'] = int(i[3])
-			host['mem_total'] = int(i[6])
-			host['clock_speed'] = int(i[8])
-			host['sys_vendor'] = i[9]
-			host['sys_model'] = i[10]
-			host['proc_vendor'] = i[11]
-			host['proc_model'] = i[12]
-			host['proc_cache'] = i[13]
-			host['cpu_flags'] = i[15]
-			host['bios_rev'] = i[17]
-			host['location'] = i[16]
-			host['dell_tag'] = host.get("dell_tag", "")
-			host['dell_tag'] = i[14]
+			host['mem_total'] = int(i[4])
+			host['clock_speed'] = int(i[5])
+			host['sys_vendor'] = i[6]
+			host['sys_model'] = i[7]
+			host['proc_vendor'] = i[8]
+			host['proc_model'] = i[9]
+			host['proc_cache'] = i[10]
+			host['cpu_flags'] = i[11]
+			host['bios_rev'] = i[12]
+			host['location'] = i[13]
+			host['system_serial_number'] = i[14]
+			host['ip_addr'] = i[14]
 		'''
 		for k, v in host.iteritems():
 			print k, v, "\n"
 		'''
 		
 		#  Get IPMI info
-		query = "select * from ipmiinfo where node_id = " + str(host['node_id']) + "" 
+		query = "select h.hw_userid, h.hw_password, h.hw_ipaddr from hardwareinfo h, portmap p, sysinfo s where p.sys_id = s.sys_id and h.hw_id = p.hw_id and h.hw_type = 'ipmi' and s.sys_id = " + str(host['sys_id']) + "" 
 		result = self.__selectDb(query)
 		if result.rowcount> 1:
-			print "Mulitple entries for system exist.  Please correct"
+			print "Multiple entries for system exist.  Please correct"
 			exit()
 		for i in result.fetchall():
-			host['ipmi_user'] = i[2]
-			host['ipmi_password'] = i[3]
-			host['ipmi_addr'] = i[1]
+			host['ipmi_user'] = i[0]
+			host['ipmi_password'] = i[1]
+			host['ipmi_addr'] = i[2]
 
 		#  Get image info
 		query = "select image_name from imagemap i, imageinfo j where i.image_id = j.image_id and mac_addr = \"" + host['mac_addr'] + "\"" 
@@ -471,7 +480,7 @@ class ResourceQuerySql(InfoStore):
 				host['pxe_image_name'] = i[0]
 
 		#  Get switch info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'switch' and node_id = " +  str(host['node_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'switch' and sys_id = " +  str(host['sys_id'])
 		result = self.__selectDb(query)
 		for i in result.fetchall():
 			host['hw_id'] = int(i[0])
@@ -483,7 +492,7 @@ class ResourceQuerySql(InfoStore):
 			host['hw_port'] = int(i[6])
 
 		#  Get drac info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and node_id = " +  str(host['node_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
 		result = self.__selectDb(query)
 		if result.rowcount > 0:
 			for i in result.fetchall():
@@ -496,7 +505,7 @@ class ResourceQuerySql(InfoStore):
 				host['drac_port'] = int(i[6])
 
 		#  Get PDU info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'pdu' and node_id = " +  str(host['node_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and h.hw_type = 'pdu' and p.sys_id = " +  str(host['sys_id'])
 		result = self.__selectDb(query)
 		for i in result.fetchall():
 			host['pdu_id'] = int(i[0])
@@ -670,7 +679,7 @@ class ResourceQuerySql(InfoStore):
 	def archiveAllocation(self, nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, res_notes, notes):
 		combined_notes = str(res_notes) + "|" + str(notes)
 		mesg = "Insert to allocation archive:"
-		query = "insert into allocationarchive (node_id, ip_addr, hostname, vlan_id, user_id, reservation_type, notes) \
+		query = "insert into allocationarchive (sys_id, ip_addr, hostname, vlan_id, user_id, reservation_type, notes) \
 				values (\"" + \
 				str(nodeId) + "\", \"" + str(ip_addr) + "\", \"" + \
 				str(hostName) + "\", \"" + str(vlan_id) + "\", \"" + \
@@ -684,7 +693,7 @@ class ResourceQuerySql(InfoStore):
 		#print "nodeId", nodeId, self.getMacFromSysId(nodeId)
 
 		#  Check if node is already allocated
-		query = "select * from allocationinfo where node_id = \"" + str(nodeId) + "\""
+		query = "select * from allocationinfo where sys_id = \"" + str(nodeId) + "\""
 		result = self.__selectDb(query)
 		if result.rowcount > 0:
 			val = str(result.fetchone())
@@ -752,7 +761,7 @@ class ResourceQuerySql(InfoStore):
 
 
 		mesg = "Insert to Node allocation:"
-		query = "insert into allocationinfo (reservation_id, node_id, ip_addr, hostname, vlan_id, notes) \
+		query = "insert into allocationinfo (reservation_id, sys_id, ip_addr, hostname, vlan_id, notes) \
 				values (\"" + str(reservationId) + "\", \"" +  str(nodeId) + "\", \"" + \
 				str(ip_addr) + "\", \"" + str(hostName) + "\", \"" + str(vlan_id) + "\", \"" + \
 				str(notes) + "\")"
@@ -779,7 +788,7 @@ class ResourceQuerySql(InfoStore):
 	@checkSuper
 	def releaseNode(self, nodeName):
 		#  Get the nodeId
-		query = "select node_id, r.reservation_id, a.ip_addr, hostname, vlan_id, a.notes, r.notes,r.user_id from allocationinfo a, sysinfo s, reservationinfo r where a.node_id = s.sys_id and a.reservation_id = r.reservation_id and location = \"" + nodeName + "\""
+		query = "select sys_id, r.reservation_id, a.ip_addr, hostname, vlan_id, a.notes, r.notes,r.user_id from allocationinfo a, sysinfo s, reservationinfo r where a.sys_id = s.sys_id and a.reservation_id = r.reservation_id and location = \"" + nodeName + "\""
 		print query
 		result = self.__selectDb(query)
 		if result.rowcount == 0:
@@ -807,7 +816,7 @@ class ResourceQuerySql(InfoStore):
 		dhcpdns.removeDhcp(hostName)
 
 		'''
-		query = "select reservation_id, notes from reservationinfo where node_id = " + str(nodeId)
+		query = "select reservation_id, notes from reservationinfo where sys_id = " + str(nodeId)
 		result = self.__selectDb(query)
 		for i in result:
 			print i
@@ -817,7 +826,7 @@ class ResourceQuerySql(InfoStore):
 			logit(self.logFile, mesg)
 			exit(1)
 		if result.rowcount > 1:
-			mesg = "WARNING:  Muliple reservations exist (" + str(result.rowcount) + ")"
+			mesg = "WARNING:  Multiple reservations exist (" + str(result.rowcount) + ")"
 			logit(self.logFile, mesg)
 		
 		resId = int(result.fetchone()[0])
@@ -827,7 +836,7 @@ class ResourceQuerySql(InfoStore):
 		'''
 		
 		#  Eventually should add count =1 so deletes do get out of control
-		query = "delete from allocationinfo where reservation_id = " + str(resId) + " and node_id = " + str(nodeId)
+		query = "delete from allocationinfo where reservation_id = " + str(resId) + " and sys_id = " + str(nodeId)
 		result = self.__selectDb(query)
 
 		#  Archive node release
@@ -933,3 +942,41 @@ class ResourceQuerySql(InfoStore):
 
 		return 0
 
+	
+	def registerHardware(self, data):
+
+		if len(self.__checkDup("hardwareinfo", "hw_name", data['hw_name'])) == 0:
+			statement = "insert into hardwareinfo (" 
+			fields = []
+			entries = []
+			for key, value in data.iteritems(): 
+				fields.append(key)
+				entries.append(value)
+			c = len(fields)
+			count = 1
+			for i in fields:
+				if c != count:
+					statement += i + ","
+				else:
+					statement += i + ")"
+				count += 1
+
+			statement += "values ("
+			c = len(entries)
+			count = 1
+			for i in entries:
+				if c != count:
+					statement += "'" + i + "', "
+				else:
+					statement += "'" + i + "') "
+				count += 1
+			try:
+				self.__insertDb(statement)
+				mesg = "Device (%s) registered successfully\n" % (data['hw_name'])
+				logit(self.logFile, mesg)
+			except Exception, e:
+				mesg = "Registration failed to add Device (%s) - %s\n" % (data['hw_name'], e)
+				logit(self.logFile, mesg)
+		else:
+			mesg = "INFO:  Device (%s) already registered\n" % (data['hw_name'])
+			sys.stderr.write(mesg)

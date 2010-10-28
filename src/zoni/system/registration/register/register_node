@@ -27,6 +27,7 @@ DEBUG () {
 }
 
 #  Capture vars passed via kernal args
+VERBOSE=0
 for x in $(cat /proc/cmdline); do
     case $x in
     imagename=*)
@@ -50,65 +51,96 @@ done
 IMAGE_URL="${PXESERVER}/${IMAGE_ROOT}/"
 
 #  Scrape system for specs
-/sbin/getSystemId > /tmp/sysinfo
-cat /proc/cpuinfo >> /tmp/sysinfo
+#/sbin/getSystemId > /tmp/sysinfo
+#  moving to dmidecode because getSystemId is now python code and 
+#  I don't want to include python in the image if I dont have to
+cat /proc/cpuinfo > /tmp/sysinfo
 cat /proc/meminfo >> /tmp/sysinfo
 ifconfig eth0 >> /tmp/sysinfo
-#fdisk >> /tmp/sysinfo
+fdisk -l | grep Disk | grep dev 1>> /tmp/sysinfo
 
-DEBUG "pxeserver is ", ${PXESERVER}
+DEBUG "pxeserver is " ${PXESERVER}
 
-
-(echo -n "MAC:          "; ifconfig eth0 | grep "HWaddr" | awk '{print $5}') >> /tmp/sysinfo
+#(echo -n "MAC:          "; ifconfig eth0 | grep "HWaddr" | awk '{print $5}') >> /tmp/sysinfo
 
 DEBUG $(cat /tmp/sysinfo)
 sleep 1
+IPADDR=$(cat /tmp/sysinfo | grep "inet addr" | awk '{print $2}' | awk -F: '{print $2}')
 MAC=$(cat /tmp/sysinfo | grep "HWaddr" | awk '{print $5}') 
 DEBUG MAC - $MAC
-MOD_MAC=`cat /tmp/sysinfo | grep "^MAC" | cut -c 15- | sed 's/:/-/g' | sed 'y/ABCDEF/abcdef/'`
+MOD_MAC=$(echo ${MAC} | sed 's/:/-/g' | sed 'y/ABCDEF/abcdef/')
 DEBUG MOD_MAC - $MOD_MAC
-SYS_MODEL=$(cat /tmp/sysinfo | grep "^Product Name:" | cut -c 15- | sed 's/ /+/g')
+SYS_MODEL=$(/sbin/dmidecode -s system-product-name | sed 's/ /+/g')
 DEBUG SYS_MODEL is $SYS_MODEL
-SERVICE_TAG=$(cat /tmp/sysinfo | grep "^Service Tag:" | cut -c 15- | sed 's/ /+/g')
-DEBUG SERVICE_TAG is $SERVICE_TAG
-EXPRESS_SERVICE_CODE=$(cat /tmp/sysinfo | grep "^Express Service Code:" | cut -c 15- | sed 's/ /+/g')
-DEBUG EXPRESS_SERVICE_CODE is $EXPRESS_SERVICE_CODE
-BIOS_REV=$(cat /tmp/sysinfo | grep "^BIOS Version:" | cut -c 15- | sed 's/ /+/g')
+SYSTEM_SERIAL_NUMBER=$(/sbin/dmidecode -s system-serial-number | sed 's/ /+/g')
+DEBUG SYSTEM_SERIAL_NUMBER is $SYSTEM_SERIAL_NUMBER
+CHASSIS_SERIAL_NUMBER=$(/sbin/dmidecode -s chassis-serial-number | sed 's/ /+/g')
+DEBUG CHASSIS_SERIAL_NUMBER is $CHASSIS_SERIAL_NUMBER
+SYSTEM_UUID=$(/sbin/dmidecode -s system-uuid | sed 's/ /+/g')
+DEBUG SYSTEM_UUID is $SYSTEM_UUID
+BIOS_REV=$(/sbin/dmidecode -s bios-version | sed 's/ /+/g')
 DEBUG BIOS_REV - $BIOS_REV
-SYS_VENDOR=$(cat /tmp/sysinfo | grep "^Vendor:" | cut -c 15- | sed 's/ /+/g')
-#NUM_PROC=$(cat /proc/cpuinfo | grep processor | wc -l);
-
+SYS_VENDOR=$(/sbin/dmidecode -s system-manufacturer | sed 's/ /+/g')
+DEBUG SYS_VENDOR - $SYS_VENDOR
 PROC_VENDOR=$(cat /tmp/sysinfo | grep vendor_id | cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
+DEBUG PROC_VENDOR - $PROC_VENDOR
 PROC_MODEL=$(cat /tmp/sysinfo | grep "model name"| cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
+DEBUG PROC_MODEL - $PROC_MODEL
 CLOCK_SPEED=$(cat /tmp/sysinfo | grep "cpu MHz"| cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
+DEBUG CLOCK_SPEED - $CLOCK_SPEED
 PROC_CACHE=$(cat /tmp/sysinfo | grep "cache size"| cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
+DEBUG PROC_CACHE - $PROC_CACHE
 CPU_FLAGS=$(cat /tmp/sysinfo | grep "flags"| cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
+DEBUG CPU_FLAGS - $CPU_FLAGS
 NUM_PROCS=$(cat /tmp/sysinfo | grep "physical id" | sort | uniq | wc -l | sed 's/ /+/g');
+DEBUG NUM_PROCS - $NUM_PROCS
 DA_PROCS=$(cat /tmp/sysinfo | grep "physical id" | sort | uniq | wc -l);
+DEBUG DA_PROCS - $DA_PROCS
 #NUM_CORES=$(cat /tmp/sysinfo | grep "cpu cores"| cut -d ":" -f 2 | tail -n1 | sed 's/ /+/g');
 DA_CORES=$(cat /tmp/sysinfo | grep "cpu cores"| cut -d ":" -f 2 | tail -n1);
+DEBUG DA_CORES - $DA_CORES
 NUM_CORES=$(echo $(($DA_PROCS * $DA_CORES)))
+DEBUG NUM_CORES - $NUM_CORES
 MEM_TOTAL=$(cat /tmp/sysinfo | grep "MemTotal"| awk '{print $2}' | sed 's/ /+/g');
-SUBNET=$(cat /tmp/sysinfo | grep "inet addr"| awk '{print $2}' | cut -d ":" -f 2 | awk -F "." '{print $3}');
+DEBUG MEM_TOTAL - $MEM_TOTAL
+NUM_DISKS=$(cat /tmp/sysinfo | grep "Disk"| grep "dev" |  wc -l)
+DEBUG NUM_DISKS - $NUM_DISKS
+
+DISK_INFO=""
+i=1
+
+while [ $i -le ${NUM_DISKS} ];do 
+	val=$(cat /tmp/sysinfo | tail -n $i | head -n 1 | awk '{print $2$5}')
+	echo $val
+	if [ $i -eq 1 ];then
+		DISK_INFO=$val
+	else
+		DISK_INFO="${DISK_INFO} $val"
+	fi
+	i=$(($i+1))
+done
+tmp=$(echo $DISK_INFO | sed 's/ /+/g')
+DISK_INFO=$tmp
+DEBUG DISK_INFO - ${DISK_INFO}
 
 #disk_size=$(cat /tmp/sysinfo | grep "Disk"| awk '{print $5}');
 
 #  Register sysinfo to DB
-DEBUG 'running cmd - wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"'
-wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&service_tag=$SERVICE_TAG&express_service_code=$EXPRESS_SERVICE_CODE&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS"
+DEBUG "wget -O- http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&system_serial_number=$SYSTEM_SERIAL_NUMBER&chassis_serial_number=${CHASSIS_SERIAL_NUMBER}&system_uuid=$SYSTEM_UUID&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS&num_disks=${NUM_DISKS}&disk_info=${DISK_INFO}"
+wget "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&system_serial_number=$SYSTEM_SERIAL_NUMBER&chassis_serial_number=${CHASSIS_SERIAL_NUMBER}&system_uuid=$SYSTEM_UUID&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS&num_disks=${NUM_DISKS}&disk_info=${DISK_INFO}"
 
 #  Get more info either from cheat file or from user entered info
 ec=1
 if [[ -e /register_automate ]]; then
-	switchinfo=`/register_automate $SERVICE_TAG switchinfo`
+	switchinfo=`/register_automate $SYSTEM_SERIAL_NUMBER switchinfo`
 	switchport=$(echo $switchinfo | cut -d ":" -f 2)
 	switch=$(echo $switchinfo | cut -d ":" -f 1)
-	pduinfo=`/register_automate $SERVICE_TAG pduinfo`
+	pduinfo=`/register_automate $SYSTEM_SERIAL_NUMBER pduinfo`
 	pduport=$(echo $pduinfo | cut -d ":" -f 2)
 	pdu_name=$(echo $pduinfo | cut -d ":" -f 1)
-	location=`/register_automate $SERVICE_TAG location`
-	hn=`/register_automate $SERVICE_TAG hostname`
-	ip_addr=`/register_automate $SERVICE_TAG ipaddr`
+	location=`/register_automate $SYSTEM_SERIAL_NUMBER location`
+	#ip_addr=`/register_automate $SYSTEM_SERIAL_NUMBER ipaddr`
+	daimage=`/register_automate $SYSTEM_SERIAL_NUMBER image`
 	ec=$?
 	DEBUG "Register automate completed"
 	DEBUG "ec is $ec"
@@ -123,29 +155,29 @@ fi
 #val=${#answer}
 #if [ $val -gt 0 ];then
 
+#  No automate entry found, prompt user for info
 if [[ $ec -ne 0 ]]; then
 	ans=n;
 	while [ $ans == "n" ] || [ $ans == "N" ]; do
-		echo -n "Please enter the location for this node: "
+		echo -n "Please enter the location/hostname for this node: "
 		read location
-		#echo -n "Please enter the hostname for this node: "
-		#read hn
-		echo -n "Please enter the IP address for this node: "
-		read ip_addr
-		echo -n "if you know what image you want, enter it here: "
-		read daimage
+		#echo -n "Please enter the IP address for this node: "
+		#read ip_addr
 		echo -n "Enter Switch name:port e.g. sw0-r3r2:8: "
 		read switchinfo
 		echo -n "Enter PDU name:port e.g. pdu0-r3r2:8: "
 		read pduinfo
+		echo -n "if you know what image you want, enter it here: "
+		read daimage
 
 		##  Confirm summary
 		echo "--  Summary --"
 		echo "Location: $location"
 		#echo "Hostname: $hn"
-		echo "IP address: $ip_addr"
-		echo "Image name: $daimage"
+		#echo "IP address: $ip_addr"
 		echo "SwitchInfo: $switchinfo"
+		echo "PDUInfo: $pduinfo"
+		echo "Image name: $daimage"
 		echo "Save Configuation? [y/n]"
 		read ans
 		##  Submit some stuff that was entered
@@ -157,78 +189,103 @@ if [[ $ec -ne 0 ]]; then
 		pdu_name=$(echo $pduinfo | cut -d ":" -f 1)
 
 	done
-	#  Update IP_ADDR
-	if [ $ip_addr ];then 
-		DEBUG "Update ip $ip_addr"
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
-	fi
-	if [ $location ];then 
-		DEBUG "Set location"
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
-	fi
-	#  If we set the imagename, register it
-	if [ $daimage ];then
-		DEBUG "setting image name"
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$daimage&location=$location"
-	#else
-		#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=bootopt&machine_type=generic&mac=$MAC&image_name=$DEFAULTIMAGE"
-	fi
-#############################
-##  USE REGISTER_AUTOMATE  ##
-#############################
-else
-	# using register automate file info
-	DEBUG "Getting bootopt..."
-	bootopt=$(/register_automate $SERVICE_TAG bootopt)
-	ec=$?
-	if [[ $ec -eq 0 ]]; then
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$bootopt&location=$location"
-	fi 
-	DEBUG "about to update ip $ip_addr in automate"
-	if [ $ip_addr ];then 
-		echo wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
-	fi
-	if [ $location ];then 
-		wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addlocation&mac=$MAC&location=$location"
-	fi
 fi
+
+#  Update IP_ADDR
+#  Removing IP address.   Let DHCP do the work
+#if [ $ip_addr ];then 
+	#DEBUG "Update ip $ip_addr"
+	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
+#fi
+VERBOSE=0
+if [ $location ];then 
+	DEBUG "Set location ${location}"
+	echo "wget -O- http://${IMAGE_URL}/zoni-register.php?action=addlocation&verbose=${VERBOSE}&mac=$MAC&location=$location"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addlocation&verbose=${VERBOSE}&mac=$MAC&location=$location"
+fi
+#  If we set the imagename, register it
+if [ $daimage ];then
+	DEBUG "setting image name"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&verbose=${VERBOSE}&mac=$MAC&image_name=$daimage&location=$location"
+fi
+
 if [ $switchport ];then 
-	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${switch}&switchport=${switchport}"
+	DEBUG "setting switchport : ${switch} ${switchport}"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addhardwareinfo&verbose=${VERBOSE}&mac=$MAC&hwdev=${switch}&hwport=${switchport}"
 fi
 
 if [ $pduport ];then 
-	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addswitchinfo&mac=$MAC&switch=${pdu_name}&switchport=${pduport}"
+	DEBUG "setting pduport : ${pdu_name} ${pduport}"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addhardwareinfo&verbose=${VERBOSE}&mac=$MAC&hwdev=${pdu_name}&hwport=${pduport}"
 fi
 
-#  Add IPMI info 
-wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&mac=$MAC&location=$location"
-IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
-IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $4}')
-
-echo $IPMI_ADDR and $IPMI_PASSWORD
-
-ipmitool lan set 1 ipaddr $IPMI_ADDR
-ipmitool lan set 1 vlan id 998 
-ipmitool lan set 1 defgw ipaddr 0.0.0.0
-ipmitool lan set 1 netmask 255.255.255.0
-ipmitool lan set 1 password $IPMI_PASSWORD
-ipmitool lan set 1 access on
-
-#  Make user 2 be root with random password
-ipmitool user set name 2 root
-ipmitool user set password 2 $IPMI_PASSWORD
-ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
-ipmitool user enable 2
+	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
+#fi
 
 #  Add dns and dhcp
-wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&mac=${MAC}&location=$location&ip_addr=$ip_addr&ipmi_addr=$IPMI_ADDR"
+DEBUG "adding to dhcp and dns"
+wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${MAC}&location=$location&ip_addr=$IPADDR"
+
+#  Setup the management interface, if any
+
+#  Check for ipmi
+#  Check for the existance of the module.  
+cat /proc/modules | grep ipmi_si 
+if [ $? -eq 0 ];then 
+	#  Assigning IP address to IPMI card since they don't seem to every accept an address from DHCP
+	#  Subnet is selected from config file
+	#  Get IPMI card mac address
+	ipmi_mac=$(ipmitool lan print |  grep -i "MAC Address" | awk -F ": " '{print $2}')
+	ipmi_ver=$(ipmitool mc info |  grep -i "IPMI Version" | awk -F ": " '{print $2}')
+	ipmi_rev=$(ipmitool mc info |  grep -i "Firmware Revision" | awk -F ": " '{print $2}')
+
+	vlan_disable=$(ipmitool lan print |  grep -i "Vlan" | awk -F ": " '{print $2}')
+
+	#  Add IPMI info 
+VERBOSE=1
+	wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}"
+	IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
+	IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_PASSWORD | awk '{print $2}')
+	IPMI_DOMAIN=$(cat /outfile.txt | grep IPMI_DOMAIN| awk '{print $2}')
+	IPMI_NETMASK=$(cat /outfile.txt | grep IPMI_NETMASK| awk '{print $2}')
+	IPMI_GATEWAY=$(cat /outfile.txt | grep IPMI_GATEWAY| awk '{print $2}')
+
+
+	
+	if [ ${IPMI_DOMAIN} -eq 1 ];then 
+		IPMI_DOMAIN="off"
+	fi
+	DEBUG "ip $IPMI_ADDR pass $IPMI_PASSWORD domain $IPMI_DOMAIN netmask $IPMI_NETMASK gateway $IPMI_GATEWAY "
+	ipmitool lan set 1 ipsrc static
+	ipmitool lan set 1 ipaddr ${IPMI_ADDR}
+	ipmitool lan set 1 vlan id ${IPMI_DOMAIN}
+	ipmitool lan set 1 defgw ipaddr ${IPMI_GATEWAY}
+	ipmitool lan set 1 netmask ${IPMI_NETMASK}
+	ipmitool lan set 1 password ${IPMI_PASSWORD}
+	ipmitool lan set 1 access on
+
+	#  Make user 2 be root with random password
+	ipmitool user set name 2 root
+	ipmitool user set password 2 $IPMI_PASSWORD
+	ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
+	ipmitool user enable 2
+
+	#DEBUG "adding to dhcp and dns"
+	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}$&ip_addr=${IPMI_ADDR}"
+
+else
+	DEBUG "IPMI interface not found"
+fi
+
+
+#  check for iLo 
+#  Code for ilo goes here...
 
 
 #  If default image is set as kernel opt, override automate file
-DEBUG "def image is $DEFAULTIMAGE "
-if [ $DEFAULTIMAGE ] ; then 
-	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$DEFAULTIMAGE&location=$location"
-fi
+#DEBUG "def image is $DEFAULTIMAGE "
+#if [ $DEFAULTIMAGE ] ; then 
+	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=assign_image&mac=$MAC&image_name=$DEFAULTIMAGE&location=$location"
+#fi
 #else
 	#echo "Interactive mode canceled due to no keyboard input"

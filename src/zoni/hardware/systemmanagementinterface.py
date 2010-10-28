@@ -58,6 +58,10 @@ class SystemManagementInterface(object):
 		'''  Activate Console'''
 		raise NotImplementedError
 
+	def registerToZoni(self):
+		'''  register hardware to zoni'''
+		raise NotImplementedError
+
 
 
 
