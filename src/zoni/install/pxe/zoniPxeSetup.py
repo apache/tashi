@@ -52,10 +52,10 @@ def main():
 	parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
 	(options, args) = parser.parse_args()
 
-	configFile = getConfig()
+	(configs, configFile) = getConfig()
 
-	ZoniPxeSetup(configFile)
-	ZoniGetSyslinux(configFile)
+	ZoniPxeSetup(configs)
+	ZoniGetSyslinux(configs)
 
 
 def createDir(dirName):

@@ -50,10 +50,10 @@ def main():
 	parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
 	(options, args) = parser.parse_args()
 
-	configFile = getConfig()
+	(configs, configFiles) = getConfig()
 
-	ZoniWebSetup(configFile)
-	ZoniCreateWebConfigFile(configFile)
+	ZoniWebSetup(configs)
+	ZoniCreateWebConfigFile(configs)
 
 
 def ZoniCreateWebConfigFile(config):

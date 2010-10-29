@@ -33,8 +33,9 @@ sys.path.append(a)
 a = os.path.join("../../..")
 sys.path.append(a)
 
-from zoni.extra.util import *
 from zoni.version import *
+from zoni.extra.util import *
+
 
 def main():
 	''' This file sets up the database for Zoni '''
@@ -57,9 +58,9 @@ def main():
 	if not options.password:
 		password = getpass.getpass()
 
-	configFile = getConfig()
+	(configs, configFiles) = getConfig()
 
-	CreateZoniDb(configFile, options.userName, password)
+	CreateZoniDb(configs, options.userName, password)
 
 
 def CreateZoniDb(config, adminUser, adminPassword):
@@ -344,7 +345,6 @@ def execQuery(conn, query):
 		sys.stdout.write("Fail\n")
 		msg = "ERROR: " + e[1]
 		sys.stderr.write(msg)
-		#logit(logFile, msg)
 		#traceback.print_exc(sys.exc_info())
 		exit()
 	return cursor
