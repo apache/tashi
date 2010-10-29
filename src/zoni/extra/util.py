@@ -29,49 +29,50 @@ def loadConfigFile(parser):
 	#parser.read(filename)
 	config = {}
 	#  Install dir
-	config['installBaseDir'] = parser.get("home", "INSTALL_BASE_DIR").split()[0]
+	config['installBaseDir'] = parser.get("home", "INSTALL_BASE_DIR")
 
 	#  Logging
-	config['logFile'] = parser.get("logging", "LOG_FILE").split()[0]
+	#config['logFile'] = parser.get("logging", "LOG_FILE")
+	config['logFile'] = parser.get("logging", "LOG_FILE")
 	
 	#  DB connection
-	config['dbUser'] = parser.get("dbConnection", "DB_USER").split()[0]
+	config['dbUser'] = parser.get("dbConnection", "DB_USER")
 	config['dbPassword'] = config.get("dbPassword", "")
 	if not parser.get("dbConnection", "DB_PASSWORD") == "":
 		config['dbPassword'] = parser.get("dbConnection", "DB_PASSWORD").strip("\",'")
-	config['dbHost'] = parser.get("dbConnection", "DB_HOST").split()[0]
-	config['dbPort'] = int(parser.get("dbConnection", "DB_PORT").split()[0])
-	config['dbInst'] = parser.get("dbConnection", "DB_INST").split()[0]
+	config['dbHost'] = parser.get("dbConnection", "DB_HOST")
+	config['dbPort'] = int(parser.get("dbConnection", "DB_PORT"))
+	config['dbInst'] = parser.get("dbConnection", "DB_INST")
 
 	#  PXE info
-	config['tftpRootDir'] = parser.get("pxe", "TFTP_ROOT_DIR").split()[0]
-	config['tftpImageDir'] = parser.get("pxe", "TFTP_IMAGE_DIR").split()[0]
-	config['tftpBootOptionsDir'] = parser.get("pxe", "TFTP_BOOT_OPTIONS_DIR").split()[0]
-	config['tftpUpdateFile'] = parser.get("pxe", "TFTP_UPDATE_FILE").split()[0]
-	config['tftpBaseFile'] = parser.get("pxe", "TFTP_BASE_FILE").split()[0]
-	config['tftpBaseMenuFile'] = parser.get("pxe", "TFTP_BASE_MENU_FILE").split()[0]
-	config['pxeServerIP'] = parser.get("pxe", "PXE_SERVER_IP").split()[0]
-	config['initrdRoot'] = parser.get("pxe", "INITRD_ROOT").split()[0]
+	config['tftpRootDir'] = parser.get("pxe", "TFTP_ROOT_DIR")
+	config['tftpImageDir'] = parser.get("pxe", "TFTP_IMAGE_DIR")
+	config['tftpBootOptionsDir'] = parser.get("pxe", "TFTP_BOOT_OPTIONS_DIR")
+	config['tftpUpdateFile'] = parser.get("pxe", "TFTP_UPDATE_FILE")
+	config['tftpBaseFile'] = parser.get("pxe", "TFTP_BASE_FILE")
+	config['tftpBaseMenuFile'] = parser.get("pxe", "TFTP_BASE_MENU_FILE")
+	config['pxeServerIP'] = parser.get("pxe", "PXE_SERVER_IP")
+	config['initrdRoot'] = parser.get("pxe", "INITRD_ROOT")
 
 	#  Image store
-	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP").split()[0]
-	config['fsImagesBaseDir'] = parser.get("imageStore", "FS_IMAGES_BASE_DIR").split()[0]
+	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP")
+	config['fsImagesBaseDir'] = parser.get("imageStore", "FS_IMAGES_BASE_DIR")
 
 	#  WWW
-	config['wwwDocumentRoot'] = parser.get("www", "WWW_DOCUMENT_ROOT").split()[0]
-	config['registrationBaseDir'] = parser.get("www", "REGISTRATION_BASE_DIR").split()[0]
+	config['wwwDocumentRoot'] = parser.get("www", "WWW_DOCUMENT_ROOT")
+	config['registrationBaseDir'] = parser.get("www", "REGISTRATION_BASE_DIR")
 	
 	#  SNMP
-	config['snmpCommunity'] = parser.get("snmp", "SNMP_COMMUNITY").split()[0]
+	config['snmpCommunity'] = parser.get("snmp", "SNMP_COMMUNITY")
 
 	#  VLAN
 	#config['vlan_reserved'] = parser.get("vlan", "VLAN_RESERVED")
 	config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
 
 	#  Domain
-	config['zoniHomeDomain'] = parser.get("domain", "ZONI_HOME_DOMAIN").split()[0]
-	config['zoniHomeNetwork'] = parser.get("domain", "ZONI_HOME_NETWORK").split()[0]
-	config['zoniIpmiNetwork'] = parser.get("domain", "ZONI_IPMI_NETWORK").split()[0]
+	config['zoniHomeDomain'] = parser.get("domain", "ZONI_HOME_DOMAIN")
+	config['zoniHomeNetwork'] = parser.get("domain", "ZONI_HOME_NETWORK")
+	config['zoniIpmiNetwork'] = parser.get("domain", "ZONI_IPMI_NETWORK")
 	#config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
 
 	#  HARDWARE CONTROL
@@ -88,7 +89,7 @@ def loadConfigFile(parser):
 	config['dhcpKeyName'] = parser.get("DhcpDns", "dhcpKeyName")
 	config['dhcpSecretKey'] = parser.get("DhcpDns", "dhcpSecretKey")
 
-	#self.ap_model['radius'] = int(parser.get("wireless_range", "radius").split()[0])
+	#self.ap_model['radius'] = int(parser.get("wireless_range", "radius"))
 	return config
 
 def getConfig(additionalNames=[], additionalFiles=[]):
@@ -103,7 +104,9 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 	if (len(configFiles) == 0):
 		raise Exception("No config file could be found: %s" % (str(allLocations)))
 
-	return loadConfigFile(config)
+	return (loadConfigFile(config), configFiles) 
+
+
 
 def logit(logfile, mesg):
 	fd = open(logfile, "a+");

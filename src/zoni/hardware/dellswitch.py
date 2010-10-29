@@ -28,11 +28,11 @@ import string
 import getpass
 import socket
 import tempfile
+import logging
 
 
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
-from zoni.extra.util import logit
 
 
 '''  Using pexpect to control switches because couldn't get snmp to work 
@@ -40,9 +40,10 @@ from zoni.extra.util import logit
 
 class HwDellSwitch(HwSwitchInterface):
 	def __init__(self, config, host=None):
+		self.config = config
 		self.host = host
 		self.verbose = False
-		self.logFile = config['logFile']
+		self.log = logging.getLogger(os.path.basename(__file__))
 
 
  	def setVerbose(self, verbose):
@@ -72,9 +73,8 @@ class HwDellSwitch(HwSwitchInterface):
 			child.sendline(self.host['hw_password'])
 			i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
 			if i == 2:
-				mesg = "ERROR:  Login failed\n"
-				logit(self.logFile, mesg)
-				sys.stderr.write(mesg)
+				mesg = "ERROR:  Login to %s failed\n" % (self.host['hw_name'])
+				self.log.error(mesg)
 				exit(1)
 
 		if opt == 1:
@@ -125,8 +125,8 @@ class HwDellSwitch(HwSwitchInterface):
 		child.terminate()
 	
 	def addVlanToTrunk(self, vlan):
-		mesg = "Adding Vlan to trunks on switch"
-		logit(self.logFile, mesg)
+		mesg = "Adding Vlan %s to trunks on switch" % (vlan)
+		self.log.info(mesg)
 		child = self.__login()
 		child.sendline('config')
 		cmd = "interface range port-channel all"
@@ -137,9 +137,9 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline('exit')
 
 	def createVlansThread(self, vlan, switch,host):
-		mesg = "Creating vlan " + str(vlan) + " on switch " + str(switch)
+		mesg = "Creating vlan %s on switch %s" % (str(vlan),str(switch))
 		print "host is ", host
-		logit(self.logFile, mesg)
+		self.log(mesg)
 		print "create"
 		self.createVlan(vlan)
 		print "cend"
@@ -151,16 +151,16 @@ class HwDellSwitch(HwSwitchInterface):
 			#print "working on switch ", switch
 			#self.host = query.getSwitchInfo(switch)
 			#thread.start_new_thread(self.createVlansThread, (vlan, switch, self.host))
-			mesg = "Creating vlan " + str(vlan) + " on switch " + str(switch)
-			logit(self.logFile, mesg)
+			mesg = "Creating vlan %s on switch %s" % (str(vlan), str(switch))
+			self.log.info(mesg)
 			self.host = query.getSwitchInfo(switch)
 			self.createVlan(vlan)
 			self.addVlanToTrunk(vlan);
 		
 	def removeVlans(self, vlan, switchlist, query):
 		for switch in switchlist:
-			mesg = "Deleting vlan " + str(vlan) + " on switch " + str(switch)
-			logit(self.logFile, mesg)
+			mesg = "Deleting vlan %s on switch %s" % (str(vlan),str(switch))
+			self.log.info(mesg)
 			self.host = query.getSwitchInfo(switch)
 			self.removeVlan(vlan)
 		
@@ -179,8 +179,8 @@ class HwDellSwitch(HwSwitchInterface):
 			#sys.stderr.write(mesg)
 			#exit(1)
 		if num > 4095 or num < 0:
-			mesg = "ERROR:  Vlan out of range.  Must be < 4095"
-			logit(self.logFile, mesg)
+			mesg = "Vlan out of range.  Must be < %s" % (self.config['vlan_max'])
+			self.log.error(mesg)
 			exit(1)
 		
 		child = self.__login()
@@ -227,7 +227,9 @@ class HwDellSwitch(HwSwitchInterface):
 		#print "after", child.after
 
 	def addNodeToVlan(self, vlan):
-		print "Adding Node to vlan ", vlan
+		mesg = "Adding Node to vlan %s" % (str(vlan))
+		self.log.info(mesg)
+		
 		child = self.__login()
 		child.sendline('config')
 		cmd = "interface ethernet g" + str(self.host['hw_port'])
@@ -242,7 +244,7 @@ class HwDellSwitch(HwSwitchInterface):
 		#  Vlan must exist in order to add a host to it.  
 		#  If it doesn't exist, try to create it
 		if i == 1:
-			sys.stderr.write("WARNING:  Vlan doesn't exist, trying to create\n")
+			self.log.warning("WARNING:  Vlan %sdoesn't exist, trying to create" % (vlan))
 			#  Add a tag showing this was created by PRS
 			newvlan = vlan + ":" + self.__getPrsLabel()
 			self.createVlan(newvlan)
@@ -251,9 +253,10 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline('exit')
 		child.sendline('exit')
 		child.terminate()
-		sys.stdout.write("Success\n")
 
 	def removeNodeFromVlan(self, vlan):
+		mesg = "Removing Node from vlan %s" % (str(vlan))
+		self.log.info(mesg)
 		child = self.__login()
 		child.sendline('config')
 		cmd = "interface ethernet g" + str(self.host['hw_port'])
@@ -286,7 +289,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline(cmd)
 		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
 		if i > 0:
-			sys.stderr.write("ERROR: setNativeVlan ", cmd, " failed\n")
+			self.log.error("setNativeVlan %s failed" % (cmd))
 
 		NOVLAN = "VLAN was not created by user."
 		cmd = "switchport trunk native vlan " + vlan
@@ -295,7 +298,7 @@ class HwDellSwitch(HwSwitchInterface):
 		#  Vlan must exist in order to add a host to it.  
 		#  If it doesn't exist, try to create it
 		if i == 1:
-			sys.stderr.write("WARNING:  Vlan doesn't exist, trying to create")
+			self.log.warning("Vlan %s doesn't exist, trying to create" % (vlan))
 			#  Add a tag showing this was created by PRS
 			newvlan = vlan + ":" + self.__getPrsLabel()
 			self.createVlan(newvlan)
@@ -331,7 +334,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline(cmd)
 		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
 		if i > 0:
-			sys.stderr.write("ERROR: setNativeVlan ", cmd, " failed\n")
+			self.log.error("setNativeVlan %s failed" % (cmd))
 
 		NOVLAN = "VLAN was not created by user."
 		cmd = "switchport trunk allowed vlan remove all"
@@ -377,17 +380,17 @@ class HwDellSwitch(HwSwitchInterface):
 			try:
 				host = string.strip(socket.gethostbyaddr(ip)[0].split(".")[0])
 			except Exception, e:
-				mesg = "WARNING:  Host (" + host + ") not registered in DNS " + str(e)
-				logit(self.logFile,mesg)
+				mesg = "Host (%s) not registered in DNS, %s" % (host,str(e))
+				self.log.warning(mesg)
 		else:
 			#  Maybe a hostname was entered...
 			try:
 				ip = socket.gethostbyname(host)
 			except Exception, e:
-				mesg = "ERROR:  Host (" + host + ") not registered in DNS " + str(e)
-				logit(self.logFile,mesg)
+				mesg = "Host (%s) not registered in DNS, %s" % (host, str(e))
+				self.log.error(mesg)
 				mesg = "Unable to resolve hostname"
-				logit(self.logFile,mesg)
+				self.log.critical(mesg)
 				exit()
 
 		switchIp = "ssh " + user + "@" + ip
@@ -407,10 +410,8 @@ class HwDellSwitch(HwSwitchInterface):
 			child.sendline(password)
 			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
 			if i == 2:
-				mesg = "ERROR:  Login failed\n"
-				logit(self.logFile, mesg)
-
-				sys.stderr.write(mesg)
+				mesg = "Login to switch %s failed" % (host)
+				self.log.error(mesg)
 				exit(1)
 
 		if opt == 1:

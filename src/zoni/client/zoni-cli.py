@@ -24,6 +24,7 @@ import os
 import sys
 import optparse
 import socket
+import logging.config
 import getpass
 
 
@@ -62,9 +63,12 @@ def main():
 	ver = version.split(" ")[0]
 	rev = revision
 
-	configFile = getConfig()
-	#logit(configFile['logFile'], "Starting Zoni client")
-	#logit(configFile['logFile'], "Loading config file")
+	(configs, configFiles) = getConfig()
+
+	logging.config.fileConfig(configFiles)
+	log = logging.getLogger(os.path.basename(__file__))
+	#logit(configs['logFile'], "Starting Zoni client")
+	#logit(configs['logFile'], "Loading config file")
 
 	parser = optparse.OptionParser(usage="%prog [-n] [-u] [--uid] [-v]", version="%prog " + ver + " " + rev)
 	parser.add_option("-n", "--nodeName", dest="nodeName", help="Specify node")
@@ -169,7 +173,7 @@ def main():
 	cmdargs = {}
 
 	#  setup db connection
-	query = zoni.data.resourcequerysql.ResourceQuerySql(configFile, options.verbosity)
+	query = zoni.data.resourcequerysql.ResourceQuerySql(configs, options.verbosity)
 
 	#  Get host info
 	host=None
@@ -181,10 +185,10 @@ def main():
 	#  Hardware control
 	if options.hardwareType:
 
-		if (options.hardwareType) and options.hardwareType not in configFile['hardware_control']:
+		if (options.hardwareType) and options.hardwareType not in configs['hardware_control']:
 			mesg = "Non support hardware type specified\n"
 			mesg += "Supported types:\n"
-			mesg += str(configFile['hardware_control'])
+			mesg += str(configs['hardware_control'])
 			mesg += "\n\n"
 			sys.stdout.write(mesg)
 			exit()
@@ -330,7 +334,7 @@ def main():
 	if (options.rgasstest):
 		#pdu = raritanDominionPx(host)
 		#print pdu
-		#bootit = pxe.Pxe(configFile, options.verbosity)
+		#bootit = pxe.Pxe(configs, options.verbosity)
 		#bootit.createPxeUpdateFile(query.getPxeImages())
 		#bootit.updatePxe()
 		#print "host is ", host
@@ -436,7 +440,7 @@ def main():
 			exit()
 
 		#  Update PXE 
-		bootit = pxe.Pxe(configFile, options.verbosity)
+		bootit = pxe.Pxe(configs, options.verbosity)
 		bootit.createPxeUpdateFile(query.getPxeImages())
 		bootit.updatePxe()
 		
@@ -470,7 +474,7 @@ def main():
 			host = query.getSwitchInfo(options.interactiveSwitchConfig)
 
 		HwSwitch = HwDellSwitch
-		hwswitch = HwSwitch(configFile, host)
+		hwswitch = HwSwitch(configs, host)
 		if options.verbosity:
 			hwswitch.setVerbose(True)
 
@@ -515,7 +519,7 @@ def main():
 		else:
 			if string.lower(args[0]) == "dell":
 				HwSwitch = HwDellSwitch
-				hw = HwSwitch(configFile)
+				hw = HwSwitch(configs)
 			elif string.lower(args[0]) == "raritan":
 				hw = raritanDominionPx()
 			else:
@@ -551,7 +555,7 @@ def main():
 		if options.addDns:
 			if len(args) < 2:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname IP_Address\n"
+				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + " hostname IP_Address\n"
 				print mesg
 				exit()
 			
@@ -560,7 +564,7 @@ def main():
 			if validIp(ip):
 				mesg = "Adding DNS entry: %s (%s) " % (hostName, ip)
 				sys.stdout.write(mesg)
-				dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+				dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 				dhcpdns.addDns(hostName, ip)
 				try:
 					socket.gethostbyname(hostName)
@@ -576,11 +580,11 @@ def main():
 		if options.removeDns or options.removeDhcp or options.removeCname:
 			if len(args) < 1:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname\n"
+				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + " hostname\n"
 				sys.stdout.write(mesg)
 				exit()
 			hostName = args[0]
-			dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+			dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 			if options.removeDns:	
 				mesg = "Removing DNS entry: %s " % (hostName)
 				sys.stdout.write(mesg)
@@ -607,7 +611,7 @@ def main():
 		if options.addDhcp:
 			if len(args) < 3:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + sys.argv[0] + " " + thisone + " hostname IP_Address Mac_Address\n"
+				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + " hostname IP_Address Mac_Address\n"
 				print mesg
 				exit()
 			
@@ -615,7 +619,7 @@ def main():
 			ip = args[1]
 			mac = args[2]
 			if validIp(ip) and validMac(mac):
-				dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+				dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 				dhcpdns.addDhcp(hostName, ip, mac)
 				if dhcpdns.error:
 					mesg = "ERROR:  Add DHCP Error " + dhcpdns.error + "\n"
@@ -634,14 +638,14 @@ def main():
 		if options.addCname:
 			if len(args) < 2:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + sys.argv[0] + " " + thisone + "cname existing_name"
+				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + "cname existing_name"
 				print mesg
 				exit()
 			hostName = args[1]
 			cname = args[0]
 			mesg = "Adding DNS CNAME entry: %s -> %s  " % (cname, hostName)
 			sys.stdout.write(mesg)
-			dhcpdns = DhcpDns(configFile, verbose=options.verbosity)
+			dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 			dhcpdns.addCname(cname, hostName)
 			if dhcpdns.error: 
 				mesg = "[FAIL]  \n" + str(dhcpdns.error) + "\n" 
