@@ -291,7 +291,6 @@ extra='xencons=tty'
 		f = open(fn, "w")
 		f.write(bootstr)
 		f.write(diskconfig)
-		f.write(rootconfig)
 		f.write(netconfig)
 		f.write(memconfig)
 		f.write(cpuconfig)
