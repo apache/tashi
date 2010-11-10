@@ -290,12 +290,12 @@ extra='xencons=tty'
 #(bootloader, (kernel, extra), (kernel, ramdisk)), disk, vif, memory, vcpus, root, extra
 		f = open(fn, "w")
 		f.write(bootstr)
-		f.write(rootconfig)
+		f.write(diskconfig)
 		f.write(netconfig)
 		f.write(memconfig)
 		f.write(cpuconfig)
 # is root necessary? Only when using kernel directly
-		f.write(diskconfig)
+		f.write(rootconfig)
 		f.write(extraconfig)
 		f.close()
 		return fn
