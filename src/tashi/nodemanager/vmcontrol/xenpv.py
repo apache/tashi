@@ -244,8 +244,8 @@ usbdevice='tablet'
 shadow_memory=8
 '''
 			rootconfig = '''
-root='/dev/xvda1 ro'
-'''
+root='/dev/%s ro'
+'''%(diskU)
 			diskconfig = '''
 disk=['%s:%s,ioemu:%s,w']
 '''%(disk0, image, diskU)
@@ -257,8 +257,8 @@ vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
 			raise Exception, "Unknown vmType in hints: %s"%vmType
 		if rootconfig is None:
 			rootconfig = '''
-root ='/dev/xvda1 ro'
-'''
+root ='/dev/%s ro'
+'''%(diskU)
 
 		if diskconfig is None:
 			diskconfig = '''
@@ -291,11 +291,11 @@ extra='xencons=tty'
 		f = open(fn, "w")
 		f.write(bootstr)
 		f.write(rootconfig)
-		f.write(diskconfig)
 		f.write(netconfig)
 		f.write(memconfig)
 		f.write(cpuconfig)
 # is root necessary? Only when using kernel directly
+		f.write(diskconfig)
 		f.write(extraconfig)
 		f.close()
 		return fn
