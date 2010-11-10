@@ -156,6 +156,7 @@ class XenPV(VmControlInterface, threading.Thread):
 	def createXenConfig(self, vmName, 
 	                    image, macAddr, netID, memory, cores, hints, id):
 		bootstr = None
+		rootconfig = None
 		diskconfig = None
 		netconfig = None
 		memconfig = None
@@ -242,6 +243,9 @@ usbdevice='tablet'
 
 shadow_memory=8
 '''
+			rootconfig = '''
+root='/dev/xvda1 ro'
+'''
 			diskconfig = '''
 disk=['%s:%s,ioemu:%s,w']
 '''%(disk0, image, diskU)
@@ -251,7 +255,10 @@ vif = [ 'type=ioemu,bridge=%s,mac=%s' ]
 
 		else:
 			raise Exception, "Unknown vmType in hints: %s"%vmType
-
+		if rootconfig is None:
+			rootconfig = '''
+root ='/dev/xvda1 ro'
+'''
 
 		if diskconfig is None:
 			diskconfig = '''
@@ -283,11 +290,12 @@ extra='xencons=tty'
 #(bootloader, (kernel, extra), (kernel, ramdisk)), disk, vif, memory, vcpus, root, extra
 		f = open(fn, "w")
 		f.write(bootstr)
+		f.write(rootconfig)
 		f.write(diskconfig)
 		f.write(netconfig)
 		f.write(memconfig)
 		f.write(cpuconfig)
-# is root necessary?
+# is root necessary? Only when using kernel directly
 		f.write(extraconfig)
 		f.close()
 		return fn
