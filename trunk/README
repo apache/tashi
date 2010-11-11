@@ -1,0 +1,6 @@
+The Tashi project aims to build a software infrastructure for 
+cloud computing on massive internet-scale datasets (what we call 
+Big Data). The idea is to build a cluster management system 
+that enables the Big Data that are stored in a cluster/data center 
+to be accessed, shared, manipulated, and computed on by remote users 
+in a convenient, efficient, and safe manner.
