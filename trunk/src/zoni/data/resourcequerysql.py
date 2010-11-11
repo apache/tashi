@@ -413,7 +413,7 @@ class ResourceQuerySql(InfoStore):
 		print "---------------------------------------------------------------------------------"
 		if self.verbose:
 			#print "Res_id\tUser    \tNode    \tCores\tMemory  \tExpiration\t\tVLAN\tHOSTNAME    \tIPADDR    \t\tReservationNotes|AllocationNotes"
-			print "%-5s%-10s%-10s%-12s%-12s%-5s%-15s%-18s%-24s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Vlan", "Hostname", "IP Addr", "Boot Image Name", "Notes")
+			print "%-5s%-10s%-11s%-12s%-12s%-5s%-15s%-18s%-24s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Vlan", "Hostname", "IP Addr", "Boot Image Name", "Notes")
 		else:
 			print "%-10s%-10s%-13s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
 
