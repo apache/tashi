@@ -82,10 +82,13 @@ def CreateZoniDb(config, adminUser, adminPassword):
 	createDatabase(conn, adminUser, adminPassword, db)
 	setPriviledges(conn, user, passwd, db)
 	conn.close()
-	conn = connectDb(host, port, adminUser, adminPassword, db)
+	#conn = connectDb(host, port, adminUser, adminPassword, db)
+	conn = connectDb(host, port, user, passwd, db)
 	createTables(conn)
 	createRegistration(conn, config)
 	addInitialConfig(conn, config)
+	conn.commit()
+	conn.close()
 	sys.stdout.write("Finished\n")
 
 def connectDb (host, port, user, passwd, db=None):
@@ -115,7 +118,7 @@ def createDatabase (conn, user, passwd, db):
 
 def setPriviledges(conn, user, passwd, db):
 	sys.stdout.write("Setting user priviledges...")
-	cmd = "grant select, insert, update, delete on " + db + ".* to " + user + "@\'%\' identified by \'" + passwd + "\';"
+	cmd = "grant create, select, insert, update, delete on " + db + ".* to " + user + "@\'%\' identified by \'" + passwd + "\';"
 	execQuery(conn, cmd)
 	sys.stdout.write("Success\n")
 
@@ -126,61 +129,61 @@ def createTables(conn):
 	'''  Create Tables  '''
 	#  Create sysinfo 
 	sys.stdout.write("    Creating sysinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(8) NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `system_serial_number` char(128) default NULL, `chassis_serial_number` char(128) default NULL, `system_uuid` char(254) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default CURRENT_TIMESTAMP, `last_update` timestamp, PRIMARY KEY  (`sys_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(11) unsigned NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `system_serial_number` char(128) default NULL, `chassis_serial_number` char(128) default NULL, `system_uuid` char(254) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default CURRENT_TIMESTAMP, `last_update` timestamp, state_id int(11) DEFAULT 1,max_reservation int(10) default -1, PRIMARY KEY  (`sys_id`))")
 	sys.stdout.write("Success\n")
 
 	#  Create hardwareinfo
 	sys.stdout.write("    Creating hardwareinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `hardwareinfo` ( `hw_id` int(8) NOT NULL auto_increment, `hw_type` varchar(64) NOT NULL, `hw_mac` varchar(64) default NULL, `hw_name` varchar(256) NOT NULL, `hw_make` varchar(64), `hw_model` varchar(64), `hw_version_sw` varchar(64), `hw_version_fw` varchar(64), `hw_ipaddr` varchar(64) NOT NULL, `hw_userid` varchar(64) default NULL, `hw_password` varchar(64) default NULL, `hw_notes` longtext, PRIMARY KEY  (`hw_id`))") 
-	sys.stdout.write("Success\n")
- 	#  Create allocationinfo
-	sys.stdout.write("    Creating allocationinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(8) NOT NULL auto_increment, `sys_id` int(8) NOT NULL, `reservation_id` int(8) NOT NULL, `ip_addr` varchar(64) NOT NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) NOT NULL, `notes` tinytext, PRIMARY KEY  (`allocation_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `hardwareinfo` ( `hw_id` int(11) unsigned NOT NULL auto_increment, `hw_type` varchar(64) NOT NULL, `hw_mac` varchar(64) default NULL, `hw_name` varchar(256) NOT NULL, `hw_make` varchar(64), `hw_model` varchar(64), `hw_version_sw` varchar(64), `hw_version_fw` varchar(64), `hw_ipaddr` varchar(64) NOT NULL, `hw_userid` varchar(64) default NULL, `hw_password` varchar(64) default NULL, `hw_notes` longtext, PRIMARY KEY  (`hw_id`))") 
 	sys.stdout.write("Success\n")
 	#  Create imageinfo
 	sys.stdout.write("    Creating imageinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imageinfo` ( `image_id` int(11) unsigned NOT NULL auto_increment, `image_name` varchar(256) NOT NULL, `dist` varchar(128) NOT NULL, `dist_ver` varchar(128) NOT NULL, `kernel_id` int(11), `initrd_id` int(11), PRIMARY KEY  (`image_id`))")
-	sys.stdout.write("Success\n")
-	#  Create imagemap
-	sys.stdout.write("    Creating imagemap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imagemap` ( `mac_addr` char(64) NOT NULL, `image_id` int(11) NOT NULL, PRIMARY KEY  (`mac_addr`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imageinfo` ( `image_id` int(11) unsigned NOT NULL auto_increment, `image_name` varchar(256) NOT NULL, `dist` varchar(128), `dist_ver` varchar(128), `kernel_id` int(11), `initrd_id` int(11), PRIMARY KEY  (`image_id`))")
 	sys.stdout.write("Success\n")
 	#  Create reservationinfo
 	sys.stdout.write("    Creating reservationinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `reservationinfo` ( `reservation_id` int(8) NOT NULL auto_increment, `user_id` int(8) NOT NULL, `reservation_date` timestamp NOT NULL default CURRENT_TIMESTAMP, `reservation_expiration` datetime NOT NULL, `notes` tinytext, PRIMARY KEY  (`reservation_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `reservationinfo` ( `reservation_id` int(11) unsigned NOT NULL auto_increment, `user_id` int(11) NOT NULL, `reservation_date` timestamp NOT NULL default CURRENT_TIMESTAMP, `reservation_expiration` datetime NOT NULL, `notes` tinytext, PRIMARY KEY  (`reservation_id`)) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create portmap 
 	sys.stdout.write("    Creating portmap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `portmap` (`hw_id` int(8) NOT NULL, `sys_id` int(8) NOT NULL, `port_num` int(8))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `portmap` (`hw_id` int(11) unsigned NOT NULL, `sys_id` int(11) unsigned NOT NULL, `port_num` int(11))")
 	sys.stdout.write("Success\n")
 	#  Create vlan
 	sys.stdout.write("    Creating vlaninfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `vlaninfo` ( `vlan_id` int(11) NOT NULL auto_increment, `vlan_num` int(11) NOT NULL, `vlan_desc` varchar(256) NOT NULL, PRIMARY KEY  (`vlan_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `vlaninfo` ( `vlan_id` int(11) unsigned NOT NULL auto_increment, `vlan_num` int(11) NOT NULL, `vlan_desc` varchar(256) NOT NULL, PRIMARY KEY  (`vlan_id`))")
 	sys.stdout.write("Success\n")
 	#  Create domaininfo
 	sys.stdout.write("    Creating domaininfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_desc` varchar(256) NOT NULL, PRIMARY KEY  (`domain_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_desc` varchar(256) NOT NULL, `reservation_id` int(11) unsigned NOT NULL,  PRIMARY KEY  (`domain_id`), INDEX (reservation_id), FOREIGN KEY (reservation_id) REFERENCES reservationinfo(reservation_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create domainmap
 	sys.stdout.write("    Creating domainmembermap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domainmembermap` (`domain_id` int(11) NOT NULL, `vlan_id` int(11) NOT NULL)")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domainmembermap` (`domain_id` int(11) unsigned NOT NULL, `vlan_id` int(11) unsigned NOT NULL, INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo(domain_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create system, domain member map
 	sys.stdout.write("    Creating sysdomainmembermap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysdomainmembermap` (`sys_id` int(11) NOT NULL, `domain_id` int(11) NOT NULL)")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysdomainmembermap` (`sys_id` int(11) unsigned NOT NULL, `domain_id` int(11) NOT NULL)")
+	sys.stdout.write("Success\n")
+ 	#  Create allocationinfo
+	sys.stdout.write("    Creating allocationinfo...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, PRIMARY KEY  (`allocation_id`), INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo (domain_id) on DELETE CASCADE) ENGINE=INNODB")
+	sys.stdout.write("Success\n")
+	#  Create imagemap
+	sys.stdout.write("    Creating imagemap...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `imagemap` ( `allocation_id` int(11) unsigned NOT NULL, `image_id` int(11) unsigned NOT NULL, INDEX(allocation_id), FOREIGN KEY (allocation_id) REFERENCES allocationinfo(allocation_id) on DELETE CASCADE)ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create poolinfo
 	sys.stdout.write("    Creating poolinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `poolinfo` (`pool_id` int(11) NOT NULL auto_increment, `pool_name` varchar(64) NOT NULL, `pool_ip_network` varchar(64) NOT NULL, PRIMARY KEY (`pool_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `poolinfo` (`pool_id` int(11) unsigned NOT NULL auto_increment, `pool_name` varchar(64) NOT NULL, `pool_ip_network` varchar(64) NOT NULL, PRIMARY KEY (`pool_id`))")
 	sys.stdout.write("Success\n")
 	#  Create poolmap
 	sys.stdout.write("    Creating poolmap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `poolmap` (`pool_id` int(11) NOT NULL, `vlan_id` int(11) NOT NULL)")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `poolmap` (`pool_id` int(11) NOT NULL, `vlan_id` int(11) unsigned NOT NULL)")
 	sys.stdout.write("Success\n")
-	#  Create allocationarchive
-	sys.stdout.write("    Creating allocationarchive...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationarchive` ( `ar_id` smallint(8) NOT NULL auto_increment, `sys_id` int(8) NOT NULL, `ip_addr` varchar(64) NOT NULL, `hostname` varchar(64) NOT NULL, `domain_id` int(11) NOT NULL, `user_id` int(8) NOT NULL, `cur_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP, `reservation_type` varchar(64) NOT NULL, `notes` tinytext, PRIMARY KEY  (`ar_id`))")
-	sys.stdout.write("Success\n")
+	##  Create allocationarchive
+	#sys.stdout.write("    Creating allocationarchive...")
+	#execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationarchive` ( `ar_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) NOT NULL, `ip_addr` varchar(64) NOT NULL, `hostname` varchar(64) NOT NULL, `domain_id` int(11) NOT NULL, `user_id` int(11) NOT NULL, `cur_time` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP, `reservation_type` varchar(64) NOT NULL, `notes` tinytext, PRIMARY KEY  (`ar_id`))")
+	#sys.stdout.write("Success\n")
 	#  Create kernelinfo 
 	sys.stdout.write("    Creating kernelinfo...")
 	execQuery(conn, "CREATE TABLE IF NOT EXISTS `kernelinfo` ( `kernel_id` int(11) unsigned NOT NULL auto_increment, `kernel_name` varchar(256) NOT NULL, `kernel_release` varchar(128) NOT NULL, `kernel_arch` varchar(128) NOT NULL, PRIMARY KEY  (`kernel_id`))")
@@ -192,6 +195,14 @@ def createTables(conn):
 	#  Create diskinfo
 	sys.stdout.write("    Creating diskmap...")
 	execQuery(conn, "CREATE TABLE IF NOT EXISTS `diskmap` ( `disk_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) NOT NULL, `disk_name` varchar(128), `disk_size` varchar(256), PRIMARY KEY  (`disk_id`))")
+	sys.stdout.write("Success\n")
+	#  Create stateinfo
+	sys.stdout.write("    Creating stateinfo...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `stateinfo` ( `state_id` int(11) unsigned NOT NULL auto_increment, `state_name` varchar(256) NOT NULL, `state_extra` varchar(256), PRIMARY KEY  (`state_id`))")
+	sys.stdout.write("Success\n")
+	#  Create vlanmembermap
+	sys.stdout.write("    Creating vlanmembermap...")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `vlanmembermap` (`vlanmember_id` int(11) unsigned NOT NULL auto_increment, `allocation_id` int(11) unsigned NOT NULL, `vlan_id` int(11) unsigned NOT NULL, vlan_type varchar(128) NOT NULL, PRIMARY KEY (`vlanmember_id`), INDEX(allocation_id), FOREIGN KEY (allocation_id) REFERENCES allocationinfo(allocation_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 
 def createRegistration(conn, config):
@@ -237,6 +248,14 @@ def createRegistration(conn, config):
 		sys.stdout.write("Yes\n")    
 		initrdIdInteractive = str(checkVal[1][0][0])
 
+	#  Insert disk option
+	sys.stdout.write("    Adding Disk to imageinfo...")
+	query = "select * from imageinfo where image_name = 'disk'"
+	r = execQuery(conn, query)
+	if len(r.fetchall()) < 1:
+		execQuery(conn, "INSERT into `imageinfo` (image_name) values ('disk')")
+		sys.stdout.write("Success\n")
+
 	#  Link initrd and kernel to image
 	sys.stdout.write("    Registering initrd and kernel to registration image...")
 	query = "select * from imageinfo where image_name = 'zoni-register-64' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
@@ -252,8 +271,20 @@ def createRegistration(conn, config):
 
 
 def addInitialConfig(conn, config):
-	#  Add the home vlan
 	sys.stdout.write("    Adding initial configuration info into DB...\n")
+	#  Create Initial reservation
+	sys.stdout.write("        Adding zoni reservation...")
+	checkVal =  entryExists(conn, "reservationinfo", "reservation_id", '1')
+	if checkVal:
+		sys.stdout.write("Reservation already exists in DB...\n")
+		#  Get the domainId 
+		vlanId = str(checkVal[1][0][0])
+	else:
+		r = execQuery(conn, "INSERT into `reservationinfo` (user_id, reservation_expiration, notes) values (0, '9999-12-31', 'Zoni Default Registration')")
+		vlanId = str(r.lastrowid)
+		sys.stdout.write("Success\n")
+
+	#  Add the home vlan
 	sys.stdout.write("        Adding vlan info...")
 	checkVal =  entryExists(conn, "vlaninfo", "vlan_num", config['zoniHomeDomain'])
 	if checkVal:
@@ -267,13 +298,13 @@ def addInitialConfig(conn, config):
 
 	#  Create the Zoni Home domain
 	sys.stdout.write("        Creating Zoni Home Domain...")
-	checkVal =  entryExists(conn, "domaininfo", "domain_name", "ZoniHome")
+	checkVal =  entryExists(conn, "domaininfo", "domain_name", "Zoni")
 	if checkVal:
 		sys.stdout.write("Default Domain (ZoniHome) already exists in DB...\n")
 		#  Get the domainId 
 		domainId = str(checkVal[1][0][0])
 	else:
-		r = execQuery(conn, "INSERT into `domaininfo` (domain_name, domain_desc) values (" + config['zoniHomeDomain'] + ", 'Zoni Home Domain' )")
+		r = execQuery(conn, "INSERT into `domaininfo` (domain_name, domain_desc, reservation_id) values ('Zoni', 'Zoni Home Domain',1)")
 		domainId = str(r.lastrowid)
 		sys.stdout.write("Success\n")
 
@@ -334,11 +365,24 @@ def addInitialConfig(conn, config):
 		domainId = str(r.lastrowid)
 		sys.stdout.write("Success\n")
 	
+	#  Add default states
+	sys.stdout.write("        Adding default states..")
+	checkVal =  entryExists(conn, "stateinfo", "state_name", 'normal')
+	if checkVal:
+		sys.stdout.write("Default state (default) already exists...\n")
+	else:
+		r = execQuery(conn, "INSERT into `stateinfo` (state_name) values ('normal')")
+		r = execQuery(conn, "INSERT into `stateinfo` (state_name) values ('off')")
+		r = execQuery(conn, "INSERT into `stateinfo` (state_name) values ('drained')")
+		r = execQuery(conn, "INSERT into `stateinfo` (state_name) values ('reserved')")
+		r = execQuery(conn, "INSERT into `stateinfo` (state_name) values ('restricted')")
+		sys.stdout.write("Success\n")
 
 def execQuery(conn, query):
 	cursor = conn.cursor()
 	try:
 		cursor.execute (query)
+		conn.commit()
 	#except Exception:
 		#traceback.print_exc(sys.exc_info())
 	except MySQLdb.OperationalError, e:

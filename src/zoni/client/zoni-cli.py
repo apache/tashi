@@ -26,6 +26,7 @@ import optparse
 import socket
 import logging.config
 import getpass
+import re
 
 
 
@@ -76,10 +77,15 @@ def main():
 	parser.add_option("-u", "--userName", dest="userName", help="Specify user name")
 	parser.add_option("--uid", dest="uid", help="Specify user id")
 	parser.add_option("-v", "--verbose", dest="verbosity", help="Be verbose", action="store_true", default=False)
+	parser.add_option("--Name", "--name", dest="Name", help="Specify name of entry")
+	parser.add_option("--Show", "--show", dest="show", help="Show something", default=None, action="store_true")
+	parser.add_option("-d", "--domain", dest="domain", help="Work with this domain")
+	parser.add_option("--notes", "--Notes",  dest="myNotes", help="Notes", default="")
+	parser.add_option("--force",  dest="forcefully", help="Apply gentle pressure", default=False, action="store_true")
 
 
 	#  Hardware controller
-	group = optparse.OptionGroup(parser, "Hardware control", "Options to control power on nodes")
+	group = optparse.OptionGroup(parser, "Hardware control", "Options for node power control")
 	group.add_option("--hw", dest="hardwareType", help="Make hardware call to ipmi|drac|pdu")
 	group.add_option("--powerStatus", "--powerstatus", dest="POWERSTATUS", help="Get power status on node", action="store_true", default=False)
 	group.add_option("--reboot", "--reboot", dest="REBOOTNODE", help="Reboot node (Soft)", action="store_true", default=False)
@@ -94,25 +100,23 @@ def main():
 	group = optparse.OptionGroup(parser, "Query Interface", "Query current systems and allocations")
 	group.add_option("-R", "--showReservation", "--showreservation", dest="showReservation", help="Show current node reservations", action="store_true", default=False)
 	group.add_option("-A", "--showAllocation", "--showallocation", dest="showAllocation", help="Show current node allocation", action="store_true", default=False)
-	group.add_option("-s", "--showResources", dest="showResources", help="Show available resources to choose from", action="store_true", default=False)
+	group.add_option("-S", "--showResources", dest="showResources", help="Show available resources to choose from", action="store_true", default=False)
 	group.add_option("-p", "--procs", dest="numProcs", help="Set number of processors" )
 	group.add_option("-c", "--clock", dest="clockSpeed", help="Processor clock" )
 	group.add_option("--memory", dest="numMemory", help="Amount of memory (Bytes)" )
 	group.add_option("-f", "--cpuflags", dest="cpuFlags", help="CPU flags" )
 	group.add_option("--cores", dest="numCores", help="Number of Cores" )
-	group.add_option("-i", "--showPxeImages", "--showpxeimages", dest="showPxeImages", help="Show available PXE images to choose from", action="store_true", default=False)
-	group.add_option("-m", "--showPxeImageMap", "--showpxeimagemap", dest="showPxeImageMap", help="Show PXE images host mapping", action="store_true", default=False)
-	group.add_option("--showArchive", "--showarchive", dest="showArchive", help="Show allocation archive", action="store_true", default=False)
+	group.add_option("-I", "--showPxeImages", "--showpxeimages", dest="showPxeImages", help="Show available PXE images to choose from", action="store_true", default=False)
+	group.add_option("-M", "--showPxeImageMap", "--showpxeimagemap", dest="showPxeImageMap", help="Show PXE images host mapping", action="store_true", default=False)
 	parser.add_option_group(group)
 	#parser.add_option("-p", "--printResources", dest="printResources", help="Print available resources to choose from", action="store_true", default=False)
 
 	#  Admin Interface
 	group = optparse.OptionGroup(parser, "Admin Interface", "Administration Interface:")
 	group.add_option("--admin", dest="ADMIN", help="Enter Admin mode", action="store_true", default=False)
-	group.add_option("--addPxeImage", "--addpxeimage", dest="imageName", help="Add PXE image to database", action="store_true", default=False)
 	group.add_option("--enableHostPort", "--enablehostport", dest="enableHostPort", help="Enable a switch port", action="store_true", default=False)
 	group.add_option("--disableHostPort", "--disablehostport", dest="disableHostPort", help="Disable a switch port", action="store_true", default=False)
-	group.add_option("--removeVlan", "--removevlan", dest="removeVlanId", help="Remove vlan from all switches")
+	group.add_option("--destroyVlan", "--destroyvlan", dest="removeVlanId", help="Remove vlan from all switches")
 	group.add_option("--createVlan", "--createvlan", dest="createVlanId", help="Create a vlan on all switches")
 	group.add_option("--addNodeToVlan", "--addnodetovlan", dest="add2Vlan", help="Add node to a vlan")
 	group.add_option("--removeNodeFromVlan", "--removenodefromvlan", dest="removeFromVlan", help="Remove node from a vlan")
@@ -134,27 +138,36 @@ def main():
 	#group.add_option("--addVlanToTrunks", "--addvlantotrunks", dest="addVlanToTrunks", help="")
 	
 
+	#  Domain Interface
+	group = optparse.OptionGroup(parser, "Domain Interface", "Manage Zoni Domain:")
+	group.add_option("-D", "--showDomains", "--showdomains", dest="showDomains", help="Show Zoni domains", action="store_true", default=False)
+	group.add_option("--addDomain", "--adddomain", dest="addDomain", help="Add new domain to Zoni", action="store_true", default=False)
+	group.add_option("--removeDomain", "--removedomain", dest="removeDomain", help="remove a domain from Zoni", action="store_true", default=False)
+	group.add_option("-V", "--showVlans", "--showvlans", dest="showVlans", help="Show an from Zoni", action="store_true", default=False)
+	group.add_option("--addVlan", "--addvlan", dest="addVlan", help="Add new vlan to Zoni", action="store_true", default=False)
+	group.add_option("--removeVlan", "--removevlan", dest="removeVlan", help="Remove an from Zoni", action="store_true", default=False)
+	group.add_option("--assignVlan", "--assignvlan", dest="assignVlan", help="Assign vlan to a domain")
+	parser.add_option_group(group)
+
 	#  Allocation Interface
 	group = optparse.OptionGroup(parser, "Allocation Interface", "Change current systems allocations:")
-	#group.add_option("-a", "--allocateResources", dest="allocateResources", help="Allocate resource", action="store_true", default=False)
 	group.add_option("--addImage", "--addimage", dest="addImage", help="Add image to Zoni - amd64-image:dist:dist_ver")
 	group.add_option("--delImage", "--delimage", dest="delImage", help="Delete PXE image")
-	group.add_option("--assignImage", "--assignimage", dest="assignImage", help="Assign image to resource")
+	#group.add_option("--addPxeImage", "--addpxeimage", dest="imageName", help="Add PXE image to database", action="store_true", default=False)
+	group.add_option("--imageName", "--imagename", dest="imageName", help="Assign image to resource")
 
 	group.add_option("--allocateNode", "--allocatenode", dest="allocateNode", help="Assign node to a user", action="store_true", default=False)
-	group.add_option("--allocationNotes", "--allocationnotes", dest="allocationNotes", help="Description of allocation")
+	group.add_option("--vlaninfo", "--vlanInfo", dest="vlanInfo", help="Specify vlan info for allocation")
 	group.add_option("--vlanIsolate", "--vlanisolate", dest="vlanIsolate", help="Specify vlan for network isolation")
 	group.add_option("--hostName", "--hostname", dest="hostName", help="Specify hostname for node")
 	group.add_option("--ipaddr", dest="ipAddr", help="Specify ip address for node")
 
 	group.add_option("--releaseNode", "--releasenode", dest="releaseNode", help="Release current node allocation", action="store_true", default=False)
 	group.add_option("--reservationDuration", "--reservationduration", dest="reservationDuration", help="Specify duration of node reservation - YYYYMMDD format")
-	group.add_option("--reservationId", "--reservationid", dest="reservationId", help="Reservation ID")
-	group.add_option("--reservationNotes", "--reservationnotes", dest="reservationNotes", help="Description of reservation")
+	group.add_option("-r", "--reservationId", "--reservationid", dest="reservationId", help="Reservation ID")
 	group.add_option("--addReservation", "--addreservation", dest="addReservation", help="Add a Reservation", action="store_true", default=False)
 	group.add_option("--updateReservation", "--updatereservation", dest="updateReservation", help="Update Reservation", action="store_true", default=False)
 	group.add_option("--delReservation", "--delreservation", dest="delReservation", help="Delete Reservation")
-	#group.add_option("-a", "--allocateResources", dest="allocateResources", help="Allocate resource", action="store_true", default=False)
 	group.add_option("--rgasstest", dest="rgasstest", help="Debug testing function", action="store_true", default=False)
 	parser.add_option_group(group)
 
@@ -170,6 +183,7 @@ def main():
 
 	(options, args) = parser.parse_args()
 
+	
 	cmdargs = {}
 
 	#  setup db connection
@@ -199,7 +213,7 @@ def main():
 				hw = Ipmi(options.nodeName, host["ipmi_user"], host["ipmi_password"])
 
 			if options.hardwareType == "pdu":
-				hw = raritanDominionPx(host)
+				hw = raritanDominionPx(configs, host)
 
 			if options.hardwareType == "drac":
 				#  Check if node has drac card
@@ -263,7 +277,7 @@ def main():
 	if (options.cpuFlags):
 		cmdargs["cpu_flags"] = options.cpuFlags
 	if (options.nodeName):
-		cmdargs["node_id"] = options.nodeName
+		cmdargs["sys_id"] = options.nodeName
 
 	if 	(options.numCores or options.clockSpeed or options.numMemory or options.numProcs or options.cpuFlags) and not options.showResources:
 			usage = "MISSING OPTION: When specifying hardware parameters, you need the -s or --showResources switch"
@@ -272,9 +286,8 @@ def main():
 			exit()
 
 	#  Show current allocations 
-	if (options.showAllocation):
+	if (options.showAllocation) or (options.show and re.match(".lloca.*", args[0])):
 		if options.uid:
-			print "set"
 			nameorid = int(options.uid)
 		else: 
 			nameorid = options.userName
@@ -283,44 +296,31 @@ def main():
 		exit()
 
 	#  Show current reservation
-	if (options.showReservation):
+	if options.showReservation or (options.show and re.match(".eserv.*", args[0])):
 		if options.uid:
-			print "set"
 			nameorid = int(options.uid)
 		else: 
 			nameorid = options.userName
 
 		query.showReservation(nameorid)
-		exit()
-
-	#  Show allocation Archive
-	if (options.showArchive):
-		query.showArchive()
 
 	#  Print all Resources
-	if (options.showResources):
+	if options.showResources or (options.show and re.match(".esour.*", args[0])):
 		query.showResources(cmdargs)
 
 	#  Show PXE images
-	if (options.showPxeImages):
+	#if (options.show and re.match(".esour.*", args[0])):
+	if options.showPxeImages or (options.show and re.match("pxei.*", args[0])):
 		query.showPxeImages()
 
 	#  Show machine to PXE image mapping
-	if (options.showPxeImageMap):
+	if options.showPxeImageMap or (options.show and re.match("pxem.*", args[0])):
 		query.showPxeImagesToSystemMap(cmdargs)
-		exit()
 
 	if (len(sys.argv) == 1):
 		parser.print_help()
 		exit()
 
-
-	#  Get the host object
-	#hostObj = getHostObject()
-	#if (options.allocateResources) and options.nodeName:
-		#query.getHostInfo(options.nodeName)
-		
-		#exit()
 
 	#  Delete reservation
 	if (options.delReservation):
@@ -346,7 +346,7 @@ def main():
 		#drac.powerReset()
 		#drac.getPowerStatus()
 		print "host is ", host
-		pdu = raritanDominionPx(host)
+		pdu = raritanDominionPx(configs, host)
 		print "pdu", pdu
 		pdu.getPowerStatus()
 		exit()
@@ -359,8 +359,7 @@ def main():
 				mesg += "  Username:  --userName=username or --uid 1000\n"
 
 			mesg += "  Reservation Duration:  --reservationDuration YYYYMMDD or numdays(optional, default 15 days)\n"
-			#mesg += "  ReservationId:  --reservationId IDNUM(optional, you want this if you want to add nodes to an existing reservation)\n"
-			mesg += "  Notes:  --reservationNotes(optional)\n"
+			mesg += "  Notes:  --notes(optional)\n"
 			sys.stderr.write(mesg)		
 			exit()
 
@@ -368,15 +367,29 @@ def main():
 		if not options.uid:
 			userId = usermgt.getUserId(options.userName)
 
-		reservationId = query.addReservation(userId, options.reservationDuration, options.reservationNotes)
+		reservationId = query.addReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
 
 
 	#  Allocate node to user
 	if (options.allocateNode):
-		vlanNum = 999
-		if (options.vlanIsolate):
-			vlanNum = options.vlanIsolate
+		if options.reservationId and options.domain and options.vlanInfo and options.nodeName and options.imageName:
+			host = query.getHostInfo(options.nodeName)
+			#  optparse does not pass multiple args that are quoted anymore?  
+			#  Used to work with python 2.5.2.  Doesn't work with python 2.6.5.  
+			query.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.myNotes + " " + str(string.join(args[0:len(args)])))
+		else:
+			mesg = "USAGE: %s --allocateNode --nodeName nodeName --domain domainname --reservationId ID --vlanInfo vlanNums:info, --imageName imagename [--notes]\n" % (sys.argv[0])
+			mesg += "Options\n"
+			mesg += "  --domain testdomain\n"
+			mesg += "  --reservationId 10\n"
+			mesg += "  --vlanInfo 999:native,1000:tagged,1001:tagged\n"
+			mesg += "  --imageName imageName (see available images with 'zoni -I')\n"
+			mesg += "  --hostName mynode01 (optional)\n"
+			mesg += "  --notes \"your notes here \"(optional)\n"
+			sys.stdout.write(mesg)
+			exit()
 		
+		exit()  #remove this
 		if not (options.reservationId) or not options.nodeName: 
 			mesg = "ERROR:  AllocateNode requires the following arguments...\n"
 			if not (options.nodeName):
@@ -387,11 +400,12 @@ def main():
 			mesg += "  Hostname:  --hostName mynode01\n"
 			mesg += "  Domain:  --vlanIsolate vlan_num(default 999)\n"
 			mesg += "  IP address:  --ipaddr 172.17.10.100\n"
-			mesg += "  Notes:  --allocationNotes(optional)\n"
+			mesg += "  Notes:  --notes(optional)\n"
 			sys.stderr.write(mesg)		
 			exit()
 
-		query.allocateNode(options.reservationId, host['node_id'], options.hostName,  vlanNum, options.ipAddr, options.allocationNotes)
+		print host['sys_id']
+		query.allocateNode(options.reservationId, host['sys_id'], options.hostName,  vlanNum, options.ipAddr, options.Notes)
 		exit()
 
 	#  Update allocation
@@ -404,7 +418,7 @@ def main():
 			mesg += "  Username:  --userName=username or --uid 1000 (optional)\n"
 			mesg += "  Reservation Duration:  --reservationDuration YYYYMMDD or numdays (optional, default 15 days)\n"
 			mesg += "  Vlan:  --vlanIsolate vlan_num(optional)\n"
-			mesg += "  Notes:  --reservationNotes(optional)\n"
+			mesg += "  Notes:  --notes(optional)\n"
 			sys.stderr.write(mesg)		
 			exit()
 
@@ -415,8 +429,8 @@ def main():
 			if not options.uid:
 				userId = usermgt.getUserId(options.userName)
 
-		print options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.reservationNotes
-		query.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.reservationNotes)
+		print options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes
+		query.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes)
 
 	#  Release node allocation
 	if (options.releaseNode):
@@ -430,19 +444,19 @@ def main():
 		query.releaseNode(options.nodeName)
 		
 	#  Assign image to host
-	if (options.assignImage):
-		if not options.nodeName:
-			usage = "Node not specified.  Please specify a node with --nodeName or -n"
-			print usage
-			exit()
-		if query.assignImagetoHost(host, options.assignImage):
-			print "ERROR"
-			exit()
-
+	#if (options.assignImage):
+		#if not options.nodeName:
+			#usage = "Node not specified.  Please specify a node with --nodeName or -n"
+			#print usage
+			#exit()
+		#if query.assignImagetoHost(host, options.assignImage):
+			#print "ERROR"
+			#exit()
+#
 		#  Update PXE 
-		bootit = pxe.Pxe(configs, options.verbosity)
-		bootit.createPxeUpdateFile(query.getPxeImages())
-		bootit.updatePxe()
+		#bootit = pxe.Pxe(configs, options.verbosity)
+		#bootit.createPxeUpdateFile(query.getPxeImages())
+		#bootit.updatePxe()
 		
 	
 	#  Add image to database
@@ -452,6 +466,51 @@ def main():
 	if (options.delImage):
 		query.delImage(options.delImage)
 
+	#  Domain interface
+	if (options.showDomains):
+		query.showDomains()
+	if (options.addDomain):
+		if len(args) > 2 and options.reservationId:
+			query.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
+		else:
+			mesg = "USAGE: %s --addDomain domainname domaindesc --reservationId ID\n" % (sys.argv[0])
+			sys.stdout.write(mesg)
+			exit()
+	if (options.removeDomain):
+		if len(args) > 0:
+			query.removeDomain(args[0])
+		else:
+			mesg = "USAGE: %s --removeDomain domainname \n" % (sys.argv[0])
+			sys.stdout.write(mesg)
+			exit()
+
+	if (options.showVlans):
+		query.showVlans()
+	if (options.addVlan):
+		print len(args)
+		if len(args) > 0:
+			query.addVlan(args[0], string.join(args[1:len(args)]))
+		else:
+			mesg = "USAGE: %s --addVlan vlanNumber [VlanDesc]\n" % (sys.argv[0])
+			sys.stdout.write(mesg)
+			exit()
+	if (options.removeVlan):
+		if len(args) > 1:
+			query.removeVlan(args[0])
+		else:
+			mesg = "USAGE: %s --removeVlan VlanNumber\n" % (sys.argv[0])
+			sys.stdout.write(mesg)
+			exit()
+
+	if (options.assignVlan):
+		print len(args)
+		if len(args) > 0:
+			query.assignVlan(options.assignVlan, args[0], options.forcefully)
+		else:
+			mesg = "USAGE: %s --assignVlan vlannum DomainName\n" % (sys.argv[0])
+			sys.stdout.write(mesg)
+			exit()
+		
 	#  Admin Interface
 	#  snmpwalk -v2c -c zoni-domain sw0-r1r1 .1.3.6.1.2.1.17.7.1.4.3.1.5    
 	if (options.ADMIN):
@@ -521,7 +580,7 @@ def main():
 				HwSwitch = HwDellSwitch
 				hw = HwSwitch(configs)
 			elif string.lower(args[0]) == "raritan":
-				hw = raritanDominionPx()
+				hw = raritanDominionPx(configs)
 			else:
 				mesg = "Undefined hardware type\nSupported Hardware" + str(supported_hardware) + "\n"
 				sys.stderr.write(mesg)
@@ -535,7 +594,7 @@ def main():
 			data = hw.registerToZoni(args[1], password, args[2])
 
 			#  Register to DB
-			query.registerHardware(data)
+			#query.registerHardware(data)
 			
 	#  Zoni Helper
 	if options.addDns or options.removeDns or options.addDhcp or options.removeDhcp or options.addCname or options.removeCname:

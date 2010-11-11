@@ -30,9 +30,11 @@ import socket
 import tempfile
 import logging
 
-
+#import zoni
+from zoni.data.resourcequerysql import *
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
+from zoni.agents.dhcpdns import DhcpDns
 
 
 '''  Using pexpect to control switches because couldn't get snmp to work 
@@ -472,6 +474,22 @@ class HwDellSwitch(HwSwitchInterface):
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_make'] = str(varBinds[0][1])
 
-		return a
+		#  Register in dns
+		if self.config['dnsEnabled']:
+			try:
+				mesg = "Adding %s(%s) to dns" % (host, ip)
+				self.log.info(mesg)
+				DhcpDns(self.config, verbose=self.verbose).addDns(host, ip)
+				mesg = "Adding %s(%s) to dhcp" % (host, ip)
+				self.log.info(mesg)
+				DhcpDns(self.config, verbose=self.verbose).addDhcp(host, ip, a['hw_mac'])
+			except:
+				mesg = "Adding %s(%s) %s to dhcp/dns failed" % (host, ip, a['hw_mac'])
+				self.log.error(mesg)
+			
+		#  Add to db
+		#  Register to DB
+		query = ResourceQuerySql(self.config, self.verbose)
+		query.registerHardware(a)
 
 

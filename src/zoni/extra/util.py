@@ -34,6 +34,10 @@ def loadConfigFile(parser):
 	#  Logging
 	config['logFile'] = parser.get("logging", "LOG_FILE").split()[0]
 	
+	#  Management
+	config['userManagement'] = parser.get("management", "USER_MANAGEMENT").split()[0]
+	config['infoStore'] = parser.get("management", "INFO_STORE").split()[0]
+	
 	#  DB connection
 	config['dbUser'] = parser.get("dbConnection", "DB_USER").split()[0]
 	config['dbPassword'] = config.get("dbPassword", "")
@@ -66,7 +70,7 @@ def loadConfigFile(parser):
 
 	#  VLAN
 	#config['vlan_reserved'] = parser.get("vlan", "VLAN_RESERVED")
-	config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
+	config['vlan_max'] = int(parser.get("vlan", "VLAN_MAX"))
 
 	#  Domain
 	config['zoniHomeDomain'] = parser.get("domain", "ZONI_HOME_DOMAIN").split()[0]
@@ -78,6 +82,8 @@ def loadConfigFile(parser):
 	config['hardware_control'] = parser.get("hardware", "HARDWARE_CONTROL")
 
 	#  DHCP/DNS
+	config['dnsEnabled'] = parser.get("DhcpDns", "dnsEnabled")
+	config['reverseDns'] = parser.get("DhcpDns", "reverseDns")
 	#config['dnsKeyFile'] = parser.get("DhcpDns", "dnsKeyfile")
 	config['dnsKeyName'] = parser.get("DhcpDns", "dnsKeyName")
 	config['dnsSecretKey'] = parser.get("DhcpDns", "dnsSecretKey")
@@ -119,6 +125,7 @@ def logit(logfile, mesg):
 
 def checkSuper(f):
 	def myF(*args, **kw):
+		res = f(*args, **kw)
 		if os.getuid() != 0:
 			print "Please use sudo!"
 			exit()

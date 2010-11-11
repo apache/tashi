@@ -22,14 +22,14 @@ import sys
 import os 
 import string
 import warnings
+import logging
 import time
 warnings.filterwarnings("ignore")
 
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from pysnmp.proto import rfc1902
-
-
-from systemmanagementinterface import SystemManagementInterface
+from zoni.data.resourcequerysql import *
+from zoni.hardware.systemmanagementinterface import SystemManagementInterface
 
 
 #class systemmagement():
@@ -37,8 +37,12 @@ from systemmanagementinterface import SystemManagementInterface
 		#self.proto = proto
 
 class raritanDominionPx(SystemManagementInterface):
-	def __init__(self, host=None):
+	def __init__(self, config, host=None):
 		#  Register
+		self.config = config
+		self.log = logging.getLogger(__name__)
+		self.verbose = False
+
 		if host != None:
 			self.host = host['location']
 			self.pdu_name = host['pdu_name']
@@ -50,7 +54,6 @@ class raritanDominionPx(SystemManagementInterface):
 			self.oid_name = ",2"
 			self.oid_set = ",3"
 			self.oid_status = ",3"
-			self.verbose = False
 
 			if self.getOffset():
 				self.port = host['pdu_port'] - 1
@@ -177,6 +180,12 @@ class raritanDominionPx(SystemManagementInterface):
 		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
+
+		if len(varBinds) < 1:
+			mesg = "Incorrect authentication details"
+			self.log.error(mesg)
+			return -1
+
 		a['hw_make'] = str(varBinds[0][1])
 
 		oid = eval("1,3,6,1,4,1,13742,4,1,1,6,0")
@@ -218,5 +227,20 @@ class raritanDominionPx(SystemManagementInterface):
 		a['hw_userid'] = user
 		a['hw_password'] = password
 
-		return a
+		#  Register in dns
+		if self.config['dnsEnabled']:
+			try:
+				mesg = "Adding %s(%s) to dns" % (host, ip)
+				self.log.info(mesg)
+				DhcpDns(self.config, verbose=self.verbose).addDns(host, ip)
+				mesg = "Adding %s(%s) to dhcp" % (host, ip)
+				self.log.info(mesg)
+				DhcpDns(self.config, verbose=self.verbose).addDhcp(host, ip, a['hw_mac'])
+			except:
+				mesg = "Adding %s(%s) %s to dhcp/dns failed" % (host, ip, a['hw_mac'])
+				self.log.error(mesg)
 
+		#  Add to db
+		#  Register to DB
+		query = ResourceQuerySql(self.config, self.verbose)
+		query.registerHardware(a)

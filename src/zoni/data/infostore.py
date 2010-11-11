@@ -32,6 +32,26 @@ class InfoStore (object):
 	#def updateDatabase(self, query):
 		#raise NotImplementedError
 
+	def addDomain(self):
+		raise NotImplementedError
+
+	def removeDomain(self):
+		raise NotImplementedError
+
+	def showDomains(self):
+		raise NotImplementedError
+
+	def addVlan(self):
+		raise NotImplementedError
+
+	def removeVlan(self):
+		raise NotImplementedError
+
+	def showVlans(self):
+		raise NotImplementedError
+
+	def assignVlan(self):
+		raise NotImplementedError
 
 	def printAll(self):
 		raise NotImplementedError
@@ -56,3 +76,12 @@ class InfoStore (object):
 		'''
 		raise NotImplementedError
 	
+	def addPxeImage(self):
+		raise NotImplementedError
+
+	def removePxeImage(self):
+		raise NotImplementedError
+
+	def assignPxeImage(self):
+		raise NotImplementedError
+

@@ -24,11 +24,11 @@ import string
 import MySQLdb
 import subprocess
 import traceback
+import logging
 
 import usermanagement
-
 from zoni.data.infostore import InfoStore
-from zoni.extra.util import logit, checkSuper
+from zoni.extra.util import checkSuper
 from zoni.agents.dhcpdns import DhcpDns
 
 class ResourceQuerySql(InfoStore):
@@ -39,12 +39,13 @@ class ResourceQuerySql(InfoStore):
 		self.user = config['dbUser']
 		self.passwd = config['dbPassword']
 		self.db = config['dbInst']
+		#self.log = logging.getLogger(os.path.basename(__name__))
+		self.log = logging.getLogger(__name__)
 		
 		self.tftpRootDir = config['tftpRootDir']
 		self.tftpImageDir = config['tftpImageDir']
 		self.tftpBootOptionsDir = config['tftpBootOptionsDir']
 
-		self.logFile = config['logFile']
 
 		if config['dbPort'] == "":
 			config['dbPort'] = 3306
@@ -65,13 +66,135 @@ class ResourceQuerySql(InfoStore):
 				print "ERROR : ", e
 				exit(1)
 
+	def getNote(self):
+		return "Created by Zoni"
+
+	def addDomain(self, name, desc, reservationId):
+		#  Check if there is a reservation
+		query = "select * from reservationinfo where reservation_id = %s" % (reservationId)
+		result = self.__selectDb(query)
+		if result.rowcount < 1:
+			mesg = "Reservation does not exist : %s" % (reservationId)
+			self.log.error(mesg)
+			return -1
+
+		if desc == None:
+			desc = self.getNote()
+
+		print name
+		if self.__checkDup("domaininfo", "domain_name", name):
+			self.log.error("Domain (%s) already exists" % (name))
+			return -1
+		query = "insert into domaininfo (domain_name, domain_desc, reservation_id) values ('%s','%s', '%s')" % (name, desc, reservationId)
+		try:
+			result = self.__insertDb(query)
+			mesg = "Adding domain %s(%s)" % (name, desc)
+			self.log.info(mesg)
+		except Exception, e:
+			mesg = "Adding domain %s(%s) failed : %s" % (name, desc, e)
+			self.log.error(mesg)
+		
+
+	def removeDomain(self, name):
+		mesg = "Removing domain %s" % (name)
+		self.log.info(mesg)
+		query = "delete from domaininfo where domain_name = '%s'" % (name)
+		result = self.__deleteDb(query)
+		#  Need to remove any vlans attached to this domain
+
+	def showDomains(self):
+		query = "select domain_name, domain_desc from domaininfo"
+		result = self.__selectDb(query)
+		desc = result.description
+		if result.rowcount > 0:
+			print "%s\t%s\n-------------------------------------" % (result.description[0][0], result.description[1][0])
+			for row in result.fetchall():
+				print "%s\t\t%s" % (row[0], row[1])
+			return 0
+		else:
+			mesg = "No Domains exist"
+			self.log.info(mesg)
+			return -1
+
+	def addVlan(self, vnumber, desc=None):
+		if desc == None:
+			desc = "Created by Zoni"
+		if int(vnumber) > self.vlan_max:
+			self.log.error("Max vlan size is %s" % (self.vlan_max))
+			return -1
+
+		if self.__checkDup("vlaninfo", "vlan_num", vnumber):
+			self.log.error("Vlan %s already exists" % (vnumber))
+			return -1
+		query = "insert into vlaninfo (vlan_num, vlan_desc) values ('%s','%s')" % (vnumber, desc)
+		try:
+			result = self.__insertDb(query)
+			mesg = "Adding vlan %s(%s)" % (vnumber, desc)
+			self.log.info(mesg)
+		except Exception, e:
+			mesg = "Adding vlan %s(%s) failed : %s" % (vnumber, desc, e)
+			self.log.error(mesg)
+		
+
+	def removeVlan(self, vnumber):
+		query = "delete from vlaninfo where vlan_num = '%s'" % (vnumber)
+		result = self.__deleteDb(query)
+		if result > 0:
+			mesg = "Successfully removed vlan %s" % (vnumber)
+			self.log.info(mesg)
+			return 0
+		else:
+			mesg = "Failed to removed vlan %s" % (vnumber)
+			self.log.info(mesg)
+			return -1
+		#  Need to remove any vlans attached to this vlan 
+
+	def showVlans (self):
+		query = "select vlan_num, vlan_desc from vlaninfo order by vlan_num"
+		try:
+			result = self.__selectDb(query)
+			print "%s\t%s\n-------------------------------------" % (result.description[0][0], result.description[1][0])
+			for row in result.fetchall():
+				print "%s\t\t%s" % (row[0], row[1])
+			return 0
+		except Exception, e:
+			mesg = "No Vlans defined: %s" % (e)
+			self.log.info(mesg)
+			return -1
+
+	def assignVlan(self, vlan, domain, force=None):
+		domainId = self.__getSomething("domain_id", "domaininfo", "domain_name", domain)
+		vlanId = self.__getSomething("vlan_id", "vlaninfo", "vlan_num", vlan)
+		query = "select * from domainmembermap m, vlaninfo v, domaininfo d where d.domain_id = '%s' and v.vlan_id = %s and v.vlan_id = m.vlan_id and m.domain_id = d.domain_id" % (int(domainId), int(vlanId))
+		if self.__selectDb(query).rowcount > 0:
+			self.log.warning("Vlan %s already assigned to domain %s" % (vlan, domain));
+			return 0
+
+		# warning if vlan already assigned to another domain
+		query = "select * from domainmembermap where vlan_id = %s" % (vlanId)
+		if self.__selectDb(query).rowcount > 0:
+			self.log.warning("Vlan %s already assigned to a domain" % (vlan));
+			if not force:
+				return -1
+
+		self.log.info("Assigning vlan %s to domain %s" % (vlan, domain))
+		query = "insert into domainmembermap (domain_id, vlan_id) values (%s, %s)" % (domainId, vlanId)
+		self.__insertDb(query)
+
+	def __getSomething(self, fieldname, table, critField, crit):
+		query = "select %s from %s where %s = '%s'" % (fieldname, table, critField, crit)
+		result = self.__selectDb(query)
+		return result.fetchall()[0][0]
+
+
 	def __checkDup (self, table, colname, value, colname2=None, value2=None):
 		cond = "where %s = '%s' " % (colname, value)
 		if (colname2 != None and value2 != None):
 			cond += " and %s = '%s'" % (colname2, value2)
 		query = "select * from %s %s" % (table, cond)
 		result = self.__selectDb(query)
-		#j$val = $this->set_num_rows ($result);
+		if result.rowcount == 0:
+			return []
 		return result.fetchall()
 
 	def __create_queryopts(self, cmdargs, extra=None):
@@ -189,7 +312,7 @@ class ResourceQuerySql(InfoStore):
 				break
 		if not myvlan:
 			mesg = "No Vlans for you!  You Go Now\n"
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 		return myvlan
 	
 	def isVlanAvailable(self, vlan):
@@ -207,9 +330,9 @@ class ResourceQuerySql(InfoStore):
 		if result.rowcount > 0:
 			return result.fetchall()[0][0]
 		else:
-			mesg = "ERROR: VLAN does not exist: " + str(vlan)
-			logit(self.logFile, mesg)
-			exit()
+			mesg = "VLAN does not exist: " + str(vlan)
+			self.log.error(mesg)
+			return -1 
 
 	def isIpAvailable(self, ip_addr, vlan_id):
 		query = "select * from allocationinfo where ip_addr = \"" + str(ip_addr) + "\" and vlan_id = \"" + str(vlan_id) + "\""
@@ -251,11 +374,11 @@ class ResourceQuerySql(InfoStore):
 		return ip_addr
 
 
-	def showArchive(self):
-		query = "select * from allocationarchive"
-		result = self.__selectDb(query)
-		for i in result:
-			print i
+	#def showArchive(self):
+		#query = "select * from allocationarchive"
+		#result = self.__selectDb(query)
+		#for i in result:
+			#print i
 
 	def showAllocation(self, userId=None):
 		#from IPython.Shell import IPShellEmbed
@@ -263,27 +386,27 @@ class ResourceQuerySql(InfoStore):
 		#shell(local_ns=locals(), global_ns=globals())
 
 		#  specify usermanagement - ldap or files
-		usermgt = usermanagement.ldap()
+		usermgt = eval("usermanagement.%s" % (self.config['userManagement']) + "()")
 
-		query = "select r.user_id, s.location, s.num_cores, s.mem_total, \
-				r.reservation_expiration, r.notes, r.reservation_id, v.vlan_num, a.ip_addr, a.hostname,\
-				a.notes, i.image_name \
-				from allocationinfo a, sysinfo s, reservationinfo r, vlaninfo v, imageinfo i, imagemap m where \
-				s.mac_addr = m.mac_addr and \
-				m.image_id = i.image_id and \
-				s.sys_id = a.sys_id  and \
-				v.vlan_id = a.vlan_id and \
-				r.reservation_id = a.reservation_id "
+		query = "select r.user_id, d.domain_name, s.location, s.num_cores, \
+				s.mem_total, r.reservation_expiration, r.notes, r.reservation_id, a.hostname, \
+				a.notes, i.image_name from \
+				sysinfo s, imageinfo i, \
+				allocationinfo a, domaininfo d, reservationinfo r, imagemap j where \
+				i.image_id = j.image_id \
+				and r.reservation_id = a.reservation_id \
+				and d.domain_id = a.domain_id and s.sys_id = a.sys_id "
 		if userId:
 			myid = userId
 			if type(userId) == str:
 				#  convert username to id
 				myid = usermgt.getUserId(userId)
 				
-			query += " and user_id = " + myid + " " 
+			query += " and user_id = '%s' " % (myid)
 
 		query += "order by r.reservation_id asc, s.location"
 
+		print query
 		result = self.__selectDb(query)
 		
 		print "NODE ALLOCATION"
@@ -292,30 +415,30 @@ class ResourceQuerySql(InfoStore):
 			#print "Res_id\tUser    \tNode    \tCores\tMemory  \tExpiration\t\tVLAN\tHOSTNAME    \tIPADDR    \t\tReservationNotes|AllocationNotes"
 			print "%-5s%-10s%-10s%-12s%-12s%-5s%-15s%-18s%-24s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Vlan", "Hostname", "IP Addr", "Boot Image Name", "Notes")
 		else:
-			print "%-10s%-10s%-12s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
+			print "%-10s%-10s%-13s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
 
 		for i in result.fetchall():
 			uid = i[0]
-			host = i[1]
-			cores = i[2]
-			memory = i[3]
-			expire = str(i[4])[0:10]
+			domain = i[1]
+			host = i[2]
+			cores = i[3]
+			memory = i[4]
+			expire = str(i[5])[0:10]
 			if expire == "None":
 				expire = "0000-00-00"
-			rnotes = i[5]
-			resId= i[6]
-			vlanId= i[7]
-			ip_addr = i[8]
-			hostname = i[9]
-			anotes = i[10]
-			image_name = i[11]
+			rnotes = i[6]
+			resId= i[7]
+			hostname = i[8]
+			anotes = i[9]
+			image_name = i[10]
 			userName = usermgt.getUserName(uid)
 			combined_notes = str(rnotes) + "|" + str(anotes)
 			if self.verbose:
-				#print "%s\t%s    \t%s    \t%s\t%s  \t%s\t%s\t%s    \t%s    \t%s" % (resId, userName, host, cores, memory,expire, vlanId, hostname, ip_addr, combined_notes)
-				print "%-5s%-10s%-10s%-2s%-10s%-12s%-5s%-15s%-18s%-24s%s" % (resId, userName, host, cores, memory,expire, vlanId, hostname, ip_addr, image_name, combined_notes)
+				vlanId = 1000
+				ip_addr = "10.0.0.10"
+				print "%-5s%-10s%-10s%-2s/%-10s%-12s%-5s%-15s%-18s%-24s%s" % (resId, userName, host, cores, memory,expire, vlanId, hostname, ip_addr, image_name, combined_notes)
 			else:
-				print "%-10s%-10s%-2s%-10s%-12s%s" % (userName, host, cores, memory,expire, combined_notes)
+				print "%-10s%-10s%-2s/%-10s%-12s%s" % (userName, host, cores, memory,expire, combined_notes)
 		print "---------------------------------------------------------------------------------"
 		print str(result.rowcount) + " systems returned"
 
@@ -404,7 +527,6 @@ class ResourceQuerySql(InfoStore):
 	def showPxeImagesToSystemMap(self, cmdargs):
 		extra = "l.mac_addr = j.mac_addr and j.image_id = i.image_id"
 		queryopt = self.__create_queryopts(cmdargs, extra=extra)
-		print queryopt
 
 		query = "select  l.location, j.mac_addr, i.image_name from sysinfo l , imageinfo i, imagemap j " + queryopt + " order by l.location"
 		#print query
@@ -426,7 +548,6 @@ class ResourceQuerySql(InfoStore):
 	def getHostInfo(self, node):
 		host = {}
 		query = "select sys_id, mac_addr, num_procs, num_cores, mem_total, clock_speed, sys_vendor, sys_model, proc_vendor, proc_model, proc_cache, cpu_flags, bios_rev, location, system_serial_number, ip_addr from sysinfo where location = \"" + node + "\"" 
-		#print "query is ", query
 		result = self.__selectDb(query)
 		if result.rowcount > 1:
 			print "Multiple entries for system exist.  Please correct"
@@ -471,7 +592,7 @@ class ResourceQuerySql(InfoStore):
 			host['ipmi_addr'] = i[2]
 
 		#  Get image info
-		query = "select image_name from imagemap i, imageinfo j where i.image_id = j.image_id and mac_addr = \"" + host['mac_addr'] + "\"" 
+		query = "select image_name from imagemap i, imageinfo j where i.image_id = j.image_id" 
 		result = self.__selectDb(query)
 		if result.rowcount == 0:
 			host['pxe_image_name'] = "None"
@@ -539,21 +660,28 @@ class ResourceQuerySql(InfoStore):
 
 	def __queryDb(self, query):
 		cursor = self.conn.cursor()
-		cursor.execute (query)
-		row = cursor.fetchall()
-		desc = cursor.description
+		try:
+			cursor.execute (query)
+			self.conn.commit()
+			row = cursor.fetchall()
+			desc = cursor.description
+		except MySQLdb.OperationalError, e:
+			msg = "%s : %s" % (e[1], query)
+			self.log.error(msg)
+			#traceback.print_exc(sys.exc_info())
+
 		return row
 
 	def execQuery(self, query):
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
+			self.conn.commit()
 		#except Exception:
 			#traceback.print_exc(sys.exc_info())
 		except MySQLdb.OperationalError, e:
-			msg = "ERROR: " + e[1]
-			sys.stderr.write(msg)
-			logit(self.logFile, msg)
+			msg = "%s : %s" % (e[1], query)
+			self.log.error(msg)
 			#traceback.print_exc(sys.exc_info())
 			exit()
 		return cursor
@@ -565,43 +693,57 @@ class ResourceQuerySql(InfoStore):
 		#except Exception:
 			#traceback.print_exc(sys.exc_info())
 		except MySQLdb.OperationalError, e:
-			msg = "ERROR: " + e[1]
-			sys.stderr.write(msg)
-			logit(self.logFile, msg)
+			msg = "SELECT Failed : %s : %s" % (e[1], query)
+			self.log.error(msg)
 			#traceback.print_exc(sys.exc_info())
-			exit()
+			return -1 
+		return cursor
+
+	def __deleteDb(self, query):
+		cursor = self.conn.cursor()
+		try:
+			cursor.execute (query)
+			self.conn.commit()
+		except MySQLdb.OperationalError, e:
+			msg = "DELETE Failed : %s : %s" % (e[1], query)
+			sys.stderr.write(msg)
+			self.log.error(msg)
+			#traceback.print_exc(sys.exc_info())
+			return -1
 		return cursor
 
 	def __updateDb(self, query):
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
+			self.conn.commit()
 		except MySQLdb.OperationalError, e:
-			msg = "ERROR: " + e[1]
+			msg = "UPDATE Failed : %s : %s" % (e[1], query)
 			sys.stderr.write(msg)
-			logit(self.logFile, msg)
+			self.log.error(msg)
 			#traceback.print_exc(sys.exc_info())
-			exit()
+			return -1
+		return cursor
 
 	def __insertDb(self, query):
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
+			self.conn.commit()
 		#except Exception:
 			#traceback.print_exc(sys.exc_info())
 		except MySQLdb.OperationalError, e:
-			msg = "ERROR: " + e[1]
-			sys.stderr.write(msg)
-			logit(self.logFile, msg)
+			msg = "INSERT Failed : %s : %s" % (e[1], query)
+			self.log.error(msg)
 			#traceback.print_exc(sys.exc_info())
-			exit()
+			return -1
+		return cursor
 
 
 	def updateReservation (self, reservationId, userId=None, reservationDuration=None, vlanIsolate=None, allocationNotes=None):
 
-
-		mesg = "Updating reservation"
-		logit(self.logFile, mesg)
+		mesg = "Updating reservation %s" % (str(reservationId))
+		self.log.info(mesg)
 
 		if reservationDuration:
 			if len(resDuration) == 8:
@@ -612,30 +754,29 @@ class ResourceQuerySql(InfoStore):
 				p = os.popen(cmd)
 				expireDate = string.strip(p.read())
 			else:
-				mesg = "ERROR: Invalid reservation duration\n"
-				sys.stderr.write(mesg)
-				logit(self.logFile, mesg)
+				mesg = "ERROR: Invalid reservation duration"
+				self.log.error(mesg)
 				exit()
 
 			mesg = "Updating reservationDuration :" + resDuration
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 			query = "update reservationinfo set reservation_exiration = \"" + expireDate_ + "\" where reservation_id = \"" + str(reservationId) + "\""
 			self.__updateDb(query)
 
 		if allocationNotes:
 			mesg = "Updating allocationNotes to " + allocationNotes 
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 			query = "update reservationinfo set notes = \"" + allocationNotes + "\" where reservation_id = \"" + str(reservationId) + "\""
 			self.__updateDb(query)
 		if vlanIsolate:
 			mesg = "UPDATING Vlan: " 
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 			query = "update reservationinfo set vlan_num = " + vlanIsolate + " where reservation_id = \"" + str(reservationId) + "\""
 			print "query is ", query
 			self.__updateDb(query)
 		if userId:
 			mesg = "UPDATING USER:"
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 			query = "update reservationinfo set user_id = " + userId + " where reservation_id = \"" + str(reservationId) + "\""
 			self.__updateDb(query)
 
@@ -657,120 +798,92 @@ class ResourceQuerySql(InfoStore):
 			expireDate = string.strip(p.read())
 		else:
 			mesg = "ERROR: Invalid reservation duration\n"
-			sys.stderr.write(mesg)
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 			exit()
 
 		#  create reservation
 		#  Create the reservation
 		print userId, expireDate,reservationNotes
-		query = "insert into reservationinfo (user_id, reservation_expiration, notes) values (\"" + str(userId) + "\", " + str(expireDate) + ", \"" + reservationNotes + "\")"
-		mesg = "Creating new reservation\n" + query
-		logit(self.logFile, mesg)
-		self.__selectDb(query)
+		query = "insert into reservationinfo (user_id, reservation_expiration, notes) values (\"" + str(userId) + "\", " + str(expireDate) + ", \"" + str(reservationNotes) + "\")"
+		mesg = "Creating new reservation : " + query
+		self.log.info(mesg)
+		self.__insertDb(query)
 		#  Get the res_id
 		query = "select max(reservation_id) from reservationinfo"
 		res_id = self.__selectDb(query).fetchone()[0]
 		mesg = "  Reservation created - ID :" + str(res_id)
-		logit(self.logFile, mesg) 
+		self.log.info(mesg)
+
 		return res_id
 
 
-	def archiveAllocation(self, nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, res_notes, notes):
-		combined_notes = str(res_notes) + "|" + str(notes)
-		mesg = "Insert to allocation archive:"
-		query = "insert into allocationarchive (sys_id, ip_addr, hostname, vlan_id, user_id, reservation_type, notes) \
-				values (\"" + \
-				str(nodeId) + "\", \"" + str(ip_addr) + "\", \"" + \
-				str(hostName) + "\", \"" + str(vlan_id) + "\", \"" + \
-				str(user_id) + "\", \"" + str(reservation_type) + "\", \"" + \
-				str(combined_notes) + "\")" 
+	#def archiveAllocation(self, nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, res_notes, notes):
+		#combined_notes = str(res_notes) + "|" + str(notes)
+		#mesg = "Insert to allocation archive:"
+		#query = "insert into allocationarchive (sys_id, ip_addr, hostname, vlan_id, user_id, reservation_type, notes) \
+				#values (\"" + \
+				#str(nodeId) + "\", \"" + str(ip_addr) + "\", \"" + \
+				#str(hostName) + "\", \"" + str(vlan_id) + "\", \"" + \
+				#str(user_id) + "\", \"" + str(reservation_type) + "\", \"" + \
+				#str(combined_notes) + "\")" 
+#
+		#self.__insertDb(query)
 
-		self.__insertDb(query)
-
-	@checkSuper
-	def allocateNode(self, reservationId, nodeId, hostName, vlanIsolate=None, ip_addr=None, notes=None):
-		#print "nodeId", nodeId, self.getMacFromSysId(nodeId)
+	def allocateNode(self, reservationId, domain, sysId, vlanInfo, imageName, notes=None):
+		print "reservationId", reservationId, domain, sysId, vlanInfo, imageName, notes
 
 		#  Check if node is already allocated
-		query = "select * from allocationinfo where sys_id = \"" + str(nodeId) + "\""
-		result = self.__selectDb(query)
-		if result.rowcount > 0:
-			val = str(result.fetchone())
-			mesg = "ERROR:  Node already allocated " + val + "\n"
-			logit(self.logFile, mesg)
-			exit()
-
+		result = self.__checkDup("allocationinfo", "sys_id", sysId)
+		if len(result) > 0:
+			mesg = "Node already allocated : %s" % (result)
+			self.log.info(mesg)
+			return -1
 
 		#  Check if reservation exists
-
-		query = "select reservation_id, user_id, reservation_date, \
-				reservation_expiration, notes  from reservationinfo \
-				where reservation_id = \"" + str(reservationId) + "\""
-		result = self.__selectDb(query)
-
-		if result.rowcount > 0:
-			res_results = result.fetchall()[0]
-			val = str(res_results)
-			res_id= res_results[0]
-			user_id = res_results[1]
-			res_notes = res_results[4]
-			if self.verbose:
-				mesg = "Reservation: " + val
-				logit(self.logFile, mesg)
+		result = self.__checkDup("reservationinfo", "reservation_id", reservationId)
+		if len(result) == 0:
+			mesg = "Reservation does not exist: " + reservationId + "\n"
+			self.log.error(mesg)
+			return -1
 		else:
-			mesg = "ERROR: Reservation does not exist: " + reservationId + "\n"
-			logit(self.logFile, mesg)
-			exit()
+			resinfo = result[0]
 
+		#  Check if domain exists
+		domainId = self.__getSomething("domain_id", "domaininfo", "domain_name", domain)
+		if len(self.__checkDup("domaininfo", "domain_id", domainId)) == 0:
+			mesg = "Domain does not exist: %s(%s)" % (domainId, domain)
+			self.log.error(mesg)
+			return -1
 		
-		if not vlanIsolate:
-			vlan = self.getAvailableVlan()
-		else:
-			vlan = vlanIsolate
+		#  Check that all the vlans exist
+		for i in vlanInfo.split(","):
+			v = i.split(":")[0]
+			if self.getVlanId(v) < 0:
+				return -1
 
-		#  Allocate nodes to the reservation
-		#  Reserve the node and assign to user
-		vlan_id = self.getVlanId(vlan)
-		if vlan != 999:
-			if not ip_addr:
-				ip_addr  = self.getDomainIp(vlan)
-			else:
-				# Check to see if IP is free
-				query = "select * from allocationinfo where ip_addr = \"" + str(ip_addr) + "\""
-				result = self.__selectDb(query)
-				if result.rowcount > 0:
-					mesg = "ERROR: IP Address specified (" + str(ip_addr) + ") already in use\n"
-					mesg += str(result.fetchone())
-					logit(self.logFile, mesg)
-					exit()
-		else:
-			ip_addr = self.getIpFromSysId(nodeId)	
-		#print "ip is ", ip_addr
+		#  Insert to allocationinfo
+		nodeName = self.getLocationFromSysId(sysId)
+		mesg = "allocateNode %s : domain %s : reservation %s(%s)" % (nodeName, domain, reservationId, resinfo[4])
+		self.log.info(mesg)
+		query = "insert into allocationinfo (sys_id, reservation_id, domain_id, notes) values ('%s', '%s', '%s', '%s')" % (sysId, reservationId, domainId, notes)
+		result = self.__insertDb(query)
+		allocationId = result.lastrowid
 
-		#  If there is no hostname, set to default
-		if not hostName:
-			hostName = self.getLocationFromSysId(nodeId)
+		#  Parse vlan info and add to vlanmembermap
+		for i in vlanInfo.split(","):
+			print i
+			v = i.split(":")[0]
+			vId = self.getVlanId(v)
+			t = i.split(":")[1]
+			query = "insert into vlanmembermap (allocation_id, vlan_id, vlan_type) values ('%s', '%s', '%s')" % (allocationId, vId, t)
+			result = self.__insertDb(query)
+			mesg = "Adding vlan %s to node %s" % (v, nodeName)
+			self.log.info(mesg)
 
-		#print "hostname is ", hostName, "ip is ", ip_addr, "vlan is ", vlan_id
-
-		#  Assign IP address to node
-		dhcpdns = DhcpDns(self.config, verbose=1)
-		dnscheck = dhcpdns.addDhcp(hostName, ip_addr, self.getMacFromSysId(nodeId))
-		dhcpdns.addDns(hostName, ip_addr)
-
-
-		mesg = "Insert to Node allocation:"
-		query = "insert into allocationinfo (reservation_id, sys_id, ip_addr, hostname, vlan_id, notes) \
-				values (\"" + str(reservationId) + "\", \"" +  str(nodeId) + "\", \"" + \
-				str(ip_addr) + "\", \"" + str(hostName) + "\", \"" + str(vlan_id) + "\", \"" + \
-				str(notes) + "\")"
-		self.__insertDb(query)
-
-		#Archive
-		reservation_type = "allocation"
-		self.archiveAllocation(nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, res_notes, notes)
-
+		#  Insert into imagemap
+		image_id = self.__getSomething("image_id", "imageinfo", "image_name", imageName)
+		query = "insert into imagemap (allocation_id, image_id) values ('%s', '%s')" % (allocationId, image_id)
+		result = self.__insertDb(query)
 
 	def rgasstest(self, vlan_num):
 		query = "select * from vlaninfo where vlan_num = " + vlan_num
@@ -797,7 +910,7 @@ class ResourceQuerySql(InfoStore):
 			exit(1)
 		if result.rowcount > 1:
 			mesg = "WARNING:  Node allocated multiple times (" + str(result.rowcount) + ")"
-			logit(self.logFile, mesg)
+			self.log.warning(mesg)
 
 		val = result.fetchone()
 		nodeId = int(val[0])
@@ -837,11 +950,11 @@ class ResourceQuerySql(InfoStore):
 		
 		#  Eventually should add count =1 so deletes do get out of control
 		query = "delete from allocationinfo where reservation_id = " + str(resId) + " and sys_id = " + str(nodeId)
-		result = self.__selectDb(query)
+		result = self.__deleteDb(query)
 
 		#  Archive node release
-		reservation_type = "release"
-		self.archiveAllocation(nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, reservation_notes, allocation_notes)
+		#reservation_type = "release"
+		#self.archiveAllocation(nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, reservation_notes, allocation_notes)
 
 	def addImage(self, imageName):
 		name = ""
@@ -864,7 +977,7 @@ class ResourceQuerySql(InfoStore):
 		
 		if name == "":
 			mesg = "ERROR:  Image details not specified\n"
-			logit(self.logFile, mesg)
+			self.log.error(mesg)
 			mesg = "Example amd64-rgass-testing:Ubuntu:8.04\n"
 			mesg += "or amd64-rgass-testing::\n"
 			sys.stderr.write(mesg)
@@ -876,7 +989,7 @@ class ResourceQuerySql(InfoStore):
 
 	def delImage(self, imageName):
 		query = "delete from imageinfo where image_name = \"" + imageName + "\""
-		result = self.__selectDb(query)
+		result = self.__deleteDb(query)
 		if result.rowcount == 0:
 			mesg = "ERROR:  No images match your entry\n"
 			sys.stderr.write(mesg)
@@ -892,7 +1005,7 @@ class ResourceQuerySql(InfoStore):
 		row = self.__queryDb(query)
 		if len(row) < 1: 
 			mesg = "ERROR: Image \"" + image + "\" does not exist"
-			logit(self.logFile, mesg)
+			self.log.error(mesg)
 			exit()
 		new_image_id = str(row[0][0])
 
@@ -901,12 +1014,12 @@ class ResourceQuerySql(InfoStore):
 		result = self.__selectDb(query)
 		if result.rowcount > 0:
 			query = "delete from imagemap where mac_addr = \"" + host['mac_addr'] + "\""
-			result = self.__selectDb(query)
+			result = self.__deleteDb(query)
 			
 
 		#  update the database entry with the new image for the host
 		query = "insert into imagemap (mac_addr, image_id) values (\"" + host['mac_addr'] + "\", " + new_image_id + ")"
-		self.__selectDb(query)
+		self.__insertDb(query)
 		
 
 		#  Update tftp link
@@ -931,7 +1044,7 @@ class ResourceQuerySql(InfoStore):
 		try:
 			os.symlink(newlink, maclink)
 			mesg = "Image assignment Successful " +  host['location'] + " " + host['mac_addr'] + " " + image
-			logit(self.logFile, mesg)
+			self.log.info(mesg)
 		except Exception, e:
 			if OSError:
 				mesg = "Cannot modify file.  Please use sudo\n"
@@ -973,10 +1086,10 @@ class ResourceQuerySql(InfoStore):
 			try:
 				self.__insertDb(statement)
 				mesg = "Device (%s) registered successfully\n" % (data['hw_name'])
-				logit(self.logFile, mesg)
+				self.log.info(mesg)
 			except Exception, e:
 				mesg = "Registration failed to add Device (%s) - %s\n" % (data['hw_name'], e)
-				logit(self.logFile, mesg)
+				self.log.warning(mesg)
 		else:
 			mesg = "INFO:  Device (%s) already registered\n" % (data['hw_name'])
 			sys.stderr.write(mesg)
