@@ -253,6 +253,9 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		try:
 			# Prepare the target
+			self.log.info("migrateVm: Calling prepSourceVm on source host %s" % sourceHost.name)
+			self.proxy[sourceHost.name].prepSourceVm(instance)
+			self.log.info("migrateVm: Calling prepReceiveVm on target host %s" % targetHost.name)
 			cookie = self.proxy[targetHost.name].prepReceiveVm(instance, sourceHost)
 		except Exception, e:
 			self.log.exception('prepReceiveVm failed')

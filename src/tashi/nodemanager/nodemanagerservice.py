@@ -198,10 +198,12 @@ class NodeManagerService(object):
 		return instance.vmId
 	
 	def prepReceiveVm(self, instance, source):
-		instance.state = InstanceState.MigratePrep
 		instance.vmId = -1
 		transportCookie = self.vmm.prepReceiveVm(instance, source.name)
 		return transportCookie
+
+	def prepSourceVm(self, instance):
+		instance.state = InstanceState.MigratePrep
 	
 	def migrateVmHelper(self, instance, target, transportCookie):
 		self.vmm.migrateVm(instance.vmId, target.name, transportCookie)
