@@ -22,46 +22,25 @@ import sys
 import os 
 import pexpect
 import time
+import logging
+import tempfile
 
 from systemmanagementinterface import SystemManagementInterface
-
-
-#class systemmagement():
-	#def __init__(self, proto):
-		#self.proto = proto
-
-def log(f):
-	def myF(*args, **kw):
-		print "calling %s%s" % (f.__name__, str(args))
-		res = f(*args, **kw)
-		print "returning from %s -> %s" % (f.__name__, str(res))
-		return res
-	myF.__name__ = f.__name__
-	return myF
-
-import time
-
-def timeF(f):
-	def myF(*args, **kw):
-		start = time.time()
-		res = f(*args, **kw)
-		end = time.time()
-		print "%s took %f" % (f.__name__, end-start)
-		return res
-	myF.__name__ = f.__name__
-	return myF
+from zoni.extra.util import timeF, log
 
 
 class dellDrac(SystemManagementInterface):
-	def __init__(self, host):
-		self.hostname = host['location']
-		self.host = host['drac_name']
-		self.user = host['drac_userid']
-		self.password = host['drac_password']
-		self.port = host['drac_port']
+	def __init__(self, config, nodeName, hostInfo):
+		self.config = config
+		self.hostname = hostInfo['location']
+		self.host = hostInfo['drac_name']
+		self.user = hostInfo['drac_userid']
+		self.password = hostInfo['drac_password']
+		self.port = hostInfo['drac_port']
 		self.powerStatus = None
-		self.verbose = 0
+		self.verbose = False
 		self.server = "Server-" + str(self.port)
+		self.log = logging.getLogger(__name__)
 
 	def setVerbose(self, verbose):
 		self.verbose = verbose
@@ -75,50 +54,42 @@ class dellDrac(SystemManagementInterface):
 
 		opt = child.expect(['Login:',  pexpect.EOF, pexpect.TIMEOUT])
 
-
-		#XXX  Doesn't seem to do what I want:(
 		child.setecho(False)
 		if opt == 0:
+			time.sleep(.5)
 			child.sendline(self.user)
-			time.sleep(.5)
+			i=child.expect(["assword:", pexpect.EOF, pexpect.TIMEOUT])
 			child.sendline(self.password)
-			time.sleep(.5)
 			i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+			if i == 2:
+				self.log.error("Login to %s failed" % (switchIp))
+				return -1
 		else:
 			mesg = "Error"
-			sys.stderr.write(mesg)
-			exit(1)
+			self.log.error(mesg)
+			return -1
 
 		return child
 
 	@timeF
-	@log
-	def getPowerStatus(self):
+	def __setPowerStatus(self):
+		fout = tempfile.TemporaryFile()
 		child = self.__login()
+		child.logfile = fout
 		cmd = "getmodinfo -m " + self.server
 		child.sendline(cmd)
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
-		#exit()
-		val = child.readline()
-		val = child.readline()
-		while self.server not in val:
-			val = child.readline()
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		for i in fout.readlines():
+			if "ON" in i and self.server in i:
+				mesg = self.hostname + " Power is on\n\n"
+				self.powerStatus = 1
+			if "OFF" in i and self.server in i:
+				mesg = self.hostname + " Power is off\n\n"
+				self.powerStatus = 0
+		self.log.info(mesg)
 
-		if "ON" in val:
-			mesg = self.hostname + " Power is on\n\n"
-			self.powerStatus = 1
-		if "OFF" in val:
-			mesg = self.hostname + " Power is off\n\n"
-			self.powerStatus = 0
-
-		sys.stdout.write(mesg)
-
-		#while status not in val:
-			#val = child.readline()
-		#
-		#print "val for", status, "is ", val
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
-		#val = child.readlines()
+		fout.close()
 		child.close()
 		child.terminate()
 
@@ -126,76 +97,110 @@ class dellDrac(SystemManagementInterface):
 	@timeF
 	def isPowered(self):
 		if self.powerStatus == None:
-			self.getPowerStatus()
+			self.__setPowerStatus()
 		if self.powerStatus:
-			return 1;
-		if not self.powerStatus:
 			return 0;
+		return 1;
 	
+	def getPowerStatus(self):
+		return self.isPowered()
 
 	@timeF
 	def powerOn(self):
+		code = 0
+		fout = tempfile.TemporaryFile()
 		if self.powerStatus == 1:
 			mesg = self.hostname + " Power On\n\n"
-			exit(1)
+			return 0
 			
 		child = self.__login()
+		child.logfile = fout
 		cmd = "racadm serveraction -m " +  self.server + " powerup"
 		child.sendline(cmd)
-		val = child.readline()
-		val = child.readline()
-		if "OK" in val:
-			mesg = self.hostname + " Power On\n\n"
-		else:
-			mesg = self.hostname + " Power On Fail\n\n"
-		sys.stdout.write(mesg)
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		for val in fout.readlines():
+			if "OK" in val:
+				mesg = self.hostname + " Power On\n\n"
+				self.log.info(mesg)
+				code = 1 
+			else:
+				mesg = self.hostname + " Power On Fail\n\n"
+				self.log.info(mesg)
+				code = -1
+		fout.close()
 		child.terminate()
+		return code
 
 	@timeF
 	def powerOff(self):
+		code = 0
+		fout = tempfile.TemporaryFile()
 		child = self.__login()
+		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " powerdown"
 		child.sendline(cmd)
-		val = child.readline()
-		val = child.readline()
-		if "OK" in val:
-			mesg = self.hostname + " Power Off\n\n"
-		else:
-			mesg = self.hostname + " Power Off Fail\n\n"
-		sys.stdout.write(mesg)
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		for val in fout.readlines():
+			if "OK" in val:
+				mesg = self.hostname + " Power Off\n\n"
+				self.log.info(mesg)
+				code = 1
+			else:
+				mesg = self.hostname + " Power Off Fail\n\n"
+				self.log.info(mesg)
+				code = -1
 		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()
+		fout.close()
+		return code
 
 	@timeF
 	def powerCycle(self):
+		code = 0
+		fout = tempfile.TemporaryFile()
 		child = self.__login()
+		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " powercycle"
 		child.sendline(cmd)
-		val = child.readline()
-		val = child.readline()
-		if "OK" in val:
-			mesg = self.hostname + " Power Cycle\n\n"
-		else:
-			mesg = self.hostname + " Power Cycle Fail\n\n"
-		sys.stdout.write(mesg)
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		for val in fout.readlines():
+			if "OK" in val:
+				mesg = self.hostname + " Power Cycle\n\n"
+				self.log.info(mesg)
+				code = 1
+			else:
+				mesg = self.hostname + " Power Cycle Fail\n\n"
+				self.log.info(mesg)
+				code = -1
 		child.terminate()
+		fout.close()
+		return code
 		
 	@timeF
 	def powerReset(self):
+		code = 0
+		fout = tempfile.TemporaryFile()
 		child = self.__login()
+		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " hardreset"
 		child.sendline(cmd)
-		val = child.readline()
-		val = child.readline()
-		if "OK" in val:
-			mesg = self.hostname + " Power Reset\n\n"
-		else:
-			mesg = self.hostname + " Power Reset Fail\n\n"
-		sys.stdout.write(mesg)
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		for val in fout.readlines():
+			if "OK" in val:
+				mesg = self.hostname + " Power Reset\n\n"
+				self.log.info(mesg)
+				code = 1
+			else:
+				mesg = self.hostname + " Power Reset Fail\n\n"
+				self.log.info(mesg)
+				code = -1
 		child.terminate()
+		fout.close()
+		return code
 		
 	def activateConsole(self):
 		child = self.__login()
@@ -203,5 +208,3 @@ class dellDrac(SystemManagementInterface):
 		child.sendline(cmd)
 		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()
-		
-#ipmitool -I lanplus -E -H r2r1c3b0-ipmi -U root chassis power status

@@ -52,7 +52,6 @@ class HwDellSwitch(HwSwitchInterface):
 		self.verbose = verbose
 
 	def __login(self):
-		
 		switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
 		child = pexpect.spawn(switchIp)
 
@@ -92,7 +91,7 @@ class HwDellSwitch(HwSwitchInterface):
 
 	def __getPrsLabel(self):
 		dadate = datetime.datetime.now().strftime("%Y%m%d-%H%M-%S")
-		return "PRS_" + dadate
+		return "Zoni_" + dadate
 
 	
 	def enableHostPort(self):
