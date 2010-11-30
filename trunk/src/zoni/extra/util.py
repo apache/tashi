@@ -19,10 +19,14 @@
 #
 
 import os
+import string
 import ConfigParser
 import time
 import shutil
 import re
+import threading
+import subprocess
+import logging
 
 def loadConfigFile(parser):
 	#parser = ConfigParser.ConfigParser()
@@ -70,7 +74,7 @@ def loadConfigFile(parser):
 
 	#  VLAN
 	#config['vlan_reserved'] = parser.get("vlan", "VLAN_RESERVED")
-	config['vlan_max'] = int(parser.get("vlan", "VLAN_MAX"))
+	config['vlanMax'] = int(parser.get("vlan", "VLAN_MAX"))
 
 	#  Domain
 	config['zoniHomeDomain'] = parser.get("domain", "ZONI_HOME_DOMAIN").split()[0]
@@ -79,7 +83,7 @@ def loadConfigFile(parser):
 	#config['vlan_max'] = parser.get("vlan", "VLAN_MAX")
 
 	#  HARDWARE CONTROL
-	config['hardware_control'] = parser.get("hardware", "HARDWARE_CONTROL")
+	config['hardwareControl'] = eval(parser.get("hardware", "HARDWARE_CONTROL"))
 
 	#  DHCP/DNS
 	config['dnsEnabled'] = parser.get("DhcpDns", "dnsEnabled")
@@ -144,6 +148,14 @@ def timeF(f):
 	myF.__name__ = f.__name__
 	return myF
 
+def log(f):
+	def myF(*args, **kw):
+		print "calling %s%s" % (f.__name__, str(args))
+		res = f(*args, **kw)
+		print "returning from %s -> %s" % (f.__name__, str(res))
+		return res
+	myF.__name__ = f.__name__
+	return myF
 
 def createDir(dirName, checkexists=None):
 	if checkexists and os.path.exists(dirName):
@@ -179,5 +191,50 @@ def validMac(mac):
 		return 1
 	return 0
 
+def createKey(name):
+	tmpdir = "/tmp"
+	def cleanIt(tmpdir, name):
+		check = "K%s" % name
+		for i in os.listdir(tmpdir):
+			if check in i:
+				keyName = os.path.join(tmpdir, i)
+				os.unlink(keyName)
 
+	cleanIt(tmpdir, name)
+	cmd = "dnssec-keygen -a HMAC-MD5 -r /dev/urandom -b 128 -K %s -n USER %s" % (tmpdir, name)
+	c = subprocess.Popen(args=cmd.split(), stdout=subprocess.PIPE)
+	keyName = os.path.join(tmpdir, string.strip(c.stdout.readline()) + ".key")
+	f = open(keyName, "r")
+	val = string.strip(string.split(f.readline(), " " , 6)[6])
+	f.close()
+	return val
+	
+
+
+
+def debugConsole(globalDict):
+	"""A debugging console that optionally uses pysh"""
+	def realDebugConsole(globalDict):
+		try :
+			import atexit
+			from IPython.Shell import IPShellEmbed
+			def resetConsole():
+# XXXpipe: make input window sane
+				(stdin, stdout) = os.popen2("reset")
+				stdout.read()
+			dbgshell = IPShellEmbed()
+			atexit.register(resetConsole)
+			dbgshell(local_ns=globalDict, global_ns=globalDict)
+		except Exception:
+			CONSOLE_TEXT=">>> "
+			input = " "
+			while (input != ""):
+				sys.stdout.write(CONSOLE_TEXT)
+				input = sys.stdin.readline()
+				try:
+					exec(input) in globalDict
+				except Exception, e:
+					sys.stdout.write(str(e) + "\n")
+	if (os.getenv("DEBUG", "0") == "1"):
+		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
 
