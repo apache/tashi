@@ -25,10 +25,12 @@ import MySQLdb
 import subprocess
 import traceback
 import logging
+import threading
+import time
 
 import usermanagement
 from zoni.data.infostore import InfoStore
-from zoni.extra.util import checkSuper
+from zoni.extra.util import checkSuper, createKey
 from zoni.agents.dhcpdns import DhcpDns
 
 class ResourceQuerySql(InfoStore):
@@ -39,32 +41,36 @@ class ResourceQuerySql(InfoStore):
 		self.user = config['dbUser']
 		self.passwd = config['dbPassword']
 		self.db = config['dbInst']
-		#self.log = logging.getLogger(os.path.basename(__name__))
+		self.port = config['dbPort']
+		self._isDb = 1
+		self.vlan_max = config['vlanMax']
+		if self.port == "":
+			self.port = 3306
 		self.log = logging.getLogger(__name__)
 		
-		self.tftpRootDir = config['tftpRootDir']
-		self.tftpImageDir = config['tftpImageDir']
-		self.tftpBootOptionsDir = config['tftpBootOptionsDir']
+		self.conn = self.createConn()
 
-
-		if config['dbPort'] == "":
-			config['dbPort'] = 3306
-
-		self.port = config['dbPort']
-
-		self.vlan_max = config['vlan_max']
-		#self.vlan_reserved = config['vlan_reserved']
 		
+	def createConn(self):
 		#  Connect to DB
 		try:
-			self.conn = MySQLdb.connect(host = self.host, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
+			return MySQLdb.connect(host = self.host, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
+			#return MySQLdb.connect(host = self.config['dbHost'], port = self.config['dbPort'], user = self.config['dbUser'], passwd = self.config['dbPassword'], db = self.config['dbInst'])
+
 		except MySQLdb.OperationalError, e:
 			if e[0] == 2005:
 				print "ERROR :" + str(e[1])
-				exit(1)
+				return 
 			else:
 				print "ERROR : ", e
-				exit(1)
+				return 
+
+	def keepAlive(self):
+		while True:
+			if not self.conn.open:
+				self.log.info("Reinitializing DB connection")
+				self.conn = self.createConn()
+			time.sleep(10)
 
 	def getNote(self):
 		return "Created by Zoni"
@@ -81,11 +87,12 @@ class ResourceQuerySql(InfoStore):
 		if desc == None:
 			desc = self.getNote()
 
-		print name
 		if self.__checkDup("domaininfo", "domain_name", name):
 			self.log.error("Domain (%s) already exists" % (name))
 			return -1
-		query = "insert into domaininfo (domain_name, domain_desc, reservation_id) values ('%s','%s', '%s')" % (name, desc, reservationId)
+		#  Create a key for the reservation
+		domainKey = createKey(name)
+		query = "insert into domaininfo (domain_name, domain_desc, domain_key, reservation_id) values ('%s','%s', '%s', '%s')" % (name, desc, domainKey, reservationId)
 		try:
 			result = self.__insertDb(query)
 			mesg = "Adding domain %s(%s)" % (name, desc)
@@ -103,13 +110,16 @@ class ResourceQuerySql(InfoStore):
 		#  Need to remove any vlans attached to this domain
 
 	def showDomains(self):
-		query = "select domain_name, domain_desc from domaininfo"
+		usermgt = eval("usermanagement.%s" % (self.config['userManagement']) + "()")
+		query = "select r.reservation_id, r.user_id, d.domain_name, d.domain_desc from domaininfo d, allocationinfo a, reservationinfo r where d.domain_id = a.domain_id and a.reservation_id = r.reservation_id"
 		result = self.__selectDb(query)
 		desc = result.description
 		if result.rowcount > 0:
-			print "%s\t%s\n-------------------------------------" % (result.description[0][0], result.description[1][0])
+			print "%s\t%s\t%s\t%s" % (result.description[0][0], result.description[1][0], result.description[2][0], result.description[3][0])
+			print "------------------------------------------------------------"
 			for row in result.fetchall():
-				print "%s\t\t%s" % (row[0], row[1])
+				resName = usermgt.getUserName(row[1])
+				print "%s\t\t%s\t%s\t\t%s" % (row[0], resName, row[2], row[3])
 			return 0
 		else:
 			mesg = "No Domains exist"
@@ -184,6 +194,11 @@ class ResourceQuerySql(InfoStore):
 	def __getSomething(self, fieldname, table, critField, crit):
 		query = "select %s from %s where %s = '%s'" % (fieldname, table, critField, crit)
 		result = self.__selectDb(query)
+		if result.rowcount == 0:
+			mesg = "No entry for '%s' found" % (crit)
+			self.log.error(mesg)
+			#return []
+			return -1
 		return result.fetchall()[0][0]
 
 
@@ -266,12 +281,70 @@ class ResourceQuerySql(InfoStore):
 			print line
 		print str(result.rowcount) + " systems returned"
 
-		#mysql -h rodimus -u reader irp-cluster -e "select * from sysinfo where location like 'r1%' and num_procs = 1"
+	def getAvailableResources(self):
+		#  Maybe should add a status flag?
 
+		query = "select sys_id from allocationinfo"
+		result = self.__selectDb(query)
+		allocatedNodes = []
+		if result.rowcount:
+			for i in result.fetchall()[0]:
+				allocatedNodes.append(i)
+
+		query = "select sys_id, location, num_procs, num_cores, mem_total, clock_speed, proc_model from sysinfo where state_id = 0 or state_id = 1"
+		result = self.__selectDb(query)
+		desc = result.description
+		res = {}
+		for i in result.fetchall():
+			sys_id = int(i[0])
+			if sys_id not in allocatedNodes:
+				location = i[1]
+				res[location] = res.get(location, {})
+				res[location][desc[0][0]] = sys_id
+				res[location][desc[1][0]] = location
+				res[location][desc[2][0]] = int(i[2])
+				res[location][desc[3][0]] = int(i[3])
+				res[location][desc[4][0]] = int(i[4])
+				res[location][desc[5][0]] = int(i[5])
+				res[location][desc[6][0]] = i[6]
+			
+		return res
+
+	def getMyResources(self, key):
+		query = "select s.sys_id, s.location, s.num_procs, s.num_cores, s.mem_total, s.clock_speed, s.proc_model from sysinfo s, allocationinfo a, domaininfo d where a.sys_id = s.sys_id and  a.domain_id = d.domain_id and d.domain_key = '%s'" % key
+		result = self.__selectDb(query)
+		desc = result.description
+		res = {}
+		for i in result.fetchall():
+			sys_id = int(i[0])
+			location = i[1]
+			res[location] = res.get(location, {})
+			res[location][desc[0][0]] = sys_id
+			res[location][desc[1][0]] = location
+			res[location][desc[2][0]] = int(i[2])
+			res[location][desc[3][0]] = int(i[3])
+			res[location][desc[4][0]] = int(i[4])
+			res[location][desc[5][0]] = int(i[5])
+			res[location][desc[6][0]] = i[6]
+			
+		return res
+
+	def getDomainFromKey(self, key):
+		return self.__getSomething("domain_name", "domaininfo", "domain_key", key)
+
+	def getDomainIdFromKey(self, key):
+		return self.__getSomething("domain_id", "domaininfo", "domain_key", key)
+
+	def getKeyFromDomain(self, domain):
+		return self.__getSomething("domain_key", "domaininfo", "domain_name", domain)
+	
 	def getLocationFromSysId (self, nodeId):
 		query = "select location from sysinfo where sys_id = \"" + str(nodeId) + "\""
 		result = self.__selectDb(query)
 		return result.fetchall()[0][0]
+
+	def getSysIdFromLocation(self, location):
+		return self.__getSomething("sys_id", "sysinfo", "location", location)
 
 	def getMacFromSysId(self, nodeId):
 		query = "select mac_addr from sysinfo where sys_id = \"" + str(nodeId) + "\""
@@ -291,14 +364,6 @@ class ResourceQuerySql(InfoStore):
 		for switch in result.fetchall():
 			switchList.append(switch[0])
 
-		#  Use static list until we get all switches installed
-		#switchList =  ['sw1-r1r2', 'sw0-r1r1', 'sw0-r1r2', 'sw0-r1r3', 'sw0-r1r4', 'sw0-r2r3', 'sw0-r3r3', 'sw0-r3r2', 'sw0-r2r1c3', 'sw2-r1r2']
-		#switchList =  ['sw2-r1r2']
-		#switchList =  ['sw1-r1r2']
-
-
-		print switchList
-	
 		return switchList
 
 	def getAvailableVlan(self):
@@ -374,12 +439,6 @@ class ResourceQuerySql(InfoStore):
 		return ip_addr
 
 
-	#def showArchive(self):
-		#query = "select * from allocationarchive"
-		#result = self.__selectDb(query)
-		#for i in result:
-			#print i
-
 	def showAllocation(self, userId=None):
 		#from IPython.Shell import IPShellEmbed
 		#shell = IPShellEmbed(argv="")
@@ -406,14 +465,11 @@ class ResourceQuerySql(InfoStore):
 
 		query += "order by r.reservation_id asc, s.location"
 
-		print query
 		result = self.__selectDb(query)
 		
-		print "NODE ALLOCATION"
-		print "---------------------------------------------------------------------------------"
+		print "NODE ALLOCATION\n"
 		if self.verbose:
-			#print "Res_id\tUser    \tNode    \tCores\tMemory  \tExpiration\t\tVLAN\tHOSTNAME    \tIPADDR    \t\tReservationNotes|AllocationNotes"
-			print "%-5s%-10s%-11s%-12s%-12s%-5s%-15s%-18s%-24s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Vlan", "Hostname", "IP Addr", "Boot Image Name", "Notes")
+			print "%-5s%-10s%-10s%-13s%-12s%-15s%-18s%-24s%-20s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Hostname", "IP Addr", "Boot Image Name", "Vlan Member", "Notes")
 		else:
 			print "%-10s%-10s%-13s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
 
@@ -429,18 +485,25 @@ class ResourceQuerySql(InfoStore):
 			rnotes = i[6]
 			resId= i[7]
 			hostname = i[8]
+			if hostname == None:
+				hostname = host
 			anotes = i[9]
 			image_name = i[10]
 			userName = usermgt.getUserName(uid)
 			combined_notes = str(rnotes) + "|" + str(anotes)
 			if self.verbose:
-				vlanId = 1000
+				query = "select vlan_num from vlaninfo v, domainmembermap m, domaininfo d where v.vlan_id = m.vlan_id and d.domain_id = m.domain_id and d.domain_name = '%s'" % (domain);
+				vlanRes = self.__selectDb(query)
+				vlanList = []
+				for i in vlanRes.fetchall():
+					vlanList.append(str(i[0]))
+				
+				vlanMember = string.join(vlanList, ",")
 				ip_addr = "10.0.0.10"
-				print "%-5s%-10s%-10s%-2s/%-10s%-12s%-5s%-15s%-18s%-24s%s" % (resId, userName, host, cores, memory,expire, vlanId, hostname, ip_addr, image_name, combined_notes)
+				print "%-5s%-10s%-10s%-2s/%-10s%-12s%-15s%-18s%-24s%-20s%s" % (resId, userName, host, cores, memory,expire, hostname, ip_addr, image_name, vlanMember,combined_notes)
 			else:
 				print "%-10s%-10s%-2s/%-10s%-12s%s" % (userName, host, cores, memory,expire, combined_notes)
-		print "---------------------------------------------------------------------------------"
-		print str(result.rowcount) + " systems returned"
+		print "\n%s systems returned" % (str(result.rowcount))
 
 	def showReservation(self, userId=None):
 		#from IPython.Shell import IPShellEmbed
@@ -499,11 +562,10 @@ class ResourceQuerySql(InfoStore):
 
 	
 	def getPxeImages(self):
-		cursor = self.conn.cursor ()
-		line = "select image_name from imageinfo"
-		cursor.execute (line)
-		row = cursor.fetchall()
-		desc = cursor.description
+		query = "select image_name from imageinfo"
+		result = self.__selectDb(query)
+		row = result.fetchall()
+		desc = result.description
 
 		imagelist = []
 		for i in row:
@@ -513,22 +575,20 @@ class ResourceQuerySql(InfoStore):
 		
 		
 	def showPxeImages(self):
-		cursor = self.conn.cursor ()
-		line = "select image_name, dist, dist_ver  from imageinfo"
-		cursor.execute (line)
-		row = cursor.fetchall()
-		desc = cursor.description
+		query = "select image_name, dist, dist_ver  from imageinfo"
+		result = self.__selectDb(query)
+		row = result.fetchall()
+		desc = result.description
 
 		for i in row:
 			print i
 
-		cursor.close ()
 
 	def showPxeImagesToSystemMap(self, cmdargs):
-		extra = "l.mac_addr = j.mac_addr and j.image_id = i.image_id"
+		extra = "j.image_id = i.image_id"
 		queryopt = self.__create_queryopts(cmdargs, extra=extra)
 
-		query = "select  l.location, j.mac_addr, i.image_name from sysinfo l , imageinfo i, imagemap j " + queryopt + " order by l.location"
+		query = "select  s.location, s.mac_addr, i.image_name from sysinfo s , imageinfo i, imagemap j " + queryopt + " order by s.location"
 		#print query
 		result = self.__selectDb(query)
 
@@ -551,11 +611,11 @@ class ResourceQuerySql(InfoStore):
 		result = self.__selectDb(query)
 		if result.rowcount > 1:
 			print "Multiple entries for system exist.  Please correct"
-			exit()
+			return 
 		if result.rowcount < 1:
 			mesg = "node does not exist :" + str(node) + "\n"
 			sys.stderr.write(mesg)
-			exit()
+			return 
 		
 		for i in result.fetchall():
 			host['mac_addr'] = host.get("mac_addr", "")
@@ -585,7 +645,7 @@ class ResourceQuerySql(InfoStore):
 		result = self.__selectDb(query)
 		if result.rowcount> 1:
 			print "Multiple entries for system exist.  Please correct"
-			exit()
+			return 
 		for i in result.fetchall():
 			host['ipmi_user'] = i[0]
 			host['ipmi_password'] = i[1]
@@ -646,9 +706,7 @@ class ResourceQuerySql(InfoStore):
 		#  Get switch info
 		#switchList = self.getAllSwitches()
 		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password from hardwareinfo h where h.hw_name  = \"" +  str(switchName) + "\""
-		#print "query is ", query
 		result = self.__selectDb(query)
-		#desc = cursor.description
 		for i in result.fetchall():
 			host['hw_id'] = int(i[0])
 			host['hw_name'] = i[1]
@@ -659,6 +717,7 @@ class ResourceQuerySql(InfoStore):
 		return host
 
 	def __queryDb(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -673,6 +732,7 @@ class ResourceQuerySql(InfoStore):
 		return row
 
 	def execQuery(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -683,10 +743,11 @@ class ResourceQuerySql(InfoStore):
 			msg = "%s : %s" % (e[1], query)
 			self.log.error(msg)
 			#traceback.print_exc(sys.exc_info())
-			exit()
+			return 
 		return cursor
 
 	def __selectDb(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -700,6 +761,7 @@ class ResourceQuerySql(InfoStore):
 		return cursor
 
 	def __deleteDb(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -713,6 +775,7 @@ class ResourceQuerySql(InfoStore):
 		return cursor
 
 	def __updateDb(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -726,6 +789,7 @@ class ResourceQuerySql(InfoStore):
 		return cursor
 
 	def __insertDb(self, query):
+		self.conn.ping(True)
 		cursor = self.conn.cursor()
 		try:
 			cursor.execute (query)
@@ -756,7 +820,7 @@ class ResourceQuerySql(InfoStore):
 			else:
 				mesg = "ERROR: Invalid reservation duration"
 				self.log.error(mesg)
-				exit()
+				return 
 
 			mesg = "Updating reservationDuration :" + resDuration
 			self.log.info(mesg)
@@ -799,19 +863,18 @@ class ResourceQuerySql(InfoStore):
 		else:
 			mesg = "ERROR: Invalid reservation duration\n"
 			self.log.info(mesg)
-			exit()
+			return 
 
-		#  create reservation
 		#  Create the reservation
 		print userId, expireDate,reservationNotes
-		query = "insert into reservationinfo (user_id, reservation_expiration, notes) values (\"" + str(userId) + "\", " + str(expireDate) + ", \"" + str(reservationNotes) + "\")"
-		mesg = "Creating new reservation : " + query
+		query = "insert into reservationinfo (user_id, reservation_expiration, notes) values ('%s', '%s', '%s')" % (str(userId), str(expireDate), str(reservationNotes))
+		mesg = "Creating new reservation : %s" % query
 		self.log.info(mesg)
 		self.__insertDb(query)
 		#  Get the res_id
 		query = "select max(reservation_id) from reservationinfo"
 		res_id = self.__selectDb(query).fetchone()[0]
-		mesg = "  Reservation created - ID :" + str(res_id)
+		mesg = "  Reservation created - ID : %s" % str(res_id)
 		self.log.info(mesg)
 
 		return res_id
@@ -854,6 +917,12 @@ class ResourceQuerySql(InfoStore):
 			mesg = "Domain does not exist: %s(%s)" % (domainId, domain)
 			self.log.error(mesg)
 			return -1
+
+		imageId = self.__getSomething("image_id", "imageinfo", "image_name", imageName)
+		if len(self.__checkDup("imageinfo", "image_id", imageId)) == 0:
+			mesg = "Image does not exist: %s(%s)" % (imageName, imageId)
+			self.log.error(mesg)
+			return -1
 		
 		#  Check that all the vlans exist
 		for i in vlanInfo.split(","):
@@ -881,9 +950,15 @@ class ResourceQuerySql(InfoStore):
 			self.log.info(mesg)
 
 		#  Insert into imagemap
-		image_id = self.__getSomething("image_id", "imageinfo", "image_name", imageName)
-		query = "insert into imagemap (allocation_id, image_id) values ('%s', '%s')" % (allocationId, image_id)
+		query = "insert into imagemap (allocation_id, image_id) values ('%s', '%s')" % (allocationId, imageId)
 		result = self.__insertDb(query)
+	
+		self.__updateSysState(sysId, 1)
+
+		
+	def __updateSysState(self, sysId, stateId):
+		query = "update sysinfo set state_id = '%s' where sys_id = '%s'" % (stateId, sysId)
+		return self.__updateDb(query)
 
 	def rgasstest(self, vlan_num):
 		query = "select * from vlaninfo where vlan_num = " + vlan_num
@@ -897,64 +972,28 @@ class ResourceQuerySql(InfoStore):
 		self.__updateDb(query)
 		query = "delete from allocationinfo where reservation_id = " + str(res)
 		self.__updateDb(query)
+
 		
-	@checkSuper
-	def releaseNode(self, nodeName):
+	def releaseNode(self, location):
 		#  Get the nodeId
-		query = "select sys_id, r.reservation_id, a.ip_addr, hostname, vlan_id, a.notes, r.notes,r.user_id from allocationinfo a, sysinfo s, reservationinfo r where a.sys_id = s.sys_id and a.reservation_id = r.reservation_id and location = \"" + nodeName + "\""
-		print query
+		sysId = self.__getSomething("sys_id", "sysinfo", "location", location)
+		query = "select * from allocationinfo where sys_id = '%s'" % (sysId)
 		result = self.__selectDb(query)
 		if result.rowcount == 0:
-			mesg = "ERROR:  Node not allocated\n"
-			sys.stderr.write(mesg)
-			exit(1)
+			mesg = "Node %s not allocated" % (location)
+			self.log.error(mesg)
+			return
 		if result.rowcount > 1:
-			mesg = "WARNING:  Node allocated multiple times (" + str(result.rowcount) + ")"
+			mesg = "Node %s allocated multiple times(%s)" % (location, str(result.rowcount))
 			self.log.warning(mesg)
+			return 
 
-		val = result.fetchone()
-		nodeId = int(val[0])
-		resId = int(val[1])
-		ip_addr = val[2]
-		hostName = val[3]
-		vlan_id = int(val[4])
-		allocation_notes = val[5]
-		reservation_notes = val[6]
-		user_id = val[7]
-
-		print "hostname is ", hostName
-		#  Assign IP address to node
-		dhcpdns = DhcpDns(self.config, verbose=1)
-		dnscheck = dhcpdns.removeDns(hostName)
-		dhcpdns.removeDhcp(hostName)
-
-		'''
-		query = "select reservation_id, notes from reservationinfo where sys_id = " + str(nodeId)
-		result = self.__selectDb(query)
-		for i in result:
-			print i
-		print result.rowcount
-		if result.rowcount == 0:
-			mesg = "No Reservation for this node.\n  Please check"
-			logit(self.logFile, mesg)
-			exit(1)
-		if result.rowcount > 1:
-			mesg = "WARNING:  Multiple reservations exist (" + str(result.rowcount) + ")"
-			logit(self.logFile, mesg)
-		
-		resId = int(result.fetchone()[0])
-		res_notes = int(result.fetchone()[1])
-		
-		print resId, res_notes
-		'''
-		
 		#  Eventually should add count =1 so deletes do get out of control
-		query = "delete from allocationinfo where reservation_id = " + str(resId) + " and sys_id = " + str(nodeId)
+		query = "delete from allocationinfo where sys_id = '%s'" % (sysId)
 		result = self.__deleteDb(query)
-
-		#  Archive node release
-		#reservation_type = "release"
-		#self.archiveAllocation(nodeId, ip_addr, hostName, vlan_id, user_id, reservation_type, reservation_notes, allocation_notes)
+		#  Set state to available
+		self.__updateSysState(sysId, 0)
+		return 
 
 	def addImage(self, imageName):
 		name = ""
@@ -973,7 +1012,7 @@ class ResourceQuerySql(InfoStore):
 		if result.rowcount > 0:
 			mesg = "ERROR:  Image already exists\n"
 			sys.stderr.write(mesg)
-			exit()
+			return 
 		
 		if name == "":
 			mesg = "ERROR:  Image details not specified\n"
@@ -981,7 +1020,7 @@ class ResourceQuerySql(InfoStore):
 			mesg = "Example amd64-rgass-testing:Ubuntu:8.04\n"
 			mesg += "or amd64-rgass-testing::\n"
 			sys.stderr.write(mesg)
-			exit()
+			return 
 
 		query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
 		self.__insertDb(query)
@@ -993,7 +1032,7 @@ class ResourceQuerySql(InfoStore):
 		if result.rowcount == 0:
 			mesg = "ERROR:  No images match your entry\n"
 			sys.stderr.write(mesg)
-			exit()
+			return 
 
 	def assignImagetoHost(self, host, image):
 		#  imagemap db should be sys_id instead of mac_addr
@@ -1006,7 +1045,7 @@ class ResourceQuerySql(InfoStore):
 		if len(row) < 1: 
 			mesg = "ERROR: Image \"" + image + "\" does not exist"
 			self.log.error(mesg)
-			exit()
+			return 
 		new_image_id = str(row[0][0])
 
 		#  check for entry and delete in exists
@@ -1023,6 +1062,7 @@ class ResourceQuerySql(InfoStore):
 		
 
 		#  Update tftp link
+		#  XXX move to pxe.py
 		mac_addr = "01-" + string.lower(string.replace(host['mac_addr'], ":", "-"))
 		maclink = self.tftpImageDir + "/" + mac_addr
 		#print "mac link is ", maclink
@@ -1054,6 +1094,33 @@ class ResourceQuerySql(InfoStore):
 			return 1
 
 		return 0
+
+
+	def getHardwareCapabilities(self, nodeName):
+		'''  getHardwareCapabilities return a list of lists with
+			[0] = hw method
+			[1] = hw method userid
+			[2] = hw method password  '''
+
+		sysId = self.getSysIdFromLocation(nodeName)	
+		query = "select h.hw_type, h.hw_userid, h.hw_password from hardwareinfo h, portmap p where p.hw_id = h.hw_id and p.sys_id = '%s'" % sysId
+		result = self.__selectDb(query)
+		cap = []
+		val = []
+		for i in result.fetchall():
+			if i[0] in self.config['hardwareControl']:
+				val.append(i)
+
+		# order the hardware capabilities according to order in config file
+		for i in [j for j in self.config['hardwareControl']]:
+			for j in val:
+				if i in j:	
+					cap.append(j)
+		return cap
+
+	#  print out data in a consistent format
+	def __showIt(data):
+		pass
 
 	
 	def registerHardware(self, data):

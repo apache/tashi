@@ -242,7 +242,6 @@ if [ $? -eq 0 ];then
 	vlan_disable=$(ipmitool lan print |  grep -i "Vlan" | awk -F ": " '{print $2}')
 
 	#  Add IPMI info 
-VERBOSE=1
 	wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}"
 	IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
 	IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_PASSWORD | awk '{print $2}')

@@ -129,7 +129,7 @@ def createTables(conn):
 	'''  Create Tables  '''
 	#  Create sysinfo 
 	sys.stdout.write("    Creating sysinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(11) unsigned NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `system_serial_number` char(128) default NULL, `chassis_serial_number` char(128) default NULL, `system_uuid` char(254) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default CURRENT_TIMESTAMP, `last_update` timestamp, state_id int(11) DEFAULT 1,max_reservation int(10) default -1, PRIMARY KEY  (`sys_id`))")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysinfo` (`sys_id` int(11) unsigned NOT NULL auto_increment, `mac_addr` char(64) NOT NULL, `num_procs` int(10) unsigned default NULL, `num_cores` int(10) unsigned default NULL, `mem_sticks` int(10) unsigned default NULL, `mem_slots` int(10) unsigned default NULL, `mem_total` int(10) unsigned default NULL, `mem_limit` int(10) unsigned default NULL, `clock_speed` int(10) unsigned default NULL, `sys_vendor` text, `sys_model` text, `proc_vendor` char(64) default NULL, `proc_model` char(128) default NULL, `proc_cache` char(32) default NULL, `system_serial_number` char(128) default NULL, `chassis_serial_number` char(128) default NULL, `system_uuid` char(254) default NULL, `cpu_flags` text, `location` text, `bios_rev` char(32) default NULL, `ip_addr` varchar(64) NOT NULL, `init_checkin` timestamp NOT NULL default 0, `last_update` timestamp not null default 0 on update CURRENT_TIMESTAMP, state_id int(11) DEFAULT 1,max_reservation int(10) default -1, PRIMARY KEY  (`sys_id`))")
 	sys.stdout.write("Success\n")
 
 	#  Create hardwareinfo
@@ -154,7 +154,7 @@ def createTables(conn):
 	sys.stdout.write("Success\n")
 	#  Create domaininfo
 	sys.stdout.write("    Creating domaininfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_desc` varchar(256) NOT NULL, `reservation_id` int(11) unsigned NOT NULL,  PRIMARY KEY  (`domain_id`), INDEX (reservation_id), FOREIGN KEY (reservation_id) REFERENCES reservationinfo(reservation_id) on DELETE CASCADE) ENGINE=INNODB")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_key` varchar(1024) NULL, `domain_desc` varchar(256) NOT NULL, `reservation_id` int(11) unsigned NOT NULL,  PRIMARY KEY  (`domain_id`), INDEX (reservation_id), FOREIGN KEY (reservation_id) REFERENCES reservationinfo(reservation_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create domainmap
 	sys.stdout.write("    Creating domainmembermap...")
@@ -166,7 +166,7 @@ def createTables(conn):
 	sys.stdout.write("Success\n")
  	#  Create allocationinfo
 	sys.stdout.write("    Creating allocationinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, PRIMARY KEY  (`allocation_id`), INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo (domain_id) on DELETE CASCADE) ENGINE=INNODB")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, `expire_time` timestamp default 0 NOT NULL, PRIMARY KEY  (`allocation_id`), INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo (domain_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create imagemap
 	sys.stdout.write("    Creating imagemap...")
@@ -280,7 +280,7 @@ def addInitialConfig(conn, config):
 		#  Get the domainId 
 		vlanId = str(checkVal[1][0][0])
 	else:
-		r = execQuery(conn, "INSERT into `reservationinfo` (user_id, reservation_expiration, notes) values (0, '9999-12-31', 'Zoni Default Registration')")
+		r = execQuery(conn, "INSERT into `reservationinfo` (user_id, reservation_expiration, notes) values (0, '9999-12-31', 'Zoni Default')")
 		vlanId = str(r.lastrowid)
 		sys.stdout.write("Success\n")
 
