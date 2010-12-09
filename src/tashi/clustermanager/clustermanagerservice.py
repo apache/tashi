@@ -254,7 +254,7 @@ class ClusterManagerService(object):
 		try:
 			# Prepare the target
 			self.log.info("migrateVm: Calling prepSourceVm on source host %s" % sourceHost.name)
-			self.proxy[sourceHost.name].prepSourceVm(instance)
+			self.proxy[sourceHost.name].prepSourceVm(instance.vmId)
 			self.log.info("migrateVm: Calling prepReceiveVm on target host %s" % targetHost.name)
 			cookie = self.proxy[targetHost.name].prepReceiveVm(instance, sourceHost)
 		except Exception, e:
@@ -488,3 +488,16 @@ class ClusterManagerService(object):
 				self.stateTransition(instance, InstanceState.Activating, InstanceState.Running)
 			self.data.releaseInstance(instance)
 		return
+
+        def registerHost(self, hostname, memory, cores, version):
+                hostId, alreadyRegistered = self.data.registerHost(hostname, memory, cores, version)
+                if alreadyRegistered:
+                        self.log.info("Host %s is already registered, it was updated now" % hostname)
+                else:
+                        self.log.info("A host was registered - hostname: %s, version: %s, memory: %s, cores: %s" % (hostname, version, memory, cores))
+                return hostId
+
+        def unregisterHost(self, hostId):
+                self.data.unregisterHost(hostId)
+                self.log.info("Host %s was unregistered" % hostId)
+                return

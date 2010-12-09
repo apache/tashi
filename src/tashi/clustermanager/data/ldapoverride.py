@@ -104,3 +104,10 @@ class LdapOverride(DataInterface):
 	def getUser(self, id):
 		self.fetchFromLdap()
 		return self.users[id]
+		
+	def registerHost(self, hostname, memory, cores, version):
+		return self.baseDataObject.registerHost(hostname, memory, cores, version)
+	
+	def unregisterHost(self, hostId):
+		return self.baseDataObject.unregisterHost(hostId)
+

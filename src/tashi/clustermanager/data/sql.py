@@ -50,6 +50,7 @@ class SQL(DataInterface):
 		self.hostLock = threading.Lock()
 		self.hostLocks = {}
 		self.maxInstanceId = 1
+		self.idLock = threading.Lock()
 		self.sqlLock = threading.Lock()
 		self.verifyStructure()
 
@@ -258,3 +259,62 @@ class SQL(DataInterface):
 		r = cur.fetchone()
 		user = User(d={'id':r[0], 'name':r[1], 'passwd':r[2]})
 		return user
+		
+	def registerHost(self, hostname, memory, cores, version):
+		self.hostLock.acquire()
+		cur = self.executeStatement("SELECT * from hosts")
+		res = cur.fetchall()
+		for r in res:
+			if r[1] == hostname:
+				id = r[0]
+				print "Host %s already registered, update will be done" % id
+				s = ""
+				host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+				l = self.makeHostList(host)
+				for e in range(0, len(self.hostOrder)):
+					s = s + self.hostOrder[e] + "=" + l[e]
+					if (e < len(self.hostOrder)-1):
+						s = s + ", "
+				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, id))
+				self.hostLock.release()
+				return r[0], True
+		id = self.getNewId("hosts")
+		host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+		l = self.makeHostList(host)
+		self.executeStatement("INSERT INTO hosts VALUES (%s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
+		self.hostLock.release()
+		return id, False
+	
+	def unregisterHost(self, hostId):
+		self.hostLock.acquire()
+		cur = self.executeStatement("SELECT * from hosts")
+		res = cur.fetchall()
+		for r in res:
+			if r[0] == hostId:
+				self.executeStatement("DELETE FROM hosts WHERE id = %d" % hostId)
+		self.hostLock.release()
+
+	def getNewId(self, table):
+		""" Generates id for a new object. For example for hosts and users.  
+		"""
+		self.idLock.acquire()
+		cur = self.executeStatement("SELECT * from %s" % table)
+		res = cur.fetchall()
+		maxId = 0 # the first id would be 1
+		l = []
+		for r in res:
+			id = r[0]
+			l.append(id)
+			if id >= maxId:
+				maxId = id
+		l.sort() # sort to enable comparing with range output
+		# check if some id is released:
+		t = range(maxId + 1)
+		t.remove(0)
+		if l != t and l != []:
+			releasedIds = filter(lambda x : x not in l, t)
+			self.idLock.release()
+			return releasedIds[0]
+		else:
+			self.idLock.release()
+			return maxId + 1

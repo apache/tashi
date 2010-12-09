@@ -64,6 +64,7 @@ class NodeManagerService(object):
 			if (vmId not in vmList):
 				self.log.warning('vmcontrol backend does not report %d' % (vmId))
 				self.vmStateChange(vmId, None, InstanceState.Exited)
+		self.registerHost()
 		threading.Thread(target=self.backupVmInfoAndFlushNotifyCM).start()
 		threading.Thread(target=self.registerWithClusterManager).start()
 		threading.Thread(target=self.statsThread).start()
@@ -202,7 +203,8 @@ class NodeManagerService(object):
 		transportCookie = self.vmm.prepReceiveVm(instance, source.name)
 		return transportCookie
 
-	def prepSourceVm(self, instance):
+	def prepSourceVm(self, vmId):
+		instance = self.getInstance(vmId)
 		instance.state = InstanceState.MigratePrep
 	
 	def migrateVmHelper(self, instance, target, transportCookie):
@@ -291,3 +293,13 @@ class NodeManagerService(object):
 			except:
 				self.log.exception('statsThread threw an exception')
 			time.sleep(self.statsInterval)
+
+        def registerHost(self):
+                cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
+                hostname = socket.gethostname()
+		# populate some defaults
+		# XXXstroucki: I think it's better if the nodemanager fills these in properly when registering with the clustermanager
+		memory = 0
+		cores = 0
+		version = "empty"
+                cm.registerHost(hostname, memory, cores, version)

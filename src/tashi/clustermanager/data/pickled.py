@@ -32,6 +32,9 @@ class Pickled(FromConfig):
 		self.instanceIdLock = threading.Lock()
 		self.lockNames[self.instanceIdLock] = "instanceIdLock"
 		self.maxInstanceId = 1
+		self.hostLock = threading.Lock()
+		self.hostLocks = {}
+		self.idLock = threading.Lock()
 		self.load()
 	
 	def cleanInstances(self):

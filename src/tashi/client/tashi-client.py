@@ -214,6 +214,7 @@ argLists = {
 'getMyInstances': [],
 'getVmLayout': [],
 'vmmSpecificCall': [('instance', checkIid, lambda: requiredArg('instance'), True), ('arg', str, lambda: requiredArg('arg'), True)],
+'unregisterHost': [('hostId', int, lambda: requiredArg('hostId'), True)],
 }
 
 # Used to convert the dictionary built from the arguments into an object that can be used by thrift
@@ -229,6 +230,7 @@ convertArgs = {
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
 'vmmSpecificCall': '[instance, arg]',
+'unregisterHost' : '[hostId]',
 }
 
 # Descriptions
@@ -249,7 +251,8 @@ description = {
 'getInstances': 'Gets a list of all VMs in Tashi',
 'getMyInstances': 'Utility function that only lists VMs owned by the current user',
 'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
-'vmmSpecificCall': 'Direct access to VMM-specific functionality'
+'vmmSpecificCall': 'Direct access to VMM-specific functionality',
+'unregisterHost' : 'Unregisters host. Registration happens when starting node manager',
 }
 
 # Example use strings
@@ -270,7 +273,8 @@ examples = {
 'getInstances': [''],
 'getMyInstances': [''],
 'getVmLayout': [''],
-'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc']
+'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc'],
+'unregisterHost' : ['--hostId 2'],
 }
 
 show_hide = []

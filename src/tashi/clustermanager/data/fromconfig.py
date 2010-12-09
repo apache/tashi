@@ -16,6 +16,8 @@
 # under the License.    
 
 import threading
+import os
+import ConfigParser
 
 from tashi.rpycservices.rpyctypes import *
 from tashi.clustermanager.data import DataInterface
@@ -34,6 +36,11 @@ class FromConfig(DataInterface):
 		self.instanceIdLock = threading.Lock()
 		self.lockNames[self.instanceIdLock] = "instanceIdLock"
 		self.maxInstanceId = 1
+		self.hostLocks = {}
+		self.hostLock = threading.Lock()
+		self.idLock = threading.Lock()
+		if not self.config.has_section("FromConfig"):
+			return
 		for (name, value) in self.config.items("FromConfig"):
 			name = name.lower()
 			if (name.startswith("host")):
@@ -114,21 +121,28 @@ class FromConfig(DataInterface):
 			self.releaseLock(self.instanceLock)
 	
 	def acquireHost(self, hostId):
+		self.hostLock.acquire()
 		host = self.hosts.get(hostId, None)
 		if (host is None):
 			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (hostId)})
+		# hostLocks dict added when registerHost was implemented, otherwise newly added hosts don't have _lock 
+		self.hostLocks[hostId] = self.hostLocks.get(hostId, threading.Lock())
+		host._lock = self.hostLocks[host.id]
 		self.acquireLock(host._lock)
 		return host
+
 	
 	def releaseHost(self, host):
 		try:
 			if (host.id not in self.hosts): # MPR: should never be true, but good to check
-				raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (hostId)})
+				raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (host.id)})
 		finally:
+			self.save()
 			self.releaseLock(host._lock)
+			self.hostLock.release()
 	
 	def getHosts(self):
-		return self.cleanHosts()
+		return self.hosts
 	
 	def getHost(self, id):
 		host = self.hosts.get(id, None)
@@ -156,3 +170,81 @@ class FromConfig(DataInterface):
 	
 	def getUser(self, id):
 		return self.users[id]
+		
+	def registerHost(self, hostname, memory, cores, version):
+		self.hostLock.acquire()
+		for id in self.hosts.keys():
+			if self.hosts[id].name == hostname:
+				host = Host(d={'id':id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
+				self.hosts[id] = host
+				self.save()
+				self.hostLock.release()
+				return id, True
+		id = self.getNewId("hosts")
+		self.hosts[id] = Host(d={'id':id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
+		self.save()
+		self.hostLock.release()
+		return id, False
+		
+	def unregisterHost(self, hostId):
+		self.hostLock.acquire()
+		del self.hosts[hostId]
+		self.save()
+		self.hostLock.release()
+
+	def getNewId(self, table):
+		""" Generates id for a new object. For example for hosts and users.  
+		"""
+		self.idLock.acquire()
+		maxId = 0
+		l = []
+		if(table == "hosts"):
+			for id in self.hosts.keys():
+				l.append(id)
+				if id >= maxId:
+					maxId = id
+		l.sort() # sort to enable comparing with range output
+		# check if some id is released:
+		t = range(maxId + 1)
+		t.remove(0)
+		if l != t and l != []:
+			releasedIds = filter(lambda x : x not in l, t)
+			self.idLock.release()
+			return releasedIds[0]
+		else:
+			self.idLock.release()
+			return maxId + 1
+		
+	def save(self):
+		# XXXstroucki: a relative path? Where does it go
+		# and in what order does it get loaded
+		fileName = "./etc/Tashi.cfg"
+		if not os.path.exists(fileName):
+			file = open(fileName, "w")
+			file.write("[FromConfig]")
+			file.close()	
+		parser = ConfigParser.ConfigParser()
+		parser.read(fileName)
+		
+		if not parser.has_section("FromConfig"):
+			parser.add_section("FromConfig")
+		
+		hostsInFile = []
+		for (name, value) in parser.items("FromConfig"):
+			name = name.lower()
+			if (name.startswith("host")):
+				hostsInFile.append(name)
+				
+		for h in hostsInFile:
+			parser.remove_option("FromConfig", h)
+			
+		for hId in self.hosts.keys():
+			host = self.hosts[hId]
+			hostPresentation = "Host(d={'id':%s,'name':'%s','state':HostState.Normal,'memory':%s,'cores':%s,'version':'%s'})" % (hId, host.name, host.memory, host.cores, host.version)
+			parser.set("FromConfig", "host%s" % hId, hostPresentation)
+		
+		with open(fileName, 'wb') as configfile:
+			parser.write(configfile)
+		
+		
+
