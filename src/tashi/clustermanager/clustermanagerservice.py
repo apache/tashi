@@ -93,7 +93,7 @@ class ClusterManagerService(object):
 					if (self.lastContacted[k] < (now-self.expireHostTime)):
 						host = self.data.acquireHost(k)
 						try: 
-							self.log.warning('Host %s has expired after %f seconds' % (host.name, now-self.expireHostTime))
+							self.log.warning('Host %s has expired after %f seconds' % (host.name, self.expireHostTime))
 							for instanceId in [instance.id for instance in self.data.getInstances().itervalues() if instance.hostId == host.id]:
 								instance = self.data.acquireInstance(instanceId)
 								instance.decayed = True
