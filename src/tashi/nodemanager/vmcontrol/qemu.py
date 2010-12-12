@@ -334,16 +334,28 @@ class Qemu(VmControlInterface):
 			disk = instance.disks[index]
 			uri = scrubString(disk.uri)
 			imageLocal = self.dfs.getLocalHandle("images/" + uri)
+			thisDiskList = [ "file=%s" % imageLocal ]
+			thisDiskList.append("if=%s" % diskInterface")
+			thisDiskList.append("index=%d" % index")
+
+			if (diskInterface == "virtio"):
+				thisDiskList.append("boot=on")
+
 			if (disk.persistent):
 				snapshot = "off"
 				migrate = "off"
 			else:
 				snapshot = "on"
 				migrate = "on"
+
+			thisDiskList.append("snapshot=%s" % snapshot)
+
 			if (self.useMigrateArgument):
-				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,migrate=%s,media=disk " % (imageLocal, diskInterface, index, snapshot, migrate)
-			else:
-				diskString = diskString + "-drive file=%s,if=%s,index=%d,snapshot=%s,media=disk " % (imageLocal, diskInterface, index, snapshot)
+				thisDiskList.append("migrate=%s" % migrate)
+
+			diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
+
+
 		#  Nic hints
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
