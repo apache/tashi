@@ -110,8 +110,12 @@ rmdoc:
 bin/zoni-cli.py:
 	@echo Symlinking in zoni-cli...
 	(cd bin; ln -s ../src/zoni/client/zoni-cli.py .)
+usr/local/bin/zoni:
+	@echo Creating /usr/local/bin/zoni
+	(echo -e '#!/bin/bash\nPYTHONPATH=$(shell pwd)/src $(shell pwd)/bin/zoni-cli.py $$*' > /usr/local/bin/zoni; chmod 755 /usr/local/bin/zoni)
 rmzoni-cli:
 	if test -e bin/zoni-cli.py; then echo Removing zoni-cli symlink...; rm bin/zoni-cli.py; fi
+	if test -e /usr/local/bin/zoni; then echo Removing zoni...; rm /usr/local/bin/zoni; fi
 
 ## for now only print warnings having to do with bad indentation. pylint doesn't make it easy to enable only 1,2 checks
 disabled_warnings=$(shell pylint --list-msgs|grep :W0| awk -F: '{ORS=","; if ($$2 != "W0311" && $$2 != "W0312"){ print $$2}}')
