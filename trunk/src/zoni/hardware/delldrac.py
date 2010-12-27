@@ -32,6 +32,7 @@ from zoni.extra.util import timeF, log
 class dellDrac(SystemManagementInterface):
 	def __init__(self, config, nodeName, hostInfo):
 		self.config = config
+		self.nodeName = nodeName
 		self.hostname = hostInfo['location']
 		self.host = hostInfo['drac_name']
 		self.user = hostInfo['drac_userid']
@@ -191,13 +192,13 @@ class dellDrac(SystemManagementInterface):
 		fout.seek(0)
 		for val in fout.readlines():
 			if "OK" in val:
-				mesg = self.hostname + " Power Reset\n\n"
-				self.log.info(mesg)
+				self.log.info("Hardware power reset : %s", self.nodeName)
 				code = 1
-			else:
-				mesg = self.hostname + " Power Reset Fail\n\n"
-				self.log.info(mesg)
-				code = -1
+				break
+		if code == 0:
+			self.log.info("Hardware power reset fail: %s", self.nodeName)
+			code = -1
+
 		child.terminate()
 		fout.close()
 		return code

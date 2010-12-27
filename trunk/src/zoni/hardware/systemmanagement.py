@@ -67,15 +67,11 @@ class SystemManagement(SystemManagementInterface):
 			a = "inst.%s" % mycmd
 			for count in range(retries):
 				doit = eval(a)
-				if doit == -1:
-					self.log.error("%s method failed (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count)
-					continue
 				if doit  > 0:
+					self.log.info("%s method success (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
 					break
 				else:
-					self.log.error("%s method failed (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count)
-			if doit > 0:
-				break
+					self.log.error("%s method failed (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
 
 		return doit
 

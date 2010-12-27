@@ -71,18 +71,18 @@ class pcmService(object):
 
 	def powerOn(self, key, nodeName):
 		vcm = self.__key2vcm(key)
-		self.log.info("VCM_COMMAND_POWER_ON: VCM %s" % (vcm))
+		self.log.info("VCM_COMMAND_POWER_ON: VCM %s NODE %s" % (vcm, nodeName))
 		self.hardware.powerOn(nodeName)
 
 	def powerReset(self, key, nodeName):
 		vcm = self.__key2vcm(key)
-		self.log.info("VCM_COMMAND_POWER_RESET: VCM %s" % (vcm))
+		self.log.info("VCM_COMMAND_POWER_RESET: VCM %s NODE %s" % (vcm, nodeName))
 		self.hardware.powerReset(nodeName)
 		
 
 	def powerOff(self, key, nodeName):
 		vcm = self.__key2vcm(key)
-		self.log.info("VCM_COMMAND_POWER_OFF: VCM %s" % (vcm))
+		self.log.info("VCM_COMMAND_POWER_OFF: VCM %s NODE %s" % (vcm, nodeName))
 		self.hardware.powerOff(nodeName)
 
 	#def selectBootImage

@@ -89,7 +89,7 @@ def main():
 
 	#  Hardware controller
 	group = optparse.OptionGroup(parser, "Hardware control", "Options for node power control")
-	#group.add_option("--hw", dest="hardwareType", help="Make hardware call to ipmi|drac|pdu")
+	group.add_option("--hw", dest="hardwareType", help="Make hardware call to ipmi|drac|pdu")
 	group.add_option("--powerStatus", "--powerstatus", dest="POWERSTATUS", help="Get power status on node", action="store_true", default=False)
 	group.add_option("--reboot", "--reboot", dest="REBOOTNODE", help="Reboot node (Soft)", action="store_true", default=False)
 	group.add_option("--powerCycle", "--powercycle", dest="POWERCYCLE", help="Power Cycle (Hard)", action="store_true", default=False)
@@ -206,45 +206,30 @@ def main():
 	
 
 	#  Hardware control
-	#if options.hardwareType:
-	#hardware = zoni.hardware.systemmanagement.SystemManagement(configs,data)
-		#hardware.test("r1r2u29", "getPowerStatus", "test", "tes1t")
-		#hardware.getPowerStatus("r1r2u29")
-		#hardware.powerOn()
-		#hardware.powerOff("r1r2u29")
-		#hardware.runCmd("r1r2u29", "getPowerStatus", "test", "tes1t")
-		#exit()
-
-		#if (options.hardwareType) and options.hardwareType not in configs['hardware_control']:
-			#mesg = "Non support hardware type specified\n"
-			#mesg += "Supported types:\n"
-			#mesg += str(configs['hardware_control'])
-			#mesg += "\n\n"
-			#sys.stdout.write(mesg)
-			#exit()
+	if options.hardwareType and options.nodeName:
+		host = data.getHostInfo(options.nodeName)
+		if options.hardwareType == "ipmi":
+		#hardware = zoni.hardware.systemmanagement.SystemManagement(configs,data)
+			hw = Ipmi(options.nodeName, host["ipmi_user"], host["ipmi_password"])
 #
-		#if (options.hardwareType) and options.nodeName:
-			##host = data.getHostInfo(options.nodeName)
-			#if options.hardwareType == "ipmi":
-				#hw = Ipmi(options.nodeName, host["ipmi_user"], host["ipmi_password"])
+		if options.hardwareType == "pdu":
+			hw = raritanDominionPx(configs, host)
 #
-			#if options.hardwareType == "pdu":
-				#hw = raritanDominionPx(configs, host)
-#
-			#if options.hardwareType == "drac":
-				##  Check if node has drac card
-				#if "drac_name" in host:
-					#hw = dellDrac(host)
-				#else:
-					#mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
-					#sys.stdout.write(mesg)
-					#exit(1)
+		if options.hardwareType == "drac":
+			##  Check if node has drac card
+			if "drac_name" in host:
+				hw= dellDrac(configs, options.nodeName, host)
+			else:
+				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
+				sys.stdout.write(mesg)
+				exit(1)
+	else:
+		hw = zoni.hardware.systemmanagement.SystemManagement(configs,data)
 
 	if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or \
 		options.POWERON or options.POWERSTATUS or options.CONSOLE or \
 		options.POWERRESET) and options.nodeName:
 
-		hw = zoni.hardware.systemmanagement.SystemManagement(configs,data)
 		if options.verbosity:
 			hw.setVerbose(True)
 
@@ -364,11 +349,12 @@ def main():
 		#print "host is ", host
 		#drac = dellDrac("drac-r2r1c3", 1)
 		drac = dellDrac(configs, options.nodeName, host)
-		drac.getPowerStatus()
+		#drac.getPowerStatus()
 		#drac.powerOff()
 		#drac.powerOn()
 		#drac.powerCycle()
-		#drac.powerReset()
+		drac.setVerbose(options.verbosity)
+		drac.powerReset()
 		#drac.getPowerStatus()
 		#print "host is ", host
 		#pdu = raritanDominionPx(configs, options.nodeName, host)
@@ -493,7 +479,7 @@ def main():
 
 	#  Domain interface
 	if (options.showDomains):
-		idata.showDomains()
+		data.showDomains()
 	if (options.addDomain):
 		if len(args) > 2 and options.reservationId:
 			data.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
