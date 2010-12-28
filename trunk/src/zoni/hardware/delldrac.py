@@ -111,8 +111,8 @@ class dellDrac(SystemManagementInterface):
 		code = 0
 		fout = tempfile.TemporaryFile()
 		if self.powerStatus == 1:
-			mesg = self.hostname + " Power On\n\n"
-			return 0
+			self.log.info("Hardware power on : %s", self.hostname)
+			return 1
 			
 		child = self.__login()
 		child.logfile = fout
@@ -120,15 +120,15 @@ class dellDrac(SystemManagementInterface):
 		child.sendline(cmd)
 		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
+		self.log.info("Hardware power on : %s", self.hostname)
 		for val in fout.readlines():
 			if "OK" in val:
-				mesg = self.hostname + " Power On\n\n"
-				self.log.info(mesg)
 				code = 1 
-			else:
-				mesg = self.hostname + " Power On Fail\n\n"
-				self.log.info(mesg)
-				code = -1
+			if "ALREADY POWER-ON" in val:
+				code = 1 
+				self.log.info("Hardware already powered on : %s", self.hostname)
+		if code < 1:
+			self.log.info("Hardware power on failed : %s", self.hostname)
 		fout.close()
 		child.terminate()
 		return code
@@ -143,16 +143,15 @@ class dellDrac(SystemManagementInterface):
 		child.sendline(cmd)
 		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
+		self.log.info("Hardware power off : %s", self.hostname)
 		for val in fout.readlines():
 			if "OK" in val:
-				mesg = self.hostname + " Power Off\n\n"
-				self.log.info(mesg)
 				code = 1
-			else:
-				mesg = self.hostname + " Power Off Fail\n\n"
-				self.log.info(mesg)
-				code = -1
-		#i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+ 			if "CURRENTLY POWER-OFF" in val:
+				self.log.info("Hardware already power off : %s", self.hostname)
+				code = 1
+		if code < 1:
+			self.log.info("Hardware power off failed : %s", self.hostname)
 		child.terminate()
 		fout.close()
 		return code
@@ -167,15 +166,12 @@ class dellDrac(SystemManagementInterface):
 		child.sendline(cmd)
 		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
+		self.log.info("Hardware power cycle : %s", self.hostname)
 		for val in fout.readlines():
 			if "OK" in val:
-				mesg = self.hostname + " Power Cycle\n\n"
-				self.log.info(mesg)
 				code = 1
-			else:
-				mesg = self.hostname + " Power Cycle Fail\n\n"
-				self.log.info(mesg)
-				code = -1
+		if code < 1:
+			self.log.info("Hardware power cycle failed : %s", self.hostname)
 		child.terminate()
 		fout.close()
 		return code
@@ -194,10 +190,8 @@ class dellDrac(SystemManagementInterface):
 			if "OK" in val:
 				self.log.info("Hardware power reset : %s", self.nodeName)
 				code = 1
-				break
-		if code == 0:
+		if code < 1:
 			self.log.info("Hardware power reset fail: %s", self.nodeName)
-			code = -1
 
 		child.terminate()
 		fout.close()

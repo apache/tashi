@@ -210,7 +210,7 @@ def main():
 		host = data.getHostInfo(options.nodeName)
 		if options.hardwareType == "ipmi":
 		#hardware = zoni.hardware.systemmanagement.SystemManagement(configs,data)
-			hw = Ipmi(options.nodeName, host["ipmi_user"], host["ipmi_password"])
+			hw = Ipmi(configs, options.nodeName, host)
 #
 		if options.hardwareType == "pdu":
 			hw = raritanDominionPx(configs, host)
@@ -223,6 +223,36 @@ def main():
 				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
 				sys.stdout.write(mesg)
 				exit(1)
+		if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or \
+			options.POWERON or options.POWERSTATUS or options.CONSOLE or \
+			options.POWERRESET) and options.nodeName:
+
+			if options.verbosity:
+				hw.setVerbose(True)
+
+			if options.REBOOTNODE:
+				hw.powerReset()
+				exit()
+			if options.POWERCYCLE: 
+				hw.powerCycle()
+				exit()
+			if options.POWEROFF:
+				hw.powerOff()
+				exit()
+			if options.POWERON:
+				hw.powerOn()
+				exit()
+			if options.POWERRESET:
+				hw.powerReset()
+				exit()
+			if options.POWERSTATUS:
+				hw.getPowerStatus()
+				exit()
+			if options.CONSOLE:
+				hw.activateConsole()
+				exit()
+			hw.getPowerStatus()
+			exit()
 	else:
 		hw = zoni.hardware.systemmanagement.SystemManagement(configs,data)
 

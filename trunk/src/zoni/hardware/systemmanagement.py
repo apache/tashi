@@ -62,6 +62,7 @@ class SystemManagement(SystemManagementInterface):
 		#  [0] = hw method
 		#  [1] = hw method userid
 		#  [2] = hw method password
+		success = 0
 		for i in hw:
 			inst = instantiateImplementation(self.config['hardwareControl'][i[0]]['class'], self.config, nodeName, self.host)
 			a = "inst.%s" % mycmd
@@ -69,9 +70,12 @@ class SystemManagement(SystemManagementInterface):
 				doit = eval(a)
 				if doit  > 0:
 					self.log.info("%s method success (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
+					success = 1
 					break
 				else:
 					self.log.error("%s method failed (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
+			if success:
+				break
 
 		return doit
 
