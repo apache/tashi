@@ -107,6 +107,7 @@ class ClusterManagerService(object):
 					else:
 						sleepFor = min(self.lastContacted[k] + self.expireHostTime - now, sleepFor)
 				for hostId in self.decayedHosts.keys():
+					# XXXstroucki: what if the host undecays here?
 					if (self.decayedHosts[hostId] < (now-self.allowDecayed)):
 						host = self.data.getHost(hostId)
 						self.log.warning('Fetching state from host %s because it is decayed' % (host.name))
@@ -132,6 +133,7 @@ class ClusterManagerService(object):
 							self.log.warning('Fetching state on instance %d because it is decayed' % (instanceId))
 							try:
 								instance = self.data.getInstance(instanceId)
+								if instance.hostId is None: raise AssertionError
 							except TashiException, e:
 								if (e.errno == Errors.NoSuchInstanceId):
 									del self.decayedInstances[instanceId]
@@ -147,10 +149,14 @@ class ClusterManagerService(object):
 							self.decayedInstances[instanceId] = now
 						else:
 							sleepFor = min(self.decayedInstances[instanceId] + self.allowDecayed - now, sleepFor)
+					except (KeyError, TashiException):
+						self.log.warning("Don't know about instance %d anymore." % instanceId)
+						self.data.removeInstance(instance)
 					except Exception, e:
 						self.log.exception('Exception in monitorHosts trying to get instance information')
 			except Exception, e:
 				self.log.exception('Exception in monitorHosts')
+
 			time.sleep(sleepFor)
 	
 	def normalize(self, instance):
@@ -210,12 +216,19 @@ class ClusterManagerService(object):
 		else:
 			self.stateTransition(instance, None, InstanceState.Destroying)
 			self.data.releaseInstance(instance)
-			hostname = self.data.getHost(instance.hostId).name
-			try:
-				self.proxy[hostname].destroyVm(instance.vmId)
-			except Exception:
-				self.log.exception('destroyVm failed for host %s vmId %d' % (hostname, instance.vmId))
-				raise
+
+			if instance.hostId is None:
+				self.data.removeInstance(instance)
+			else:
+				hostname = self.data.getHost(instance.hostId).name
+				try:
+					if hostname is not None:
+						self.proxy[hostname].destroyVm(instance.vmId)
+				except Exception:
+					self.log.exception('destroyVm failed on host %s vmId %d' % (hostname, instance.vmId))
+					self.data.removeInstance(instance)
+
+
 		return
 	
 	def suspendVm(self, instanceId):
@@ -355,7 +368,7 @@ class ClusterManagerService(object):
 				oldHost.up = True
 				oldHost.decayed = False
 
-# compare whether CM / NM versions are acceptable
+# compare whether CM / NM versions are compatible
 				if (host.version != version and not self.allowMismatchedVersions):
 					oldHost.state = HostState.VersionMismatch
 				if (host.version == version and oldHost.state == HostState.VersionMismatch):
@@ -397,6 +410,7 @@ class ClusterManagerService(object):
 		finally:
 			self.updateDecay(self.decayedHosts, oldHost)
 			self.data.releaseHost(oldHost)
+
 		return host.id
 	
 	def vmUpdate(self, instanceId, instance, oldState):

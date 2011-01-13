@@ -64,6 +64,8 @@ def checkIid(instance):
 		raise ValueError("Unknown instance %s" % (str(instance)))
 	for instance in instances:
 		if (instance.id == instanceId):
+			# XXXstroucki uid 0 to have superuser access
+			# how about admin groups?
 			if (instance.userId != userId and instance.userId != None and userId != 0):
 				raise ValueError("You don't own that VM")
 	return instanceId
@@ -526,7 +528,10 @@ def main():
 		exitCode = e.errno
 	except Exception, e:
 		print e
-		usage(function)
+		# XXXstroucki: exception may be unrelated to usage of function
+		# so don't print usage on exception as if there were a problem
+		# with the arguments
+		#usage(function)
 	sys.exit(exitCode)
 
 if __name__ == "__main__":

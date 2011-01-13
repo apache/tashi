@@ -28,20 +28,22 @@ class SQL(DataInterface):
 		DataInterface.__init__(self, config)
 		self.uri = self.config.get("SQL", "uri")
 		self.log = logging.getLogger(__name__)
+
 		if (self.uri.startswith("sqlite://")):
 			import sqlite
-			self.dbengine = "sqlite"
+			self.dbEngine = "sqlite"
 			self.conn = sqlite.connect(self.uri[9:], autocommit=1)
 		elif (self.uri.startswith("mysql://")):
 			import MySQLdb
-			self.dbengine = "mysql"
+			self.dbEngine = "mysql"
 			uri = self.uri[8:]
 			(user, _, hostdb) = stringPartition(uri, '@')
 			(host, _, db) = stringPartition(hostdb, '/')
 			self.password = self.config.get('SQL', 'password')
 			self.conn = MySQLdb.connect(host=host, user=user, passwd=self.password, db=db)
 		else:
-			raise ValueException, 'Unknown SQL uri: %s' % (self.uri)
+			raise ValueException, 'Unknown SQL database engine by URI: %s' % (self.uri)
+
 		self.instanceOrder = ['id', 'vmId', 'hostId', 'decayed', 'state', 'userId', 'name', 'cores', 'memory', 'disks', 'nics', 'hints']
 		self.hostOrder = ['id', 'name', 'up', 'decayed', 'state', 'memory', 'cores', 'version']
 		self.instanceLock = threading.Lock()
@@ -115,9 +117,9 @@ class SQL(DataInterface):
 		h = Host()
 		for e in range(0, len(self.hostOrder)):
 			h.__dict__[self.hostOrder[e]] = l[e]
-		h.state = int(h.state)
 		h.up = boolean(h.up)
 		h.decayed = boolean(h.decayed)
+		h.state = int(h.state)
 		return h
 	
 	def registerInstance(self, instance):
@@ -205,8 +207,13 @@ class SQL(DataInterface):
 			hosts[host.id] = host
 		return hosts
 	
-	def getHost(self, id):
-		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % (int(id)))
+	def getHost(self, in_id):
+		try:
+			id = int(in_id)
+		except:
+			self.log.exception("Argument to getHost was not integer: %s" % in_id)
+
+		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % id)
 		r = cur.fetchone()
 		if (r == None):
 			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (id)})
@@ -222,8 +229,15 @@ class SQL(DataInterface):
 			instances[instance.id] = instance
 		return instances
 	
-	def getInstance(self, id):
+	def getInstance(self, in_id):
+		try:
+			id = int(in_id)
+		except:
+			self.log.exception("Argument to getInstance was not integer: %s" % in_id)
+
 		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (id))
+		# XXXstroucki should only return one row.
+		# what about migration? should it be enforced?
 		r = cur.fetchone()
 		if (not r):
 			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (id)})
