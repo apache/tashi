@@ -106,6 +106,7 @@ class raritanDominionPx(SystemManagementInterface):
 		cmdgen.CommunityData('my-agent', self.user, 0), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
 		output = varBinds[0][1]
+		print output, varBinds
 		
 		if output == 1:
 			self.powerStatus = 1
@@ -113,8 +114,8 @@ class raritanDominionPx(SystemManagementInterface):
 		if output == 0:
 			self.powerStatus = 0
 			powerstat = "off"
-
-		self.log.info("%s setPowerStatus %s" % (self.nodeName, self.powerStatus))
+		print "pwerstat", powerstat 
+		self.log.info("hardware setPowerStatus %s : %s" % (powerstat, self.nodeName))
 
 		if output:
 			return 1

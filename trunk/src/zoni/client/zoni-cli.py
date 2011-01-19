@@ -94,6 +94,7 @@ def main():
 	group.add_option("--reboot", "--reboot", dest="REBOOTNODE", help="Reboot node (Soft)", action="store_true", default=False)
 	group.add_option("--powerCycle", "--powercycle", dest="POWERCYCLE", help="Power Cycle (Hard)", action="store_true", default=False)
 	group.add_option("--powerOff", "--poweroff", dest="POWEROFF", help="Power off node", action="store_true", default=False)
+	group.add_option("--powerOffSoft", "--poweroffsoft", dest="POWEROFFSOFT", help="Power off node (soft)", action="store_true", default=False)
 	group.add_option("--powerOn", "--poweron", dest="POWERON", help="Power on node", action="store_true", default=False)
 	group.add_option("--powerReset", "--powerreset", dest="POWERRESET", help="Power reset node", action="store_true", default=False)
 	group.add_option("--console", dest="CONSOLE", help="Console mode", action="store_true", default=False)
@@ -213,7 +214,7 @@ def main():
 			hw = Ipmi(configs, options.nodeName, host)
 #
 		if options.hardwareType == "pdu":
-			hw = raritanDominionPx(configs, host)
+			hw = raritanDominionPx(configs, options.nodeName, host)
 #
 		if options.hardwareType == "drac":
 			##  Check if node has drac card
@@ -223,7 +224,7 @@ def main():
 				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
 				sys.stdout.write(mesg)
 				exit(1)
-		if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or \
+		if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or options.POWEROFFSOFT or \
 			options.POWERON or options.POWERSTATUS or options.CONSOLE or \
 			options.POWERRESET) and options.nodeName:
 
@@ -238,6 +239,9 @@ def main():
 				exit()
 			if options.POWEROFF:
 				hw.powerOff()
+				exit()
+			if options.POWEROFFSOFT:
+				hw.powerOffSoft()
 				exit()
 			if options.POWERON:
 				hw.powerOn()
@@ -256,7 +260,7 @@ def main():
 	else:
 		hw = zoni.hardware.systemmanagement.SystemManagement(configs,data)
 
-	if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or \
+	if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or options.POWEROFFSOFT or \
 		options.POWERON or options.POWERSTATUS or options.CONSOLE or \
 		options.POWERRESET) and options.nodeName:
 
@@ -268,6 +272,9 @@ def main():
 			exit()
 		if options.POWERCYCLE: 
 			hw.powerCycle(options.nodeName)
+			exit()
+		if options.POWEROFFSOFT:
+			hw.powerOffSoft(options.nodeName)
 			exit()
 		if options.POWEROFF:
 			hw.powerOff(options.nodeName)

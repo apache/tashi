@@ -87,7 +87,7 @@ class Ipmi(SystemManagementInterface):
 		return self.powerStatus
 
 	def getPowerStatus(self):
-		self.log.info("Getpowerstatus :%s" % self.nodeName)
+		#self.log.info("getPowerStatus :%s" % self.nodeName)
 		return self.isPowered()
 	
 
@@ -99,6 +99,11 @@ class Ipmi(SystemManagementInterface):
 	def powerOff(self):
 		self.log.info("Hardware power off : %s", self.nodeName)
 		cmd = self.ipmicmd + "chassis power off"
+		return self.__executeCmd(cmd)
+
+	def powerOffSoft(self):
+		self.log.info("Hardware power off (soft): %s", self.nodeName)
+		cmd = self.ipmicmd + "chassis power soft"
 		return self.__executeCmd(cmd)
 
 	def powerCycle(self):

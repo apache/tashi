@@ -22,6 +22,7 @@
 import sys
 import os 
 import logging
+import threading
 
 from systemmanagementinterface import SystemManagementInterface
 from zoni.data.resourcequerysql import *
@@ -54,7 +55,7 @@ class SystemManagement(SystemManagementInterface):
 	
 	def __iterateHardware(self, nodeName, cmd, *args):
 		retries = 2
-		print "cmd ", cmd, "args", args
+
 		mycmd = "%s()" % (cmd)
 		self.host = self.__getHostInfo(nodeName)
 		hw = self.data.getHardwareCapabilities(nodeName)
@@ -71,6 +72,12 @@ class SystemManagement(SystemManagementInterface):
 				if doit  > 0:
 					self.log.info("%s method success (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
 					success = 1
+					#  IF we use soft poweroff, start a thread to poweroff after 60 seconds to 
+					#  guarantee.  If the node doesn't have acpi installed, powerOffSoft doesn't do 
+					#  anything
+					if "powerOffSoft" in mycmd:
+						threading.Thread(args=(i[0], nodeName), target=self.softPowerConfirm).start()
+
 					break
 				else:
 					self.log.error("%s method failed (%s) on %s (attempt %s)", i[0], mycmd, nodeName, count + 1)
@@ -78,6 +85,21 @@ class SystemManagement(SystemManagementInterface):
 				break
 
 		return doit
+
+	def softPowerConfirm(self, method, nodeName):
+		#  using a sleep for now...
+		time.sleep(30)
+		inst = instantiateImplementation(self.config['hardwareControl'][method]['class'], self.config, nodeName, self.host)
+		mycmd = "%s()" % ("powerOff")
+		a = "inst.%s" % mycmd
+		doit = eval(a)
+		if doit  > 0:
+			self.log.info("%s method success after soft power off(%s))", method[0], mycmd, nodeName)
+		else:
+			self.log.error("%s method failed after soft power off(%s))", method[0], mycmd, nodeName)
+		exit()
+
+		
 
 	def runCmd(self, nodeName, cmd, *args):
 		self.__iterateHardware(nodeName, cmd, args)
@@ -87,6 +109,9 @@ class SystemManagement(SystemManagementInterface):
 
 	def powerOff(self, nodeName):
 		self.__iterateHardware(nodeName, "powerOff")
+
+	def powerOffSoft(self, nodeName):
+		self.__iterateHardware(nodeName, "powerOffSoft")
 
 	def powerCycle(self, nodeName):
 		self.__iterateHardware(nodeName, "powerCycle")

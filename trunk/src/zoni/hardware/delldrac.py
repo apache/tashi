@@ -157,6 +157,30 @@ class dellDrac(SystemManagementInterface):
 		return code
 
 	@timeF
+	def powerOffSoft(self):
+		code = 0
+		fout = tempfile.TemporaryFile()
+		child = self.__login()
+		child.logfile = fout
+		cmd = "racadm serveraction -m " + self.server + " graceshutdown"
+		child.sendline(cmd)
+		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		fout.seek(0)
+		self.log.info("Hardware power off (soft): %s", self.hostname)
+
+		for val in fout.readlines():
+			if "OK" in val:
+				code = 1
+ 			if "CURRENTLY POWER-OFF" in val:
+				self.log.info("Hardware already power off : %s", self.hostname)
+				code = 1
+		if code < 1:
+			self.log.info("Hardware power off failed : %s", self.hostname)
+		child.terminate()
+		fout.close()
+		return code
+
+	@timeF
 	def powerCycle(self):
 		code = 0
 		fout = tempfile.TemporaryFile()

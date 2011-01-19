@@ -46,6 +46,10 @@ class SystemManagementInterface(object):
 		'''  Powers off a system '''
 		raise NotImplementedError
 
+	def powerOffSoft(self):
+		'''  Powers off a system via acpi'''
+		raise NotImplementedError
+
 	def powerCycle(self):
 		'''  Powers cycles a system '''
 		raise NotImplementedError
