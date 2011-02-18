@@ -335,8 +335,8 @@ class Qemu(VmControlInterface):
 			uri = scrubString(disk.uri)
 			imageLocal = self.dfs.getLocalHandle("images/" + uri)
 			thisDiskList = [ "file=%s" % imageLocal ]
-			thisDiskList.append("if=%s" % diskInterface")
-			thisDiskList.append("index=%d" % index")
+			thisDiskList.append("if=%s" % diskInterface)
+			thisDiskList.append("index=%d" % index)
 
 			if (diskInterface == "virtio"):
 				thisDiskList.append("boot=on")
