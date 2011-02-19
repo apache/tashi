@@ -302,4 +302,4 @@ class NodeManagerService(object):
 		memory = 0
 		cores = 0
 		version = "empty"
-                cm.registerHost(hostname, memory, cores, version)
+                #cm.registerHost(hostname, memory, cores, version)
