@@ -27,6 +27,9 @@ import subprocess
 import sys
 import time
 
+# for scratch space support
+from os import system
+
 from tashi.rpycservices.rpyctypes import *
 from tashi.util import broken, logged, scrubString, boolean
 from tashi import version, stringPartition
@@ -102,6 +105,8 @@ class Qemu(VmControlInterface):
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
+		self.scratchDir = self.config.get("Qemu", "scratchDir")
+
 		try:
 			os.mkdir(self.INFO_DIR)
 		except:
@@ -338,7 +343,7 @@ class Qemu(VmControlInterface):
 			thisDiskList.append("if=%s" % diskInterface)
 			thisDiskList.append("index=%d" % index)
 
-			if (diskInterface == "virtio"):
+			if (index == 0 and diskInterface == "virtio"):
 				thisDiskList.append("boot=on")
 
 			if (disk.persistent):
@@ -348,6 +353,8 @@ class Qemu(VmControlInterface):
 				snapshot = "on"
 				migrate = "on"
 
+			thisDiskList.append("cache=off")
+
 			thisDiskList.append("snapshot=%s" % snapshot)
 
 			if (self.useMigrateArgument):
@@ -355,7 +362,50 @@ class Qemu(VmControlInterface):
 
 			diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
 
+		# scratch disk (should be probable handled elsewhere)
+		scratchSize = instance.hints.get("scratchSpace", "0")
+		scratchSize = int(scratchSize)
 
+		try:
+			if scratchSize > 0:
+				print 'creating scratch file'
+				# create scratch disk
+				# XXXstroucki: needs to be cleaned somewhere
+				scratch_file = os.path.join(self.scratchDir, instance.name + ".scratch")
+				print 'scratch file name is ', scratch_file
+				tempfd = open(scratch_file, "w")
+				print 'opened'
+				tempfd.seek( (scratchSize * 2 ** 30) - 1 )
+				print 'seeked'
+				tempfd.write('x')
+				print 'written'
+				tempfd.close()
+				print 'closed'
+				index += 1
+
+				thisDiskList = [ "file=%s" % scratch_file ]
+				thisDiskList.append("if=%s" % diskInterface)
+				thisDiskList.append("index=%d" % index)
+				thisDiskList.append("cache=off")
+				
+				if (True or disk.persistent):
+					snapshot = "off"
+					migrate = "off"
+				else:
+					snapshot = "on"
+					migrate = "on"
+
+				thisDiskList.append("snapshot=%s" % snapshot)
+
+				if (self.useMigrateArgument):
+					thisDiskList.append("migrate=%s" % migrate)
+
+				diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
+
+		except:
+			print 'caught exception'
+			raise 'exception'
+	
 		#  Nic hints
 		nicModel = instance.hints.get("nicModel", "e1000")
 		nicString = ""
@@ -402,6 +452,13 @@ class Qemu(VmControlInterface):
 		self.saveChildInfo(child)
 		self.controlledVMs[child.pid] = child
 		log.info("Adding vmId %d" % (child.pid))
+
+		# clean up scratch file
+		if scratchSize > 0:
+			scratch_file = os.path.join(self.scratchDir, instance.name + ".scratch")
+			time.sleep(5)
+			os.unlink(scratch_file)
+
 		return (child.pid, cmd)
 
 	def getPtyInfo(self, child, issueContinue):
