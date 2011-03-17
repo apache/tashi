@@ -1,0 +1,16 @@
+Current goals:
+   * integrate bug fixes from Tashi sites into SVN.
+   * Tashi is working well for us developers, so we should fork
+     a stable version as beta release. Xen startup was problematic
+     as of September, so advise on caveats there. Probably not include
+     Zoni for now.
+
+Future goals:
+   * How should Tashi accounting be done? Database entries or
+     flat files?
+   * Support host auto-registration, but only by affirmative option.
+   * Consider using libraries like libcloud to abstract VMM interactions.
+   * Add more hardware support for Zoni.
+
+Other ideas:
+   * Make available a console aggregator for user's VMs.

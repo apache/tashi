@@ -338,7 +338,7 @@ class Qemu(VmControlInterface):
 			thisDiskList.append("if=%s" % diskInterface)
 			thisDiskList.append("index=%d" % index)
 
-			if (diskInterface == "virtio"):
+			if (index == 0 and diskInterface == "virtio"):
 				thisDiskList.append("boot=on")
 
 			if (disk.persistent):
