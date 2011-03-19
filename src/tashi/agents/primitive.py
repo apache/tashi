@@ -53,7 +53,8 @@ class Primitive(object):
 		muffle = {}
 		while True:
 			try:
-				# Generate a list of VMs/host
+				# Generate a list of hosts and
+				# current loading of VMs per host
 				hosts = {}
 				load = {}
 				for h in self.client.getHosts():
@@ -67,13 +68,19 @@ class Primitive(object):
 				for i in instances.itervalues():
 					if (i.hostId or i.state == InstanceState.Pending):
 						load[i.hostId] = load[i.hostId] + [i.id]
-				# Check for VMs that have exited
+
+				# Check for VMs that have exited and call
+				# postDestroy hook
 				for i in oldInstances:
 					if (i not in instances and oldInstances[i].state != InstanceState.Pending):
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
+
 				# Schedule new VMs
+
 				oldInstances = instances
+
+
 				if (len(load.get(None, [])) > 0):
 					load[None].sort()
 					for i in load[None]:
@@ -106,8 +113,16 @@ class Primitive(object):
 												minMaxHost = h
 
 
+							# If we don't have a host yet, find one here
+							# XXXstroucki: this finds the first machine it thinks is suitable
+							# for hosting a VM. However, if there is a problem with the
+							# host, it will always try to schedule there, which means
+							# that nothing new will get scheduled there until the
+							# problem is fixed. This scheduler should not be so primitive
+							# as to do this.
 							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
+									# if the machine is suitable to host a vm...
 									if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
 										if (minMax is None or (self.densePack and len(load[h.id]) > minMax) or (not self.densePack and len(load[h.id]) < minMax)):
 											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
@@ -116,21 +131,28 @@ class Primitive(object):
 												minMax = len(load[h.id])
 												minMaxHost = h
 							if (minMaxHost):
+								# found a host
 								if (not inst.hints.get("__resume_source", None)):
 									for hook in self.hooks:
 										hook.preCreate(inst)
 								self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
 								self.client.activateVm(i, minMaxHost)
 								load[minMaxHost.id] = load[minMaxHost.id] + [i]
-								muffle.clear()
+								# get rid of its possible entry in muffle if VM is scheduled to a host
+								if (inst.name in muffle):
+									muffle.pop(inst.name)
 							else:
+								# did not find a host
 								if (inst.name not in muffle):
 									self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
 									muffle[inst.name] = True
 						except Exception, e:
+							# XXXstroucki: how can we get here?
 							if (inst.name not in muffle):
 								self.log.exception("Failed to schedule or activate %s" % (inst.name))
 								muffle[inst.name] = True
+
+
 				time.sleep(self.scheduleDelay)
 			except TashiException, e:
 				self.log.exception("Tashi exception")
