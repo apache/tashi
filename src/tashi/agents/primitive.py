@@ -66,22 +66,27 @@ class Primitive(object):
 				for i in _instances:
 					instances[i.id] = i
 				for i in instances.itervalues():
+					# XXXstroucki: do we need to look at Held machines here?
 					if (i.hostId or i.state == InstanceState.Pending):
+						# Nonrunning VMs will have hostId of None
 						load[i.hostId] = load[i.hostId] + [i.id]
 
 				# Check for VMs that have exited and call
 				# postDestroy hook
 				for i in oldInstances:
+					# XXXstroucki: do we need to look at Held machines here?
 					if (i not in instances and oldInstances[i].state != InstanceState.Pending):
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
 
-				# Schedule new VMs
 
 				oldInstances = instances
 
 
 				if (len(load.get(None, [])) > 0):
+					# Schedule VMs if they are waiting
+
+					# sort by id number (FIFO?)
 					load[None].sort()
 					for i in load[None]:
 						inst = instances[i]
@@ -93,24 +98,27 @@ class Primitive(object):
 								allowElsewhere = boolean(inst.hints.get("allowElsewhere", "False"))
 							except Exception, e:
 								allowElsewhere = False
+							# has a host preference been expressed?
 							if (targetHost != None):
 								for h in hosts.values():
-									if ((str(h.id) == targetHost or h.name == targetHost)):
-										#  make sure that host is up, in a normal state and is not reserved
-										if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
-											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
-											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
-											if (memUsage <= h.memory and coreUsage <= h.cores):
-												minMax = len(load[h.id])
-												minMaxHost = h
-								
-										#  If a host machine is reserved, only allow if userid is in reserved list
-										if ((len(h.reserved) > 0) and inst.userId in h.reserved):
-											memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
-											coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
-											if (memUsage <= h.memory and coreUsage <= h.cores):
-												minMax = len(load[h.id])
-												minMaxHost = h
+									# if this is not the host we are looking for, continue
+									if ((str(h.id) != targetHost and h.name != targetHost)):
+										continue
+									# we found the targetHost
+									#  If a host machine is reserved, only allow if userid is in reserved list
+									if ((len(h.reserved) > 0) and inst.userId not in h.reserved):
+										# Machine is reserved and not available for userId.
+										# XXXstroucki: Should we log something here for analysis?
+										break
+									# make sure that host is up, and in a normal state
+									if (h.up == True and h.state == HostState.Normal):
+										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
+										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
+										if (memUsage <= h.memory and coreUsage <= h.cores):
+											minMax = len(load[h.id])
+											minMaxHost = h
+
+							# end targethost != none
 
 
 							# If we don't have a host yet, find one here
@@ -123,33 +131,43 @@ class Primitive(object):
 							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
 									# if the machine is suitable to host a vm, lets look at it
+									# XXXstroucki: should we let users use their reserved machines here?
 									if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
 										pass
 									else:
 										# otherwise find another machine
 										continue
+									# implement dense packing policy:
+									# consider this host if
+									# minMax has not been modified  or
+									# the number of vms here is greater than minmax if we're dense packing or
+									# the number of vms here is less than minmax if we're not dense packing
 									if (minMax is None or (self.densePack and len(load[h.id]) > minMax) or (not self.densePack and len(load[h.id]) < minMax)):
 										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
 										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
 										if (memUsage <= h.memory and coreUsage <= h.cores):
 											minMax = len(load[h.id])
 											minMaxHost = h
-											if (minMaxHost):
-												# found a host
-												if (not inst.hints.get("__resume_source", None)):
-													for hook in self.hooks:
-														hook.preCreate(inst)
-														self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
-														self.client.activateVm(i, minMaxHost)
-														load[minMaxHost.id] = load[minMaxHost.id] + [i]
-				# get rid of its possible entry in muffle if VM is scheduled to a host
-														if (inst.name in muffle):
-															muffle.pop(inst.name)
-														else:
-															# did not find a host
-															if (inst.name not in muffle):
-																self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
-																muffle[inst.name] = True
+
+							if (minMaxHost):
+								# found a host
+								if (not inst.hints.get("__resume_source", None)):
+									# only run preCreate hooks if newly starting
+									for hook in self.hooks:
+										hook.preCreate(inst)
+								self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
+								self.client.activateVm(i, minMaxHost)
+								load[minMaxHost.id] = load[minMaxHost.id] + [i]
+								# get rid of its possible entry in muffle if VM is scheduled to a host
+								if (inst.name in muffle):
+									muffle.pop(inst.name)
+							else:
+								# did not find a host
+								if (inst.name not in muffle):
+									self.log.info("Failed to find a suitable place to schedule %s" % (inst.name))
+									muffle[inst.name] = True
+
+									
 						except Exception, e:
 							# XXXstroucki: how can we get here?
 							if (inst.name not in muffle):
@@ -158,15 +176,15 @@ class Primitive(object):
 				
 
 
-				time.sleep(self.scheduleDelay)
-
-
 			except TashiException, e:
 				self.log.exception("Tashi exception")
-				time.sleep(self.scheduleDelay)
+
 			except Exception, e:
 				self.log.exception("General exception")
-				time.sleep(self.scheduleDelay)
+
+
+			# wait to do the next iteration
+			time.sleep(self.scheduleDelay)
 
 def main():
 	(config, configFiles) = getConfig(["Agent"])
