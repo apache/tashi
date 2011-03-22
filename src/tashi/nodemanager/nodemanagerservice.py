@@ -89,7 +89,6 @@ class NodeManagerService(object):
 			self.log.exception('Failed to save VM info to %s' % (self.infoFile))
 	
 	def vmStateChange(self, vmId, old, cur):
-		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		instance = self.getInstance(vmId)
 		if (old and instance.state != old):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
@@ -99,6 +98,7 @@ class NodeManagerService(object):
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
 		try:
+			cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 			cm.vmUpdate(instance.id, newInst, old)
 		except Exception, e:
 			self.log.exception('RPC failed for vmUpdate on CM')
