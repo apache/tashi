@@ -106,6 +106,8 @@ class Qemu(VmControlInterface):
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
 		self.scratchDir = self.config.get("Qemu", "scratchDir")
+		if len(self.scratchDir) == 0:
+			self.scratchDir = "/tmp"
 
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -320,7 +322,6 @@ class Qemu(VmControlInterface):
 	def startVm(self, instance, source):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
 
-		
 		#  Capture startVm Hints
 		#  CPU hints
 		cpuModel = instance.hints.get("cpumodel")
@@ -362,7 +363,7 @@ class Qemu(VmControlInterface):
 
 			diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
 
-		# scratch disk (should be probable handled elsewhere)
+		# scratch disk (should be integrated better)
 		scratchSize = instance.hints.get("scratchSpace", "0")
 		scratchSize = int(scratchSize)
 
@@ -443,6 +444,8 @@ class Qemu(VmControlInterface):
 					os.close(i)
 				except:
 					pass
+			# XXXstroucki unfortunately no kvm option yet
+			os.environ['TMPDIR'] = self.scratchDir
 			os.execl(self.QEMU_BIN, *cmd)
 			sys.exit(-1)
 		os.close(pipe_w)
