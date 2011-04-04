@@ -131,12 +131,17 @@ class Primitive(object):
 							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
 									# if the machine is suitable to host a vm, lets look at it
-									# XXXstroucki: should we let users use their reserved machines here?
-									if (h.up == True and h.state == HostState.Normal and len(h.reserved) == 0):
+									if (h.up == True and h.state == HostState.Normal):
 										pass
 									else:
 										# otherwise find another machine
 										continue
+
+									# if it's reserved, see if we can use it
+									if ((len(h.reserved) > 0) and inst.userId not in h.reserved):
+										# reserved for somebody else, so find another machine
+										continue
+
 									# implement dense packing policy:
 									# consider this host if
 									# minMax has not been modified  or
