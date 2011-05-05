@@ -23,6 +23,7 @@ import socket
 import sys
 import threading
 import time
+import random
 import logging.config
 
 from tashi.rpycservices.rpyctypes import *
@@ -57,9 +58,15 @@ class Primitive(object):
 				# current loading of VMs per host
 				hosts = {}
 				load = {}
+				ctr = 0
 				for h in self.client.getHosts():
-					hosts[h.id] = h
+					hosts[ctr] = h
+					ctr = ctr + 1
 					load[h.id] = []
+
+				# shuffle host list to not continuously schedule on a failed or unsuitable machine
+				random.shuffle(hosts)
+				
 				load[None] = []
 				_instances = self.client.getInstances()
 				instances = {}
@@ -112,6 +119,7 @@ class Primitive(object):
 										break
 									# make sure that host is up, and in a normal state
 									if (h.up == True and h.state == HostState.Normal):
+										# ensure host can carry new load
 										memUsage = reduce(lambda x, y: x + instances[y].memory, load[h.id], inst.memory)
 										coreUsage = reduce(lambda x, y: x + instances[y].cores, load[h.id], inst.cores)
 										if (memUsage <= h.memory and coreUsage <= h.cores):
@@ -122,12 +130,6 @@ class Primitive(object):
 
 
 							# If we don't have a host yet, find one here
-							# XXXstroucki: this finds the first machine it thinks is suitable
-							# for hosting a VM. However, if there is a problem with the
-							# host, it will always try to schedule there, which means
-							# that nothing new will get scheduled there until the
-							# problem is fixed. This scheduler should not be so primitive
-							# as to do this.
 							if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 								for h in hosts.values():
 									# if the machine is suitable to host a vm, lets look at it
