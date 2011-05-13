@@ -168,7 +168,6 @@ class NodeManagerService(object):
 			try:
 				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
-				cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 				self.id = cm.registerNodeManager(host, instances)
 			except Exception, e:
 				self.log.exception('Failed to register with the CM')
