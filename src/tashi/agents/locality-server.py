@@ -1,4 +1,25 @@
-#! /usr/bin/env python
+#!/usr/bin/python
+
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+# 
+#   http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License. 
+
+# this module provides a service to locate servers that are close
+# to a VM. Uses all-pairs shortest path algorithm. Need to provide
+# a topology for the underlying physical infrastructure.
 
 from socket import gethostname
 import os
@@ -34,6 +55,8 @@ def cannonicalName(hn):
        except:
                return hn
 
+# define matrix multiplication that can be used to calculate a min-plus
+# distance product
 def genMul(A, B, add, mult):
        '''generalized matrix multiplication'''
        C = zeros((shape(A)[0], shape(B)[1]))
@@ -194,6 +217,12 @@ class LocalityService:
 
 
 def main():
+
+       #XXXstroucki This code has not been updated for several years.
+       # It may still be useful as an example.
+       import sys
+       sys.exit(0);
+
        ls = LocalityService()
 
 if __name__ == "__main__":
