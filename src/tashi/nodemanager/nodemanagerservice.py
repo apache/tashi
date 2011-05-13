@@ -108,8 +108,20 @@ class NodeManagerService(object):
 		return True
 	
 	def backupVmInfoAndFlushNotifyCM(self):
-		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
+		cm = None
+		cmUseCount = 0
 		while True:
+			if cmUseCount > 10 or cm is None:
+				try:
+					# XXXstroucki hope rpyc handles destruction
+					cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
+					cmUseCount = 0
+				except Exception, e:
+					self.log.warning("Could not get a handle to the clustermanager")
+					time.sleep(60)
+					continue
+
+			cmUseCount = cmUseCount + 1
 			start = time.time()
 			try:
 				self.saveVmInfo()
@@ -140,12 +152,23 @@ class NodeManagerService(object):
 				time.sleep(toSleep)
 	
 	def registerWithClusterManager(self):
-		cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
+		cm = None
+		cmUseCount = 0
 		while True:
+			if cmUseCount > 10 or cm is None:
+				try:
+					cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
+					cmUseCount = 0
+				except Exception, e:
+					self.log.warning("Could not get a handle to the clustermanager")
+					time.sleep(60)
+					continue
+			cmUseCount = cmUseCount + 1
 			start = time.time()
 			try:
 				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
+				cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 				self.id = cm.registerNodeManager(host, instances)
 			except Exception, e:
 				self.log.exception('Failed to register with the CM')
