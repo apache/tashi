@@ -121,6 +121,10 @@ class Qemu(VmControlInterface):
 	class anonClass:
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
+
+	def __cleanScratchSpace(self, file):
+		time.sleep(5)
+		os.unlink(file)
 	
 	def getSystemPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
@@ -366,6 +370,7 @@ class Qemu(VmControlInterface):
 		# scratch disk (should be integrated better)
 		scratchSize = instance.hints.get("scratchSpace", "0")
 		scratchSize = int(scratchSize)
+		scratch_file = None
 
 		try:
 			if scratchSize > 0:
@@ -375,13 +380,9 @@ class Qemu(VmControlInterface):
 				scratch_file = os.path.join(self.scratchDir, instance.name + ".scratch")
 				print 'scratch file name is ', scratch_file
 				tempfd = open(scratch_file, "w")
-				print 'opened'
 				tempfd.seek( (scratchSize * 2 ** 30) - 1 )
-				print 'seeked'
 				tempfd.write('x')
-				print 'written'
 				tempfd.close()
-				print 'closed'
 				index += 1
 
 				thisDiskList = [ "file=%s" % scratch_file ]
@@ -457,10 +458,10 @@ class Qemu(VmControlInterface):
 		log.info("Adding vmId %d" % (child.pid))
 
 		# clean up scratch file
-		if scratchSize > 0:
-			scratch_file = os.path.join(self.scratchDir, instance.name + ".scratch")
-			time.sleep(5)
-			os.unlink(scratch_file)
+		if scratchSize > 0 and scratch_file is not None:
+			# do this in the background
+			threading.Thread(target=self.__cleanScratchSpace,args=[scratch_file]).start()
+
 
 		return (child.pid, cmd)
 
