@@ -182,6 +182,7 @@ class Primitive(object):
 					# XXXstroucki what about paused and saved VMs?
 					# XXXstroucki: do we need to look at Held VMs here?
 					if (i not in self.instances and oldInstances[i].state == InstanceState.Running):
+						self.log.info("VM exited: %s" % (oldInstances[i].name))
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
 
