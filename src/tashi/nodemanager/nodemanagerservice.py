@@ -41,6 +41,7 @@ class NodeManagerService(object):
 		self.cmHost = config.get("NodeManagerService", "clusterManagerHost")
 		self.cmPort = int(config.get("NodeManagerService", "clusterManagerPort"))
 		self.authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+		self.cmRegisterHost = boolean(config.get("NodeManagerService", "registerHost"))
 		if self.authAndEncrypt:
 			self.username = config.get('AccessClusterManager', 'username')
 			self.password = config.get('AccessClusterManager', 'password')
@@ -64,7 +65,10 @@ class NodeManagerService(object):
 			if (vmId not in vmList):
 				self.log.warning('vmcontrol backend does not report %d' % (vmId))
 				self.vmStateChange(vmId, None, InstanceState.Exited)
-		self.registerHost()
+
+		if self.cmRegisterHost:
+			self.registerHost()
+
 		threading.Thread(target=self.backupVmInfoAndFlushNotifyCM).start()
 		threading.Thread(target=self.registerWithClusterManager).start()
 		threading.Thread(target=self.statsThread).start()
@@ -317,10 +321,14 @@ class NodeManagerService(object):
 
         def registerHost(self):
                 cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
-                hostname = socket.gethostname()
-		# populate some defaults
-		# XXXstroucki: I think it's better if the nodemanager fills these in properly when registering with the clustermanager
-		memory = 0
-		cores = 0
-		version = "empty"
-                #cm.registerHost(hostname, memory, cores, version)
+		try:
+                	hostname = socket.gethostname()
+			# populate some defaults
+			# XXXstroucki: I think it's better if the nodemanager fills these in properly when sending updates to the clustermanager
+			# XXXstroucki: plus, do you want strange hosts joining your cluster?
+			memory = 0
+			cores = 0
+			version = "empty"
+                	cm.registerHost(hostname, memory, cores, version)
+		except:
+			self.log.exception("Could not auto-register host with CM")

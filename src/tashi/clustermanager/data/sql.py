@@ -292,6 +292,7 @@ class SQL(DataInterface):
 				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, id))
 				self.hostLock.release()
 				return r[0], True
+
 		id = self.getNewId("hosts")
 		host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 		l = self.makeHostList(host)
