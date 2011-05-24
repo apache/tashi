@@ -409,7 +409,7 @@ class Qemu(VmControlInterface):
 			raise 'exception'
 	
 		#  Nic hints
-		nicModel = instance.hints.get("nicModel", "e1000")
+		nicModel = instance.hints.get("nicModel", "virtio")
 		nicString = ""
 		for i in range(0, len(instance.nics)):
 			nic = instance.nics[i]
