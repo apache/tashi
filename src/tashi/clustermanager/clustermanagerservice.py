@@ -69,7 +69,6 @@ class ClusterManagerService(object):
 
 	def stateTransition(self, instance, old, cur):
 		if (old and instance.state != old):
-			self.data.releaseInstance(instance)
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
 		instance.state = cur
 
@@ -108,6 +107,7 @@ class ClusterManagerService(object):
 						sleepFor = min(self.lastContacted[k] + self.expireHostTime - now, sleepFor)
 				for hostId in self.decayedHosts.keys():
 					# XXXstroucki: what if the host undecays here?
+					# XXXstroucki: exceptions every so often; should get a lock
 					if (self.decayedHosts[hostId] < (now-self.allowDecayed)):
 						host = self.data.getHost(hostId)
 						self.log.warning('Fetching state from host %s because it is decayed' % (host.name))
@@ -217,8 +217,6 @@ class ClusterManagerService(object):
 			# XXXstroucki: This is a problem with keeping
 			# clean state.
 			self.stateTransition(instance, None, InstanceState.Destroying)
-			self.data.releaseInstance(instance)
-
 			if instance.hostId is None:
 				self.data.removeInstance(instance)
 			else:
@@ -226,6 +224,7 @@ class ClusterManagerService(object):
 				try:
 					if hostname is not None:
 						self.proxy[hostname].destroyVm(instance.vmId)
+						self.data.releaseInstance(instance)
 				except Exception:
 					self.log.exception('destroyVm failed on host %s vmId %d' % (hostname, instance.vmId))
 					self.data.removeInstance(instance)
@@ -284,11 +283,12 @@ class ClusterManagerService(object):
 		except Exception, e:
 			self.log.exception('migrateVm failed')
 			raise
-		#instance = self.data.acquireInstance(instance.id)
-		#try:
-		#	instance.hostId = targetHost.id
-		#finally:
-		#	self.data.releaseInstance(instance)
+		try:
+			instance = self.data.acquireInstance(instance.id)
+			instance.hostId = targetHost.id
+		finally:
+			self.data.releaseInstance(instance)
+
 		try:
 			# Notify the target
 			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
@@ -376,6 +376,15 @@ class ClusterManagerService(object):
 				if (host.version == version and oldHost.state == HostState.VersionMismatch):
 					oldHost.state = HostState.Normal
 				for instance in instances:
+					string = ""
+					string = string + "id %d " % instance.id
+					string = string + "host %d " % host.id
+					string = string + "vmId %d " % instance.vmId
+					string = string + "user %d " % instance.userId
+					string = string + "cores %d " % instance.cores
+					string = string + "memory %d " % instance.memory
+					self.log.info('Accounting: ' + string)
+					#self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
 					try:
 						oldInstance = self.data.acquireInstance(instance.id)
 					except TashiException, e:
@@ -385,7 +394,9 @@ class ClusterManagerService(object):
 							continue
 							#oldInstance = self.data.registerInstance(instance)
 						else:
+							self.log.exception("failed to acquire instance")
 							raise
+
 					try:
 						if (oldInstance.hostId != host.id):
 							self.log.info('Host %s is claiming instance %d actually owned by hostId %s (decay)' % (host.name, oldInstance.id, str(oldInstance.hostId)))
@@ -407,6 +418,7 @@ class ClusterManagerService(object):
 						oldHost.decayed = True
 						self.data.releaseInstance(instance)
 			except Exception, e:
+				self.log.exception("Exception in RegisterNodeManager")
 				oldHost.decayed = True
 				raise
 		finally:
@@ -419,11 +431,14 @@ class ClusterManagerService(object):
 		try:
 			oldInstance = self.data.acquireInstance(instanceId)
 		except TashiException, e:
+			self.data.releaseInstance(oldInstance)
 			if (e.errno == Errors.NoSuchInstanceId):
 				self.log.exception('Got vmUpdate for unknown instanceId %d' % (instanceId))
 				return
 			else:
+				self.log.exception("Could not acquire instance")
 				raise
+
 		if (instance.state == InstanceState.Exited):
 			oldInstance.decayed = False
 			self.updateDecay(self.decayedInstances, oldInstance)

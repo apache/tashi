@@ -63,7 +63,8 @@ class Primitive(object):
 		load = {}
 		ctr = 0
 		for h in self.client.getHosts():
-			if (h.up == True and h.state == HostState.Normal):
+			#XXXstroucki get all hosts here?
+			#if (h.up == True and h.state == HostState.Normal):
 				hosts[ctr] = h
 				ctr = ctr + 1
 				load[h.id] = []
@@ -128,6 +129,10 @@ class Primitive(object):
 				# cycle list
 				for ctr in range(self.lastScheduledHost, len(self.hosts)) + range(0, self.lastScheduledHost):
 					h = self.hosts[ctr]
+
+					# XXXstroucki if it's down, find another machine
+					if (h.up == False):
+						continue
 		
 					# if it's reserved, see if we can use it
 					if ((len(h.reserved) > 0) and inst.userId not in h.reserved):

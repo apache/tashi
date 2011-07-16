@@ -49,7 +49,9 @@ class client:
 		def connectWrap(*args):
 			args = cPickle.dumps(clean(args))
 			try:
+				# XXXstroucki this is raising exception but not getting handled
 				res = getattr(self.conn.root, name)(args)
+				# XXXstroucki handle exception coming back
 			except Exception, e:
 				self.conn.close()
 				raise e

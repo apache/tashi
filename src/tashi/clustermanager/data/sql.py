@@ -49,6 +49,7 @@ class SQL(DataInterface):
 		self.instanceLock = threading.Lock()
 		self.instanceIdLock = threading.Lock()
 		self.instanceLocks = {}
+		self.instanceBusy = {}
 		self.hostLock = threading.Lock()
 		self.hostLocks = {}
 		self.maxInstanceId = 1
@@ -63,7 +64,7 @@ class SQL(DataInterface):
 			try:
 				cur.execute(stmt)
 			except:
-				self.log.exception('Exception executing SQL statement')
+				self.log.exception('Exception executing SQL statement %s' % stmt)
 		finally:
 			self.sqlLock.release()
 		return cur
@@ -135,6 +136,7 @@ class SQL(DataInterface):
 			instance._lock = threading.Lock()
 			self.instanceLocks[instance.id] = instance._lock
 			instance._lock.acquire()
+			self.instanceBusy[instance.id] = True
 			l = self.makeInstanceList(instance)
 			self.executeStatement("INSERT INTO instances VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		finally:
@@ -142,7 +144,13 @@ class SQL(DataInterface):
 		return instance
 	
 	def acquireInstance(self, instanceId):
-		self.instanceLock.acquire()
+		busyCheck = True
+		while busyCheck == True:
+			self.instanceLock.acquire()
+			busyCheck = self.instanceBusy.setdefault(instanceId, False)
+			if busyCheck:
+				self.instanceLock.release()
+
 		try:
 			cur = self.executeStatement("SELECT * from instances WHERE id = %d" % (instanceId))
 			l = cur.fetchone()
@@ -152,6 +160,7 @@ class SQL(DataInterface):
 			self.instanceLocks[instance.id] = self.instanceLocks.get(instance.id, threading.Lock())
 			instance._lock = self.instanceLocks[instance.id]
 			instance._lock.acquire()
+			self.instanceBusy[instance.id] = True
 		finally:
 			self.instanceLock.release()
 		return instance
@@ -166,7 +175,11 @@ class SQL(DataInterface):
 				if (e < len(self.instanceOrder)-1):
 					s = s + ", "
 			self.executeStatement("UPDATE instances SET %s WHERE id = %d" % (s, instance.id))
+			self.instanceBusy[instance.id] = False
 			instance._lock.release()
+		except:
+			self.log.exception("Excepted while holding lock")
+			raise
 		finally:
 			self.instanceLock.release()
 	
@@ -174,8 +187,13 @@ class SQL(DataInterface):
 		self.instanceLock.acquire()
 		try:
 			self.executeStatement("DELETE FROM instances WHERE id = %d" % (instance.id))
-			instance._lock.release()
+			#XXXstroucki extraneous instance won't have a lock
+			try:
+				instance._lock.release()
+			except:
+				pass
 			del self.instanceLocks[instance.id]
+			del self.instanceBusy[instance.id]
 		finally:
 			self.instanceLock.release()
 	
@@ -292,7 +310,6 @@ class SQL(DataInterface):
 				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, id))
 				self.hostLock.release()
 				return r[0], True
-
 		id = self.getNewId("hosts")
 		host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 		l = self.makeHostList(host)

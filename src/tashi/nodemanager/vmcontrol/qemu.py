@@ -105,6 +105,7 @@ class Qemu(VmControlInterface):
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
+		# XXXstroucki revise
 		self.scratchDir = self.config.get("Qemu", "scratchDir")
 		if len(self.scratchDir) == 0:
 			self.scratchDir = "/tmp"
@@ -122,10 +123,6 @@ class Qemu(VmControlInterface):
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
 
-	def __cleanScratchSpace(self, file):
-		time.sleep(5)
-		os.unlink(file)
-	
 	def getSystemPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
@@ -137,15 +134,20 @@ class Qemu(VmControlInterface):
 			except Exception:
 				pass
 		return pids
-	
+
+	def getInstances(self):
+		"""Will return a dict of instances by vmId to the caller"""
+		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
+
 	def matchSystemPids(self, controlledVMs):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
 		vmIds = controlledVMs.keys()
 		pids = self.getSystemPids()
 		for vmId in vmIds:
+			child = controlledVMs[vmId]
+
 			if vmId not in pids:
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
-				child = controlledVMs[vmId]
 				del controlledVMs[vmId]
 				try:
 					del self.stats[vmId]
@@ -170,10 +172,25 @@ class Qemu(VmControlInterface):
 					for i in child.monitorHistory:
 						f.write(i)
 					f.close()
+				#XXXstroucki remove scratch storage
+				scratch_name = child.instance.name
+				log.info("Removing scratch for " + scratch_name)
+				#cmd = "/sbin/lvremove -f vgscratch/lv" + scratch_name
+				cmd = "/sbin/lvremove -f vgscratch"
+    				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				try:
 					if (not child.migratingOut):
 						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
 				except Exception, e:
+					log.exception("vmStateChange failed")
+			else:
+				try:
+					if (child.migratingOut):
+						self.nm.vmStateChange(vmId, None, InstanceState.MigrateTrans)
+					else:
+						self.nm.vmStateChange(vmId, None, InstanceState.Running)
+				except:
+					#XXXstroucki nm is initialised at different time
 					log.exception("vmStateChange failed")
 						
 	
@@ -192,6 +209,10 @@ class Qemu(VmControlInterface):
 				self.vncPortLock.release()
 				child.monitorFd = os.open(child.ptyFile, os.O_RDWR | os.O_NOCTTY)
 				child.monitor = os.fdopen(child.monitorFd)
+
+				#XXXstroucki ensure instance has vmId
+				child.instance.vmId = vmId
+				
 				self.controlledVMs[child.pid] = child
 				log.info("Adding vmId %d" % (child.pid))
 			except Exception, e:
@@ -308,12 +329,6 @@ class Qemu(VmControlInterface):
 		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
 		if (memoryStr[2] == "kB"):
 			host.memory = int(memoryStr[1])/1024
-		elif (memoryStr[2] == "mB"):
-			host.memory = int(memoryStr[1])
-		elif (memoryStr[2] == "gB"):
-			host.memory = int(memoryStr[1])*1024
-		elif (memoryStr[2] == " B"):
-			host.memory = int(memoryStr[1])/(1024*1024)
 		else:
 			log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0
@@ -374,18 +389,17 @@ class Qemu(VmControlInterface):
 
 		try:
 			if scratchSize > 0:
-				print 'creating scratch file'
 				# create scratch disk
 				# XXXstroucki: needs to be cleaned somewhere
-				scratch_file = os.path.join(self.scratchDir, instance.name + ".scratch")
-				print 'scratch file name is ', scratch_file
-				tempfd = open(scratch_file, "w")
-				tempfd.seek( (scratchSize * 2 ** 30) - 1 )
-				tempfd.write('x')
-				tempfd.close()
+				# XXXstroucki: clean user provided instance name
+				scratch_name = "lv" + instance.name
+				# XXXstroucki hold lock
+				# XXXstroucki check for capacity
+				cmd = "/sbin/lvcreate -n" + scratch_name + " -L" + str(scratchSize) + "G vgscratch"
+				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
 
-				thisDiskList = [ "file=%s" % scratch_file ]
+				thisDiskList = [ "file=/dev/vgscratch/%s" % scratch_name ]
 				thisDiskList.append("if=%s" % diskInterface)
 				thisDiskList.append("index=%d" % index)
 				thisDiskList.append("cache=off")
@@ -453,16 +467,10 @@ class Qemu(VmControlInterface):
 		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = True, OSchild = True)
 		child.ptyFile = None
 		child.vncPort = -1
+		child.instance.vmId = child.pid
 		self.saveChildInfo(child)
 		self.controlledVMs[child.pid] = child
 		log.info("Adding vmId %d" % (child.pid))
-
-		# clean up scratch file
-		if scratchSize > 0 and scratch_file is not None:
-			# do this in the background
-			threading.Thread(target=self.__cleanScratchSpace,args=[scratch_file]).start()
-
-
 		return (child.pid, cmd)
 
 	def getPtyInfo(self, child, issueContinue):
