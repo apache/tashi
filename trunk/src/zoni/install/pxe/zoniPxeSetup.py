@@ -57,17 +57,6 @@ def main():
 	ZoniPxeSetup(configs)
 	ZoniGetSyslinux(configs)
 
-
-def createDir(dirName):
-	try:
-		os.mkdir(dirName, 0755)
-		print "    Creating directory " + dirName 
-	except (OSError, Exception), e:
-		if e.errno == 17:
-			print "    " + e.args[1] + ": " + dirName
-		else:
-			print "    " + e.args[1] + ": " + dirName
-
 @checkSuper
 def ZoniPxeSetup(config):
 	tftpRootDir = config['tftpRootDir']
@@ -92,8 +81,11 @@ def ZoniPxeSetup(config):
 	#  Find the base files to copy
 	
 	pxeDir = os.path.join(installBaseDir, "src", "zoni", "install", "pxe")
-	dirName = os.path.join(pxeDir, "base-menu")
-	shutil.copy2(dirName, tftpBaseMenuFile)
+	#dirName = os.path.join(pxeDir, "base-menu")
+	#shutil.copy2(dirName, tftpBaseMenuFile)
+	print "open dir name ", tftpBaseMenuFile
+	open(tftpBaseMenuFile, 'w').write(zoniCreateBaseMenu(config))
+	
 	dirName = os.path.join(pxeDir, "base.zoni")
 	shutil.copy2(dirName, tftpBaseFile)
 	#  Copy over zoni pxe image 
@@ -167,6 +159,29 @@ def ZoniGetSyslinux(config, ver=None):
 	tmpfile = os.path.join(tmpdir, syslinuxFile, "com32", "menu", "vesamenu.c32")
 	shutil.copy2(tmpfile, tftpRootDir)
 	print "Finished"
+
+def zoniCreateBaseMenu(config):
+
+	a = ""
+	a += "DISPLAY boot-screens/boot.txt\n\n"
+	a += "LABEL zoni-register-64\n"
+	a += "        kernel builds/amd64/zoni-reg/linux\n"
+	a += "        append initrd=builds/amd64/zoni-reg/initrd.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register console=tty1 rw --\n"
+	a += "\n"
+	a += "LABEL zoni-register-64-interactive\n"
+	a += "        kernel builds/amd64/zoni-reg/linux\n"
+	a += "        append initrd=builds/amd64/zoni-reg/initrd_zoni_interactive.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register console=tty1 rw --\n"
+	a += "\n"
+	a += "LABEL localdisk\n"
+	a += "    LOCALBOOT 0\n"
+	a += "LABEL rescue\n"
+	a += "        kernel ubuntu-installer/hardy/i386/linux\n"
+	a += "        append vga=normal initrd=ubuntu-installer/hardy/i386/initrd.gz  rescue/enable=true --\n"
+	a += "\n"
+	a += "PROMPT 1\n"
+	a += "TIMEOUT 100\n"
+	return a
+
 
 		
 
