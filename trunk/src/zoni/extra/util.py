@@ -135,6 +135,7 @@ def checkSuper(f):
 			exit()
 		return res
 	myF.__name__ = f.__name__
+	
 	return myF
 
 
@@ -166,10 +167,11 @@ def createDir(dirName, checkexists=None):
 		os.mkdir(dirName, 0755)
 		print "	Creating directory " + dirName
 	except (OSError, Exception), e:
-		if e.errno == 17:
-			print "	" + e.args[1] + ": " + dirName
-		else:
-			print "	" + e.args[1] + ": " + dirName
+		print "	" + e.args[1] + ": " + dirName
+		return 0
+
+	return 1
+
 
 
 def validIp(ip):
