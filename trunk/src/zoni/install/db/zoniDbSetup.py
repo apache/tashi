@@ -21,6 +21,15 @@
 import os 
 import sys
 import string
+try:   
+	import MySQLdb
+	import traceback
+	import optparse
+	import getpass
+except ImportError, e:
+	print "Module not installed : %s" % e
+	exit()
+
 import MySQLdb
 import traceback
 import optparse
