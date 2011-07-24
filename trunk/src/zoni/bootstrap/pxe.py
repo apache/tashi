@@ -51,8 +51,8 @@ class Pxe(BootStrapInterface):
 
 		self.port = config['dbPort']
 
-		self.vlan_max = config['vlan_max']
-		self.vlan_reserved = config['vlan_reserved']
+		self.vlan_max = config['vlanMax']
+		#self.vlan_reserved = config['vlanReserved']
 		
 		#  Connect to DB
 		self.conn = MySQLdb.connect(host = self.host, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
