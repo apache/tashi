@@ -31,9 +31,9 @@ from tashi.util import getConfig, createClient, instantiateImplementation, boole
 import tashi
 
 class Primitive(object):
-	def __init__(self, config, client):
+	def __init__(self, config, cmclient):
 		self.config = config
-		self.client = client
+		self.cm = cmclient
 		self.hooks = []
 		self.log = logging.getLogger(__file__)
 		self.scheduleDelay = float(self.config.get("Primitive", "scheduleDelay"))
@@ -45,7 +45,7 @@ class Primitive(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, client, False))
+					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
 	        self.hosts = {}
@@ -62,7 +62,7 @@ class Primitive(object):
 		# load's keys are the host id, or None if not on a host. values are instance ids
 		load = {}
 		ctr = 0
-		for h in self.client.getHosts():
+		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
 			#if (h.up == True and h.state == HostState.Normal):
 				hosts[ctr] = h
@@ -70,15 +70,21 @@ class Primitive(object):
 				load[h.id] = []
 			
 		load[None] = []
-		_instances = self.client.getInstances()
+		_instances = self.cm.getInstances()
 		instances = {}
 		for i in _instances:
 			instances[i.id] = i
+			
+		# XXXstroucki put held machines behind pending ones
+		heldInstances = []
 		for i in instances.itervalues():
-			# XXXstroucki: do we need to look at Held machines here?
 			if (i.hostId or i.state == InstanceState.Pending):
 				# Nonrunning VMs will have hostId of None
 				load[i.hostId] = load[i.hostId] + [i.id]
+			elif (i.hostId is None and i.state == InstanceState.Held):
+				heldInstances = heldInstances + [i.id]
+
+		load[None] = load[None] + heldInstances
 
 		self.hosts = hosts
 		self.load = load
@@ -117,7 +123,7 @@ class Primitive(object):
 						# XXXstroucki: Should we log something here for analysis?
 						break
 					if self.__checkCapacity(h, inst):
-						minMax = len(load[h.id])
+						minMax = len(self.load[h.id])
 						minMaxHost = h
 
 		
@@ -158,11 +164,15 @@ class Primitive(object):
 					for hook in self.hooks:
 						hook.preCreate(inst)
 				self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
-				self.client.activateVm(inst.id, minMaxHost)
-				self.load[minMaxHost.id] = self.load[minMaxHost.id] + [inst.id]
-				# get rid of its possible entry in muffle if VM is scheduled to a host
-				if (inst.name in self.muffle):
-					self.muffle.pop(inst.name)
+				rv = self.cm.activateVm(inst.id, minMaxHost)
+
+				if rv == "success":
+					self.load[minMaxHost.id] = self.load[minMaxHost.id] + [inst.id]
+					# get rid of its possible entry in muffle if VM is scheduled to a host
+					if (inst.name in self.muffle):
+						self.muffle.pop(inst.name)
+				else:
+					self.log.warning("Instance %s failed to activate on host %s" % (inst.name, minMaxHost.name))
 			else:
 				# did not find a host
 				if (inst.name not in self.muffle):
@@ -220,9 +230,9 @@ def main():
 	(config, configFiles) = getConfig(["Agent"])
 	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
-	client = createClient(config)
+	cmclient = createClient(config)
 	logging.config.fileConfig(configFiles)
-	agent = Primitive(config, client)
+	agent = Primitive(config, cmclient)
 	agent.start()
 
 if __name__ == "__main__":
