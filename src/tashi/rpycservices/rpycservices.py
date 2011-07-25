@@ -3,7 +3,7 @@ from tashi.rpycservices.rpyctypes import *
 import cPickle
 
 clusterManagerRPCs = ['createVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'migrateVm', 'pauseVm', 'unpauseVm', 'getHosts', 'getNetworks', 'getUsers', 'getInstances', 'vmmSpecificCall', 'registerNodeManager', 'vmUpdate', 'activateVm', 'registerHost']
-nodeManagerRPCs = ['instantiateVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'prepReceiveVm', 'prepSourceVm', 'migrateVm', 'receiveVm', 'pauseVm', 'unpauseVm', 'getVmInfo', 'listVms', 'vmmSpecificCall', 'getHostInfo']
+nodeManagerRPCs = ['instantiateVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'prepReceiveVm', 'prepSourceVm', 'migrateVm', 'receiveVm', 'pauseVm', 'unpauseVm', 'getVmInfo', 'listVms', 'vmmSpecificCall', 'getHostInfo', 'liveCheck']
 
 def clean(args):
 	"""Cleans the object so cPickle can be used."""
@@ -49,9 +49,7 @@ class client:
 		def connectWrap(*args):
 			args = cPickle.dumps(clean(args))
 			try:
-				# XXXstroucki this is raising exception but not getting handled
 				res = getattr(self.conn.root, name)(args)
-				# XXXstroucki handle exception coming back
 			except Exception, e:
 				self.conn.close()
 				raise e
