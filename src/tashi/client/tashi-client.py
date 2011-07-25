@@ -359,7 +359,7 @@ def makeTable(list, keys=None):
 		stdout = os.popen("stty size")
 		r = stdout.read()
 		stdout.close()
-		(consoleHeight, consoleWidth) = map(lambda x: int(x.strip()), r.split())
+		#(consoleHeight, consoleWidth) = map(lambda x: int(x.strip()), r.split())
 	except:
 		pass
 	for obj in list:
