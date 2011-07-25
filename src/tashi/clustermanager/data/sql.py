@@ -71,8 +71,10 @@ class SQL(DataInterface):
 		
 	def getNewInstanceId(self):
 		self.instanceIdLock.acquire()
-		instanceId = self.maxInstanceId
+		cur = self.executeStatement("SELECT MAX(id) FROM instances")
+		self.maxInstanceId = cur.fetchone()[0]
 		self.maxInstanceId = self.maxInstanceId + 1
+		instanceId = self.maxInstanceId
 		self.instanceIdLock.release()
 		return instanceId
 	
