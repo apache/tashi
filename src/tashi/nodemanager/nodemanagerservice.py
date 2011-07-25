@@ -165,6 +165,8 @@ class NodeManagerService(object):
 			try:
 				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
+				#import pprint
+				#self.log.warning("Instances: " + pprint.saferepr(instances))
 				self.id = cm.registerNodeManager(host, instances)
 			except Exception, e:
 				self.log.exception('Failed to register with the CM')
@@ -288,6 +290,9 @@ class NodeManagerService(object):
 	
 	def listVms(self):
 		return self.instances.keys()
+
+	def liveCheck(self):
+		return "alive"
 	
 	def statsThread(self):
 		if (self.statsInterval == 0):
