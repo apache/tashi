@@ -67,8 +67,6 @@ class ClusterManagerService(object):
 		threading.Thread(target=self.monitorCluster).start()
 
 	def stateTransition(self, instance, old, cur):
-		if cur == InstanceState.Running:
-			self.log.exception("%d was made running here" % instance.id)
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
 		instance.state = cur
