@@ -491,7 +491,8 @@ class ClusterManagerService(object):
 							if (oldNic.mac == nic.mac):
 								oldNic.ip = nic.ip
 
-		self.data.releaseInstance(oldInstance)
+			self.data.releaseInstance(oldInstance)
+
 		return "success"
 	
 	def activateVm(self, instanceId, host):
