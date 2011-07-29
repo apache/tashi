@@ -220,7 +220,7 @@ class Primitive(object):
 				self.log.exception("Tashi exception")
 
 			except Exception, e:
-				self.log.exception("General exception")
+				self.log.warning("Scheduler iteration failed")
 
 
 			# wait to do the next iteration
