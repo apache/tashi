@@ -745,7 +745,7 @@ def main():
 		if options.addCname:
 			if len(args) < 2:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + "cname existing_name"
+				mesg += "Example: %s %s cname existing_name" % (os.path.basename(sys.argv[0]), thisone) 
 				print mesg
 				exit()
 			hostName = args[1]
@@ -755,10 +755,10 @@ def main():
 			dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 			dhcpdns.addCname(cname, hostName)
 			if dhcpdns.error: 
-				mesg = "[FAIL]  \n" + str(dhcpdns.error) + "\n" 
+				mesg = "[FAIL]  \n %s\n" % str(dhcpdns.error)
 				sys.stdout.write(mesg) 
 			else: 
-				mesg = "[SUCCESS]" + "\n" 
+				mesg = "[SUCCESS]\n"
 				sys.stdout.write(mesg) 
 
 if __name__ == "__main__":

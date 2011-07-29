@@ -155,7 +155,8 @@ class DhcpDns():
 			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
 			stdin.write("\n")
 			if (self.reverseDns):
-				ip = socket.gethostbyname(name)
+				hostInfo = socket.gethostbyaddr(name)
+				ip = hostInfo[2]
 				ipSegments = map(int, ip.split("."))
 				ipSegments.reverse()
 				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
@@ -175,15 +176,20 @@ class DhcpDns():
 				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
 
 	def addCname(self, name, origName):
+		
 		cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
 			#  Check for existance of hostname
-			ip = socket.gethostbyname(origName)
+			#ip = socket.gethostbyname(origName)
+			#  add this to make sure we always input the textual name instead of the ip address by mistake
+			hostInfo = socket.gethostbyaddr(origName)
+			hostName = hostInfo[0].split(".")[0]
+
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
 			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
-			stdin.write("update add %s.%s %d CNAME %s.%s\n" % (name, self.dnsDomain, self.dnsExpire, origName, self.dnsDomain))
+			stdin.write("update add %s.%s %d CNAME %s.%s\n" % (name, self.dnsDomain, self.dnsExpire, hostName, self.dnsDomain))
 			stdin.write("\n")
 			stdin.close()
 			output = stdout.read()
