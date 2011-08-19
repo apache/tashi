@@ -156,7 +156,7 @@ class DhcpDns():
 			stdin.write("\n")
 			if (self.reverseDns):
 				hostInfo = socket.gethostbyaddr(name)
-				ip = hostInfo[2]
+				ip = hostInfo[2][0]
 				ipSegments = map(int, ip.split("."))
 				ipSegments.reverse()
 				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
