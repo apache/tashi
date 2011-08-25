@@ -27,7 +27,6 @@ DEBUG () {
 }
 
 #  Capture vars passed via kernal args
-VERBOSE=0
 for x in $(cat /proc/cmdline); do
     case $x in
     imagename=*)
@@ -39,8 +38,8 @@ for x in $(cat /proc/cmdline); do
     defaultimage=*)
         DEFAULTIMAGE=${x#defaultimage=}
         ;;
-    image_root=*)
-        IMAGE_ROOT=${x#image_root=}
+    zoniroot=*)
+        ZONIROOT=${x#zoniroot=}
         ;;
     verbose=*)
         VERBOSE=${x#verbose=}
@@ -48,7 +47,8 @@ for x in $(cat /proc/cmdline); do
 	esac
 done
 
-IMAGE_URL="${PXESERVER}/${IMAGE_ROOT}/"
+
+IMAGE_URL="${PXESERVER}/${ZONIROOT}/"
 
 #  Scrape system for specs
 #/sbin/getSystemId > /tmp/sysinfo
@@ -197,7 +197,6 @@ fi
 	#DEBUG "Update ip $ip_addr"
 	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
 #fi
-VERBOSE=0
 if [ $location ];then 
 	DEBUG "Set location ${location}"
 	echo "wget -O- http://${IMAGE_URL}/zoni-register.php?action=addlocation&verbose=${VERBOSE}&mac=$MAC&location=$location"
@@ -222,9 +221,11 @@ fi
 	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=addip&mac=$MAC&ip_addr=$ip_addr"
 #fi
 
-#  Add dns and dhcp
-DEBUG "adding to dhcp and dns"
-wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${MAC}&location=$location&ip_addr=$IPADDR"
+if [ $location ];then
+	#  Add dns and dhcp
+	DEBUG "adding to dhcp and dns"
+	wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${MAC}&location=$location&ip_addr=$IPADDR"
+fi
 
 #  Setup the management interface, if any
 
@@ -242,6 +243,7 @@ if [ $? -eq 0 ];then
 	vlan_disable=$(ipmitool lan print |  grep -i "Vlan" | awk -F ": " '{print $2}')
 
 	#  Add IPMI info 
+	echo "wget -O/outfile.txt 'http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}'"
 	wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}"
 	IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
 	IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_PASSWORD | awk '{print $2}')
@@ -269,8 +271,10 @@ if [ $? -eq 0 ];then
 	ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
 	ipmitool user enable 2
 
+	#Already done in add_ipmi
 	#DEBUG "adding to dhcp and dns"
-	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}$&ip_addr=${IPMI_ADDR}"
+	#DEBUG "wget -O- http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}$&ip_addr=${IPMI_ADDR}"
+	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}&ip_addr=${IPMI_ADDR}"
 
 else
 	DEBUG "IPMI interface not found"

@@ -35,6 +35,7 @@ from zoni.data.resourcequerysql import *
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
 from zoni.agents.dhcpdns import DhcpDns
+from zoni.extra.util import *
 
 
 '''  Using pexpect to control switches because couldn't get snmp to work 
@@ -52,14 +53,22 @@ class HwDellSwitch(HwSwitchInterface):
 		self.verbose = verbose
 
 	def __login(self):
-		switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
+		# ssh
+		if self.config['hardwareControl']['dellswitch']['accessmode'] == "ssh":
+			switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
+		# telnet 
+		else:
+			switchIp = "telnet " +  self.host['hw_name'] 
+
+
+
 		child = pexpect.spawn(switchIp)
 
 		#  Be Verbose and print everything
 		if self.verbose:
 			child.logfile = sys.stdout
 
-		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', 'User:', pexpect.EOF, pexpect.TIMEOUT])
 		#XXX  Doesn't seem to do what I want:(
 		child.setecho(False)
 
@@ -68,11 +77,11 @@ class HwDellSwitch(HwSwitchInterface):
 			child.sendline("yes")
 			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
 			
-		if opt == 0:
+		if opt == 0 or opt == 3:
 			child.sendline(self.host['hw_userid'])
 			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
 			child.sendline(self.host['hw_password'])
-			i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			i=child.expect(['console','#', 'Name:', '>',pexpect.EOF, pexpect.TIMEOUT])
 			if i == 2:
 				mesg = "ERROR:  Login to %s failed\n" % (self.host['hw_name'])
 				self.log.error(mesg)
@@ -85,7 +94,6 @@ class HwDellSwitch(HwSwitchInterface):
 			#  on the 6448 dell, need to send enable, just send to all
 			child.sendline('enable')
 			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
-
 
 		return child
 
@@ -139,11 +147,8 @@ class HwDellSwitch(HwSwitchInterface):
 
 	def createVlansThread(self, vlan, switch,host):
 		mesg = "Creating vlan %s on switch %s" % (str(vlan),str(switch))
-		print "host is ", host
 		self.log(mesg)
-		print "create"
 		self.createVlan(vlan)
-		print "cend"
 		self.addVlanToTrunk(vlan);
 		thread.exit()
 
@@ -224,8 +229,6 @@ class HwDellSwitch(HwSwitchInterface):
 		#child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 
 		child.terminate()
-		#print "before", child.before
-		#print "after", child.after
 
 	def addNodeToVlan(self, vlan):
 		mesg = "Adding Node to vlan %s" % (str(vlan))
@@ -374,6 +377,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 	
 	def registerToZoni(self, user, password, host):
+		self.setVerbose(True)
 		host = string.strip(str(host))
 		#  Get hostname of the switch
 		if len(host.split(".")) == 4:
@@ -394,33 +398,12 @@ class HwDellSwitch(HwSwitchInterface):
 				self.log.critical(mesg)
 				exit()
 
-		switchIp = "ssh " + user + "@" + ip
-		child = pexpect.spawn(switchIp)
-		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
-		#XXX  Doesn't seem to do what I want:(
-		child.setecho(False)
-
-		#  Send a yes to register authenticity of host for ssh
-		if opt == 2:
-			child.sendline("yes")
-			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
-			
-		if opt == 0:
-			child.sendline(user)
-			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
-			child.sendline(password)
-			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
-			if i == 2:
-				mesg = "Login to switch %s failed" % (host)
-				self.log.error(mesg)
-				exit(1)
-
-		if opt == 1:
-			child.sendline(password)
-			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
-			#  on the 6448 dell, need to send enable, just send to all
-			child.sendline('enable')
-			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
+		#  log into the switch
+		self.host = {}
+		self.host['hw_userid'] = user
+		self.host['hw_name'] = host
+		self.host['hw_password'] = password
+		child = self.__login()
 
 		fout = tempfile.TemporaryFile()
 		child.logfile = fout
@@ -428,10 +411,11 @@ class HwDellSwitch(HwSwitchInterface):
 		cmd = "show system"
 		child.sendline(cmd)
 		val = host + "#"
-		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+		tval = host + ">"
+		i = child.expect([val, tval, '\n\r\n\r', "--More--",  pexpect.EOF, pexpect.TIMEOUT])
 		cmd = "show version"
 		child.sendline(cmd)
-		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+		i = child.expect([val, tval, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
 
 		fout.seek(0)
 		a={}
@@ -440,10 +424,11 @@ class HwDellSwitch(HwSwitchInterface):
 				datime = time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
 				val = "Registered by Zoni on : " + datime
 				a['hw_notes'] = val + "; " + string.strip(i.split(':', 1)[1])
-			if "System MAC" in i:
-				a['hw_mac'] = string.strip(i.split(':', 1)[1])
-			if "SW version" in i:
-				a['hw_version_sw'] = string.strip(i.split('   ')[1].split()[0])
+			if "MAC" in i:
+				a['hw_mac'] = normalizeMac(string.strip(i.split(":", 1)[1]))
+			#  moving this capture to snmp 
+			#if "SW version" in i:
+				#a['hw_version_sw'] = string.strip(i.split('   ')[1].split()[0])
 			if "HW version" in i:
 				a['hw_version_fw'] = string.strip(i.split('   ')[1].split()[0])
 				
@@ -467,11 +452,18 @@ class HwDellSwitch(HwSwitchInterface):
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_model'] = str(varBinds[0][1])
+
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,3,0")
 		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_make'] = str(varBinds[0][1])
+
+		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,4,0")
+		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		cmdgen.CommunityData('my-agent', user, 0), \
+		cmdgen.UdpTransportTarget((host, 161)), oid)
+		a['hw_version_sw'] = str(varBinds[0][1])
 
 		#  Register in dns
 		if self.config['dnsEnabled']:

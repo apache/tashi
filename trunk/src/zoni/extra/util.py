@@ -186,6 +186,10 @@ def validIp(ip):
 			return 0
 	return 1
 
+def normalizeMac(mac):
+	rawmac = re.sub('[.:-]', '', mac)
+	return  string.lower(":".join(["%s%s" % (rawmac[i], rawmac[i+1]) for i in range(0,12,2)]))
+
 def validMac(mac):
 	reg = '([a-fA-F0-9]{2}[:|\\-]?){6}'
 	val = re.compile(reg).search(mac)

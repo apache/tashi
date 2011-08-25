@@ -18,11 +18,12 @@
 #
 #  $Id$
 #
+	#  Need to put base directory here 
     include("include/zoni_www_registration.conf");
 	include("include/zoni_functions.php");
-	$PYTHONPATH=$G['ZONI_BASE_DIR'] . "/src"
 
     $G = init_globals();
+	$PYTHONPATH=$G['ZONI_BASE_DIR'] . "/src";
     $verbose = (isset($_GET['verbose'])) ? $_GET['verbose']: 0;
 
     DEBUG($verbose, "<pre>");
@@ -378,6 +379,7 @@
 		DEBUG($verbose, "doing the dns and dhcp updates");
 		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDns $location $ip_addr");
 		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDhcp $location $ip_addr $mac_addr");
+		#print "location is " + $location + " and ip is " + $ip_addr;
 		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDns $location $ip_addr");
 		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDhcp $location $ip_addr $mac_addr");
 	}

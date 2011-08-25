@@ -66,6 +66,7 @@ def ZoniPxeSetup(config):
 	tftpBaseFile = config['tftpBaseFile'] 
 	tftpBaseMenuFile = config['tftpBaseMenuFile'] 
 	installBaseDir = config['installBaseDir']
+	registrationBaseDir = config['registrationBaseDir']
 	
 
 	#  Create the directory structure
@@ -168,11 +169,11 @@ def zoniCreateBaseMenu(config):
 	a += "DISPLAY boot-screens/boot.txt\n\n"
 	a += "LABEL zoni-register-64\n"
 	a += "        kernel builds/amd64/zoni-reg/linux\n"
-	a += "        append initrd=builds/amd64/zoni-reg/initrd.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register console=tty1 rw --\n"
+	a += "        append initrd=builds/initrd/images/zoni-register-64.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register image_root=" + config['registrationBaseDir'] + " console=tty1 rw --\n"
 	a += "\n"
 	a += "LABEL zoni-register-64-interactive\n"
 	a += "        kernel builds/amd64/zoni-reg/linux\n"
-	a += "        append initrd=builds/amd64/zoni-reg/initrd_zoni_interactive.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register console=tty1 rw --\n"
+	a += "        append initrd=builds/initrd/images/zoni-register-64.gz pxeserver=" + config['pxeServerIP'] +  " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register verbose=1 image_root=" + config['registrationBaseDir'] + " console=tty1 rw --\n"
 	a += "\n"
 	a += "LABEL localdisk\n"
 	a += "    LOCALBOOT 0\n"

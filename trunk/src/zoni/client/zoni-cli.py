@@ -617,14 +617,14 @@ def main():
 	#  Register hardware
 	if options.register: 
 
-		supported_hardware = ['dell', 'raritan']
+		supported_hardware = ['dellswitch', 'raritan']
 		if len(args) < 3:
 			mesg = "ERROR:  Expecting username and ip address of hardware to be registered\n"
 			mesg += os.path.basename(sys.argv[0]) + " --register HARDWARE username ipaddr\n"
 			mesg += "Supported hardware " + str(supported_hardware) + "\n"
 			sys.stderr.write(mesg)
 		else:
-			if string.lower(args[0]) == "dell":
+			if string.lower(args[0]) == "dellswitch":
 				HwSwitch = HwDellSwitch
 				hw = HwSwitch(configs)
 			elif string.lower(args[0]) == "raritan":
