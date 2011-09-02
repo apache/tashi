@@ -32,7 +32,7 @@ class SQL(DataInterface):
 		if (self.uri.startswith("sqlite://")):
 			import sqlite
 			self.dbEngine = "sqlite"
-			self.conn = sqlite.connect(self.uri[9:], autocommit=1)
+			self.conn = sqlite.connect(self.uri[9:], autocommit=1, timeout=1500)
 		elif (self.uri.startswith("mysql://")):
 			import MySQLdb
 			self.dbEngine = "mysql"
@@ -73,6 +73,9 @@ class SQL(DataInterface):
 		self.instanceIdLock.acquire()
 		cur = self.executeStatement("SELECT MAX(id) FROM instances")
 		self.maxInstanceId = cur.fetchone()[0]
+		# XXXstroucki perhaps this can be handled nicer
+		if (self.maxInstanceId is None):
+			self.maxInstanceId = 0
 		self.maxInstanceId = self.maxInstanceId + 1
 		instanceId = self.maxInstanceId
 		self.instanceIdLock.release()
@@ -165,6 +168,7 @@ class SQL(DataInterface):
 			self.instanceBusy[instance.id] = True
 		finally:
 			self.instanceLock.release()
+
 		return instance
 	
 	def releaseInstance(self, instance):

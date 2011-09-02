@@ -141,6 +141,11 @@ class Qemu(VmControlInterface):
 
 	def matchSystemPids(self, controlledVMs):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
+		if self.nm is None:
+			#XXXstroucki log may not be there yet either
+			#self.log.info("NM hook not yet available")
+			return
+
 		vmIds = controlledVMs.keys()
 		pids = self.getSystemPids()
 		for vmId in vmIds:
@@ -219,6 +224,7 @@ class Qemu(VmControlInterface):
 				log.exception("Failed to load VM info for %d", vmId)
 			else:
 				log.info("Loaded VM info for %d", vmId)
+		# XXXstroucki NM may not be available yet here.
 		self.matchSystemPids(self.controlledVMs)
 	
 	def pollVMsLoop(self):

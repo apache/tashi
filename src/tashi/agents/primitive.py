@@ -62,6 +62,7 @@ class Primitive(object):
 		# load's keys are the host id, or None if not on a host. values are instance ids
 		load = {}
 		ctr = 0
+
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
 			#if (h.up == True and h.state == HostState.Normal):

@@ -158,7 +158,8 @@ def getVmLayout():
 	return hosts.values()
 
 def createMany(instance, count):
-	l = len(str(count))
+	# will create instances from 0 to count-1
+	l = len(str(count) - 1)
 	basename = instance.name
 	instances = []
 	for i in range(0, count):
@@ -359,7 +360,6 @@ def makeTable(list, keys=None):
 		stdout = os.popen("stty size")
 		r = stdout.read()
 		stdout.close()
-		#(consoleHeight, consoleWidth) = map(lambda x: int(x.strip()), r.split())
 	except:
 		pass
 	for obj in list:

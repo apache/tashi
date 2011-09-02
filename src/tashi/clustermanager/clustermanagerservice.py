@@ -51,12 +51,17 @@ class ClusterManagerService(object):
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
-		now = time.time()
+		now = self.__now()
 		for instance in self.data.getInstances().itervalues():
 			instanceId = instance.id
 			instance = self.data.acquireInstance(instanceId)
 			instance.decayed = False
-			self.stateTransition(instance, None, InstanceState.Orphaned)
+
+			if instance.hostId is None:
+				self.stateTransition(instance, None, InstanceState.Pending)
+			else:
+				self.stateTransition(instance, None, InstanceState.Orphaned)
+
 			self.data.releaseInstance(instance)
 		for host in self.data.getHosts().itervalues():
 			hostId = host.id
@@ -70,6 +75,9 @@ class ClusterManagerService(object):
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
 		instance.state = cur
+
+	def __now(self):
+		return time.time()
 
 	def __downHost(self, host):
 		self.log.warning('Host %s is down' % (host.name))
@@ -99,9 +107,8 @@ class ClusterManagerService(object):
 		# Check if hosts have been heard from recently
 		# Otherwise, see if it is alive
 
-		now = time.time()
 		for hostId in self.hostLastContactTime.keys():
-			if (self.hostLastContactTime[hostId] < (now-self.expireHostTime)):
+			if (self.hostLastContactTime[hostId] < (self.__now() - self.expireHostTime)):
 				host = self.data.acquireHost(hostId)
 				string = None
 				try:
@@ -114,7 +121,7 @@ class ClusterManagerService(object):
 					del self.hostLastContactTime[hostId]
 				else:
 					self.__upHost(host)
-					self.hostLastContactTime[hostId] = now
+					self.hostLastContactTime[hostId] = self.__now()
 
 				self.data.releaseHost(host)
 
@@ -132,13 +139,11 @@ class ClusterManagerService(object):
 		if myInstancesError == True:
 			return
 
-		now = time.time()
-
 		# iterate through all hosts I believe are up
 		for hostId in self.hostLastContactTime.keys():
 			#self.log.warning("iterate %d" % hostId)
 			host = self.data.acquireHost(hostId)
-			if (self.hostLastContactTime[hostId] < (now - self.allowDecayed)):
+			if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
 				host.decayed = True
 
 				self.log.info('Fetching state from host %s because it is decayed' % (host.name))
@@ -164,12 +169,20 @@ class ClusterManagerService(object):
 				# remove instances that shouldn't be running
 				for instance in myInstancesThisHost:
 					if (instance.id not in remoteInstanceIds):
-						instance = self.data.acquireInstance(instance.id)
+						# XXXstroucki before 20110902 excepted here with host lock
+						try:
+							instance = self.data.acquireInstance(instance.id)
+						except:
+							continue
+
 						# XXXstroucki destroy?
-						del self.instanceLastContactTime[instance.id]
+						try:
+							del self.instanceLastContactTime[instance.id]
+						except:
+							pass
 						self.data.removeInstance(instance)
 
-				self.hostLastContactTime[hostId] = now
+				self.hostLastContactTime[hostId] = self.__now()
 				host.decayed = False
 
 			self.data.releaseHost(host)
@@ -177,8 +190,12 @@ class ClusterManagerService(object):
 		
 		# iterate through all VMs I believe are active
 		for instanceId in self.instanceLastContactTime.keys():
-			instance = self.data.acquireInstance(instanceId)
-			if (self.instanceLastContactTime[instanceId] < (now - self.allowDecayed)):
+			if (self.instanceLastContactTime[instanceId] < (self.__now() - self.allowDecayed)):
+				try:
+					instance = self.data.acquireInstance(instanceId)
+				except:
+					continue
+
 				instance.decayed = True
 				self.log.info('Fetching state on instance %s because it is decayed' % (instance.name))
 				if instance.hostId is None: raise AssertionError
@@ -198,10 +215,10 @@ class ClusterManagerService(object):
 				# replace existing state with new state
 				# XXXstroucki more?
 				instance.state = newInstance.state
-				self.instanceLastContactTime[instanceId] = now
+				self.instanceLastContactTime[instanceId] = self.__now()
 				instance.decayed = False
+				self.data.releaseInstance(instance)
 
-			self.data.releaseInstance(instance)
 
 
 	def monitorCluster(self):
@@ -247,6 +264,7 @@ class ClusterManagerService(object):
 	
 	def createVm(self, instance):
 		"""Function to add a VM to the list of pending VMs"""
+		# XXXstroucki: check for exception here
 		instance = self.normalize(instance)
 		instance = self.data.registerInstance(instance)
 		self.data.releaseInstance(instance)
@@ -284,7 +302,7 @@ class ClusterManagerService(object):
 						self.proxy[hostname].destroyVm(instance.vmId)
 						self.data.releaseInstance(instance)
 				except:
-					self.log.exception('destroyVm failed on host %s vmId %d' % (hostname, instance.vmId))
+					self.log.exception('destroyVm failed on host %s vmId %s' % (hostname, str(instance.vmId)))
 					self.data.removeInstance(instance)
 
 
