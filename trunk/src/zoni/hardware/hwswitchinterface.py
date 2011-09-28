@@ -48,7 +48,7 @@ class HwSwitchInterface(object):
 	def createVlan(self, vlan):
 		raise NotImplementedError
 
-	def addNode2Vlan(self, vlan):
+	def addNode2Vlan(self, vlan, taginfo):
 		raise NotImplementedError
 
 	def removeNodeFromVlan(self, vlan):

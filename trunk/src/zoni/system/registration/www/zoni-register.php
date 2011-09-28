@@ -167,7 +167,8 @@
 			$query .= "bios_rev = '$bios_rev', ";
 			$query .= "chassis_serial_number = '$chassis_serial_number', ";
 			$query .= "system_uuid = '$system_uuid', ";
-            $query .= "cpu_flags = '$cpu_flags' ";
+            $query .= "cpu_flags = '$cpu_flags', ";
+			$query .= "last_update = now() ";
             $query .= " where system_serial_number = '$system_serial_number'";
             DEBUG($verbose, "<br>query is $query <br>\n");
 			file_put_contents("/tmp/updatequery.txt", $query);

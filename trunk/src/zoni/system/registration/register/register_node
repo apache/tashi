@@ -41,6 +41,9 @@ for x in $(cat /proc/cmdline); do
     zoniroot=*)
         ZONIROOT=${x#zoniroot=}
         ;;
+    configipmi=*)
+        CONFIGIPMI=${x#configipmi=}
+        ;;
     verbose=*)
         VERBOSE=${x#verbose=}
         ;;
@@ -127,7 +130,7 @@ DEBUG DISK_INFO - ${DISK_INFO}
 
 #  Register sysinfo to DB
 DEBUG "wget -O- http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&system_serial_number=$SYSTEM_SERIAL_NUMBER&chassis_serial_number=${CHASSIS_SERIAL_NUMBER}&system_uuid=$SYSTEM_UUID&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS&num_disks=${NUM_DISKS}&disk_info=${DISK_INFO}"
-wget "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&system_serial_number=$SYSTEM_SERIAL_NUMBER&chassis_serial_number=${CHASSIS_SERIAL_NUMBER}&system_uuid=$SYSTEM_UUID&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS&num_disks=${NUM_DISKS}&disk_info=${DISK_INFO}"
+wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&mod_mac=$MOD_MAC&sys_model=$SYS_MODEL&bios_rev=$BIOS_REV&system_serial_number=$SYSTEM_SERIAL_NUMBER&chassis_serial_number=${CHASSIS_SERIAL_NUMBER}&system_uuid=$SYSTEM_UUID&sys_vendor=$SYS_VENDOR&proc_vendor=$PROC_VENDOR&proc_model=$PROC_MODEL&clock_speed=$CLOCK_SPEED&proc_cache=$PROC_CACHE&num_procs=$NUM_PROCS&num_cores=$NUM_CORES&mem_total=$MEM_TOTAL&cpu_flags=$CPU_FLAGS&num_disks=${NUM_DISKS}&disk_info=${DISK_INFO}"
 
 #  Get more info either from cheat file or from user entered info
 ec=1
@@ -229,55 +232,59 @@ fi
 
 #  Setup the management interface, if any
 
-#  Check for ipmi
-#  Check for the existance of the module.  
-cat /proc/modules | grep ipmi_si 
-if [ $? -eq 0 ];then 
-	#  Assigning IP address to IPMI card since they don't seem to every accept an address from DHCP
-	#  Subnet is selected from config file
-	#  Get IPMI card mac address
-	ipmi_mac=$(ipmitool lan print |  grep -i "MAC Address" | awk -F ": " '{print $2}')
-	ipmi_ver=$(ipmitool mc info |  grep -i "IPMI Version" | awk -F ": " '{print $2}')
-	ipmi_rev=$(ipmitool mc info |  grep -i "Firmware Revision" | awk -F ": " '{print $2}')
+if [ $configipmi ] && [ $configipmi -eq 1 ];then 
 
-	vlan_disable=$(ipmitool lan print |  grep -i "Vlan" | awk -F ": " '{print $2}')
+	#  Check for ipmi
+	#  Check for the existance of the module.  
+	cat /proc/modules | grep ipmi_si 
+	if [ $? -eq 0 ];then 
+		#  Assigning IP address to IPMI card since they don't seem to every accept an address from DHCP
+		#  Subnet is selected from config file
+		#  Get IPMI card mac address
+		ipmi_mac=$(ipmitool lan print |  grep -i "MAC Address" | awk -F ": " '{print $2}')
+		ipmi_ver=$(ipmitool mc info |  grep -i "IPMI Version" | awk -F ": " '{print $2}')
+		ipmi_rev=$(ipmitool mc info |  grep -i "Firmware Revision" | awk -F ": " '{print $2}')
 
-	#  Add IPMI info 
-	echo "wget -O/outfile.txt 'http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}'"
-	wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}"
-	IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
-	IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_PASSWORD | awk '{print $2}')
-	IPMI_DOMAIN=$(cat /outfile.txt | grep IPMI_DOMAIN| awk '{print $2}')
-	IPMI_NETMASK=$(cat /outfile.txt | grep IPMI_NETMASK| awk '{print $2}')
-	IPMI_GATEWAY=$(cat /outfile.txt | grep IPMI_GATEWAY| awk '{print $2}')
+		vlan_disable=$(ipmitool lan print |  grep -i "Vlan" | awk -F ": " '{print $2}')
+
+		#  Add IPMI info 
+		echo "wget -O/outfile.txt 'http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}'"
+		wget -O/outfile.txt "http://${IMAGE_URL}/zoni-register.php?action=add_ipmi&verbose=${VERBOSE}&mac=$MAC&location=${location}&ip_addr=${IPADDR}&ipmi_mac=${ipmi_mac}&ipmi_ver=${ipmi_ver}&ipmi_rev=${ipmi_rev}"
+		IPMI_ADDR=$(cat /outfile.txt | grep IPMI_ADDR | awk '{print $2}')
+		IPMI_PASSWORD=$(cat /outfile.txt | grep IPMI_PASSWORD | awk '{print $2}')
+		IPMI_DOMAIN=$(cat /outfile.txt | grep IPMI_DOMAIN| awk '{print $2}')
+		IPMI_NETMASK=$(cat /outfile.txt | grep IPMI_NETMASK| awk '{print $2}')
+		IPMI_GATEWAY=$(cat /outfile.txt | grep IPMI_GATEWAY| awk '{print $2}')
 
 
-	
-	if [ ${IPMI_DOMAIN} -eq 1 ];then 
-		IPMI_DOMAIN="off"
+		
+		if [ ${IPMI_DOMAIN} -eq 1 ];then 
+			IPMI_DOMAIN="off"
+		fi
+		DEBUG "ip $IPMI_ADDR pass $IPMI_PASSWORD domain $IPMI_DOMAIN netmask $IPMI_NETMASK gateway $IPMI_GATEWAY "
+		ipmitool lan set 1 ipsrc static
+		ipmitool lan set 1 ipaddr ${IPMI_ADDR}
+		ipmitool lan set 1 vlan id ${IPMI_DOMAIN}
+		ipmitool lan set 1 defgw ipaddr ${IPMI_GATEWAY}
+		ipmitool lan set 1 netmask ${IPMI_NETMASK}
+		ipmitool lan set 1 password ${IPMI_PASSWORD}
+		ipmitool lan set 1 access on
+
+		#  Make user 2 be root with random password
+		ipmitool user set name 2 root
+		ipmitool user set password 2 $IPMI_PASSWORD
+		ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
+		ipmitool user enable 2
+
+		#Already done in add_ipmi
+		#DEBUG "adding to dhcp and dns"
+		#DEBUG "wget -O- http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}$&ip_addr=${IPMI_ADDR}"
+		#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}&ip_addr=${IPMI_ADDR}"
+
+	else
+		DEBUG "IPMI interface not found"
 	fi
-	DEBUG "ip $IPMI_ADDR pass $IPMI_PASSWORD domain $IPMI_DOMAIN netmask $IPMI_NETMASK gateway $IPMI_GATEWAY "
-	ipmitool lan set 1 ipsrc static
-	ipmitool lan set 1 ipaddr ${IPMI_ADDR}
-	ipmitool lan set 1 vlan id ${IPMI_DOMAIN}
-	ipmitool lan set 1 defgw ipaddr ${IPMI_GATEWAY}
-	ipmitool lan set 1 netmask ${IPMI_NETMASK}
-	ipmitool lan set 1 password ${IPMI_PASSWORD}
-	ipmitool lan set 1 access on
 
-	#  Make user 2 be root with random password
-	ipmitool user set name 2 root
-	ipmitool user set password 2 $IPMI_PASSWORD
-	ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
-	ipmitool user enable 2
-
-	#Already done in add_ipmi
-	#DEBUG "adding to dhcp and dns"
-	#DEBUG "wget -O- http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}$&ip_addr=${IPMI_ADDR}"
-	#wget -O- "http://${IMAGE_URL}/zoni-register.php?action=updatednsdhcp&verbose=${VERBOSE}&mac=${ipmi_mac}&location=${location}&ip_addr=${IPMI_ADDR}"
-
-else
-	DEBUG "IPMI interface not found"
 fi
 
 

@@ -41,6 +41,7 @@ def loadConfigFile(parser):
 	#  Management
 	config['userManagement'] = parser.get("management", "USER_MANAGEMENT").split()[0]
 	config['infoStore'] = parser.get("management", "INFO_STORE").split()[0]
+	config['pickleFile'] = parser.get("management", "PICKLE_FILE").split()[0]
 	
 	#  DB connection
 	config['dbUser'] = parser.get("dbConnection", "DB_USER").split()[0]
@@ -60,6 +61,7 @@ def loadConfigFile(parser):
 	config['tftpBaseMenuFile'] = parser.get("pxe", "TFTP_BASE_MENU_FILE").split()[0]
 	config['pxeServerIP'] = parser.get("pxe", "PXE_SERVER_IP").split()[0]
 	config['initrdRoot'] = parser.get("pxe", "INITRD_ROOT").split()[0]
+	config['kernelRoot'] = parser.get("pxe", "KERNEL_ROOT").split()[0]
 
 	#  Image store
 	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP").split()[0]

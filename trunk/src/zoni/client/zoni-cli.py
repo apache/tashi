@@ -119,11 +119,12 @@ def main():
 	#  Admin Interface
 	group = optparse.OptionGroup(parser, "Admin Interface", "Administration Interface:")
 	group.add_option("--admin", dest="ADMIN", help="Enter Admin mode", action="store_true", default=False)
+	group.add_option("--setPortMode", "--setportmode", dest="setPortMode", help="Set port mode to access, trunk, or general")
 	group.add_option("--enableHostPort", "--enablehostport", dest="enableHostPort", help="Enable a switch port", action="store_true", default=False)
 	group.add_option("--disableHostPort", "--disablehostport", dest="disableHostPort", help="Disable a switch port", action="store_true", default=False)
-	group.add_option("--destroyVlan", "--destroyvlan", dest="removeVlanId", help="Remove vlan from all switches")
+	group.add_option("--destroyVlan", "--destroyvlan", dest="destroyVlanId", help="Remove vlan from all switches")
 	group.add_option("--createVlan", "--createvlan", dest="createVlanId", help="Create a vlan on all switches")
-	group.add_option("--addNodeToVlan", "--addnodetovlan", dest="add2Vlan", help="Add node to a vlan")
+	group.add_option("--addNodeToVlan", "--addnodetovlan", dest="add2Vlan", help="Add node to a vlan (:tagged)")
 	group.add_option("--removeNodeFromVlan", "--removenodefromvlan", dest="removeFromVlan", help="Remove node from a vlan")
 	group.add_option("--setNativeVlan", "--setnativevlan", dest="setNative", help="Configure native vlan")
 	group.add_option("--restoreNativeVlan", "--restorenativevlan", dest="restoreNative", help="Restore native vlan", action="store_true", default=False)
@@ -132,6 +133,8 @@ def main():
 	group.add_option("--interactiveSwitchConfig", "--interactiveswitchconfig", dest="interactiveSwitchConfig", help="Interactively configure a switch.  switchhname")
 	group.add_option("--showSwitchConfig", "--showswitchconfig", dest="showSwitchConfig", help="Show switch config for node", action="store_true", default=False)
 	group.add_option("--register", dest="register", help="Register hardware to Zoni", action="store_true", default=False)
+	group.add_option("--labelPort", dest="labelPort", help="Label switch port", action="store_true", default=False)
+	group.add_option("--saveConfig", dest="saveConfig", help="SWITCHNAME - Save Switch Config")
 	parser.add_option_group(group)
 
 
@@ -149,16 +152,18 @@ def main():
 	group.add_option("--addDomain", "--adddomain", dest="addDomain", help="Add new domain to Zoni", action="store_true", default=False)
 	group.add_option("--removeDomain", "--removedomain", dest="removeDomain", help="remove a domain from Zoni", action="store_true", default=False)
 	group.add_option("-V", "--showVlans", "--showvlans", dest="showVlans", help="Show an from Zoni", action="store_true", default=False)
-	group.add_option("--addVlan", "--addvlan", dest="addVlan", help="Add new vlan to Zoni", action="store_true", default=False)
-	group.add_option("--removeVlan", "--removevlan", dest="removeVlan", help="Remove an from Zoni", action="store_true", default=False)
+	#group.add_option("--addVlan", "--addvlan", dest="addVlan", help="Add new vlan to Zoni", action="store_true", default=False)
+	#group.add_option("--removeVlan", "--removevlan", dest="removeVlan", help="Remove an from Zoni", action="store_true", default=False)
 	group.add_option("--assignVlan", "--assignvlan", dest="assignVlan", help="Assign vlan to a domain")
 	parser.add_option_group(group)
 
 	#  Allocation Interface
 	group = optparse.OptionGroup(parser, "Allocation Interface", "Change current systems allocations:")
+	#group.add_option("--addReservation", "--addreservation", dest="addReservation", help="Add a Reservation", action="store_true", default=False)
 	group.add_option("--addImage", "--addimage", dest="addImage", help="Add image to Zoni - amd64-image:dist:dist_ver")
 	group.add_option("--delImage", "--delimage", dest="delImage", help="Delete PXE image")
 	#group.add_option("--addPxeImage", "--addpxeimage", dest="imageName", help="Add PXE image to database", action="store_true", default=False)
+	group.add_option("--assignImage", "--assignimage", dest="assignImage", help="Assign image to resource")
 	group.add_option("--imageName", "--imagename", dest="imageName", help="Assign image to resource")
 
 	group.add_option("--allocateNode", "--allocatenode", dest="allocateNode", help="Assign node to a user", action="store_true", default=False)
@@ -170,10 +175,13 @@ def main():
 	group.add_option("--releaseNode", "--releasenode", dest="releaseNode", help="Release current node allocation", action="store_true", default=False)
 	group.add_option("--reservationDuration", "--reservationduration", dest="reservationDuration", help="Specify duration of node reservation - YYYYMMDD format")
 	group.add_option("-r", "--reservationId", "--reservationid", dest="reservationId", help="Reservation ID")
-	group.add_option("--addReservation", "--addreservation", dest="addReservation", help="Add a Reservation", action="store_true", default=False)
 	group.add_option("--updateReservation", "--updatereservation", dest="updateReservation", help="Update Reservation", action="store_true", default=False)
 	group.add_option("--delReservation", "--delreservation", dest="delReservation", help="Delete Reservation")
 	group.add_option("--rgasstest", dest="rgasstest", help="Debug testing function", action="store_true", default=False)
+	parser.add_option_group(group)
+
+	group = optparse.OptionGroup(parser, "Reservation Interface", "Change current systems reservations:")
+	group.add_option("--createReservation", "--createreservation", dest="createReservation", help="Create a new Reservation", action="store_true", default=False)
 	parser.add_option_group(group)
 
 	#  Zoni Helpers
@@ -197,6 +205,7 @@ def main():
 	#print "after tread"
 
 	data = instantiateImplementation("zoni.data.resourcequerysql.ResourceQuerySql", configs, options.verbosity)
+	reservation = instantiateImplementation("zoni.data.reservation.reservationMysql", configs, data, options.verbosity)
 	#query = zoni.data.resourcequerysql.ResourceQuerySql(configs, options.verbosity)
 
 	#  Get host info
@@ -373,7 +382,13 @@ def main():
 		exit()
 
 	#  Specify usermanagement, ldap or files
-	usermgt = usermanagement.ldap()
+	if configs['userManagement'] == "ldap":
+		usermgt = usermanagement.ldap()
+	elif configs['userManagement'] == "files":
+		usermgt = usermanagement.files()
+	else:
+		print "User management problem"
+		exit()
 
 
 	if (options.rgasstest):
@@ -400,9 +415,9 @@ def main():
 		#exit()
 
 	#  Create a reservation for a user
-	if (options.addReservation):
+	if (options.createReservation):
 		if not (options.userName or options.uid):
-			mesg = "ERROR:  AddReservation requires the following arguments...\n"
+			mesg = "ERROR:  CreateReservation requires the following arguments...\n"
 			if not (options.userName or options.uid):
 				mesg += "  Username:  --userName=username or --uid 1000\n"
 
@@ -412,11 +427,15 @@ def main():
 			exit()
 
 		userId = options.uid
-		if not options.uid:
+		if not userId:
 			userId = usermgt.getUserId(options.userName)
 
-		reservationId = data.addReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
+		if userId:
+			reservationId = reservation.createReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
 
+		else:
+			print "user doesn't exist"
+			exit()
 
 	#  Allocate node to user
 	if (options.allocateNode):
@@ -492,17 +511,19 @@ def main():
 		data.releaseNode(options.nodeName)
 		
 	#  Assign image to host
-	#if (options.assignImage):
-		#if not options.nodeName:
-			#usage = "Node not specified.  Please specify a node with --nodeName or -n"
-			#print usage
-			#exit()
+	if (options.assignImage):
+		if not options.nodeName:
+			usage = "Node not specified.  Please specify a node with --nodeName or -n"
+			print usage
+			exit()
+		#  need to fix this later
 		#if data.assignImagetoHost(host, options.assignImage):
 			#print "ERROR"
 			#exit()
-#
+
 		#  Update PXE 
-		#bootit = pxe.Pxe(configs, options.verbosity)
+		bootit = Pxe(configs, data, options.verbosity)
+		bootit.setBootImage(host['mac_addr'], options.assignImage)
 		#bootit.createPxeUpdateFile(data.getPxeImages())
 		#bootit.updatePxe()
 		
@@ -534,21 +555,21 @@ def main():
 
 	if (options.showVlans):
 		data.showVlans()
-	if (options.addVlan):
-		print len(args)
-		if len(args) > 0:
-			data.addVlan(args[0], string.join(args[1:len(args)]))
-		else:
-			mesg = "USAGE: %s --addVlan vlanNumber [VlanDesc]\n" % (sys.argv[0])
-			sys.stdout.write(mesg)
-			exit()
-	if (options.removeVlan):
-		if len(args) > 1:
-			data.removeVlan(args[0])
-		else:
-			mesg = "USAGE: %s --removeVlan VlanNumber\n" % (sys.argv[0])
-			sys.stdout.write(mesg)
-			exit()
+	#if (options.addVlan):
+		#print len(args)
+		#if len(args) > 0:
+			#data.addVlan(args[0], string.join(args[1:len(args)]))
+		#else:
+			#mesg = "USAGE: %s --addVlan vlanNumber [VlanDesc]\n" % (sys.argv[0])
+			#sys.stdout.write(mesg)
+			#exit()
+	#if (options.removeVlan):
+		#if len(args) > 0:
+			#data.removeVlan(args[0])
+		#else:
+			#mesg = "USAGE: %s --removeVlan VlanNumber\n" % (sys.argv[0])
+			#sys.stdout.write(mesg)
+			#exit()
 
 	if (options.assignVlan):
 		print len(args)
@@ -562,8 +583,9 @@ def main():
 	#  Admin Interface
 	#  snmpwalk -v2c -c zoni-domain sw0-r1r1 .1.3.6.1.2.1.17.7.1.4.3.1.5    
 	if (options.ADMIN):
+			
 
-		if not options.nodeName and not  options.createVlanId and not options.removeVlanId and not options.switchPort and not options.interactiveSwitchConfig:
+		if not options.nodeName and not  options.createVlanId and not options.destroyVlanId and not options.switchPort and not options.interactiveSwitchConfig and not options.saveConfig:
 			mesg = "\nERROR:  nodeName or switch not specified.  Please specify nodename with -n or --nodeName or --switchport\n"
 			parser.print_help()
 			sys.stderr.write(mesg)
@@ -585,20 +607,42 @@ def main():
 		if options.verbosity:
 			hwswitch.setVerbose(True)
 
-		#print "create vlan", options.createVlanId
-		if options.enableHostPort and options.nodeName:
+		if options.setPortMode:
+			hwswitch.setPortMode(options.setPortMode)
+
+		if options.saveConfig:
+			hwswitch.saveConfig(options.saveConfig, data)
+		if options.labelPort:
+			mydesc = None
+			if len(args) > 0:
+				mydesc = " ".join(["%s" % i for i in args])
+			hwswitch.labelPort(mydesc)
+			
+		if options.enableHostPort and (options.nodeName or options.switchPort):
 			hwswitch.enableHostPort()
 		if options.disableHostPort and (options.nodeName or options.switchPort):
 			hwswitch.disableHostPort()
+		#  Create a new vlan on all switches and add to db
 		if options.createVlanId:
+			print options.createVlanId
 			hwswitch.createVlans(options.createVlanId, data.getAllSwitches(), data)
-		if options.removeVlanId:
-			hwswitch.removeVlans(options.removeVlanId, data.getAllSwitches(), data)
+			data.addVlan(options.createVlanId, string.join(args[1:len(args)]))
+		#  Remove vlan on all switches and remove from db
+		if options.destroyVlanId:
+			hwswitch.removeVlans(options.destroyVlanId, data.getAllSwitches(), data)
+			data.removeVlan(options.destroyVlanId)
 
 		if options.add2Vlan and (options.nodeName or options.switchPort):
-			hwswitch.addNodeToVlan(options.add2Vlan)
+			tag=None
+			vlan = options.add2Vlan
+			if ":" in options.add2Vlan:
+				print options.add2Vlan
+				vlan = options.add2Vlan.split(":")[0]
+				tag = options.add2Vlan.split(":")[1]
 
-		if options.removeFromVlan and options.nodeName:
+			hwswitch.addNodeToVlan(vlan, tag)
+
+		if options.removeFromVlan and (options.nodeName or options.switchPort): 
 			hwswitch.removeNodeFromVlan(options.removeFromVlan)
 		if options.setNative and (options.nodeName or options.switchPort):
 			hwswitch.setNativeVlan(options.setNative)
