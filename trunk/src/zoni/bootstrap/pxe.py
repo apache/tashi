@@ -130,11 +130,12 @@ class Pxe(BootStrapInterface):
 		name = self.tftpBootOptionsDir + "/" + image + "-menu"
 		kOpt= self.data.getKernelOptions(image)
 		kernelPath = os.path.join(self.kernelRoot, kOpt['kernel_arch'], kOpt['kernel_name'])
+		initrdPath = os.path.join(self.initrdRoot, kOpt['kernel_arch'], kOpt['initrd_name'])
 		val = "DISPLAY boot-screens/boot.txt\n\n"
 		val += "LABEL %s\n" % kOpt['image_name']
 		val += "	MENU DEFAULT\n"
 		val += "	kernel %s\n" % kernelPath
-		val += "	append %s\n" % kOpt['initrd_options']
+		val += "	append initrd=%s %s\n" % (initrdPath, kOpt['initrd_options'])
 
 		f = open(name, "w")
 		f.write(val)
