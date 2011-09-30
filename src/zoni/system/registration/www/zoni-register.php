@@ -18,10 +18,12 @@
 #
 #  $Id$
 #
+	#  Need to put base directory here 
     include("include/zoni_www_registration.conf");
 	include("include/zoni_functions.php");
 
     $G = init_globals();
+	$PYTHONPATH=$G['ZONI_BASE_DIR'] . "/src";
     $verbose = (isset($_GET['verbose'])) ? $_GET['verbose']: 0;
 
     DEBUG($verbose, "<pre>");
@@ -138,7 +140,7 @@
             $query .= "(mac_addr, num_procs, num_cores, mem_total, ";
             $query .= "clock_speed, sys_vendor, sys_model, proc_vendor, ";
             $query .= "proc_model, proc_cache, bios_rev, system_serial_number, ";
-            $query .= "chassis_serial_number, system_uuid, last_update, ";
+            $query .= "chassis_serial_number, system_uuid, init_checkin, ";
             $query .= "cpu_flags)";
             $query .= " values ('$mac_addr', '$num_procs', '$num_cores', ";
             $query .= " '$mem_total', '$clock_speed', '$sys_vendor', ";
@@ -165,8 +167,8 @@
 			$query .= "bios_rev = '$bios_rev', ";
 			$query .= "chassis_serial_number = '$chassis_serial_number', ";
 			$query .= "system_uuid = '$system_uuid', ";
-			$query .= "last_update= NOW(), ";
-            $query .= "cpu_flags = '$cpu_flags' ";
+            $query .= "cpu_flags = '$cpu_flags', ";
+			$query .= "last_update = now() ";
             $query .= " where system_serial_number = '$system_serial_number'";
             DEBUG($verbose, "<br>query is $query <br>\n");
 			file_put_contents("/tmp/updatequery.txt", $query);
@@ -305,6 +307,7 @@
 			$query .= "hw_version_fw = '$ipmi_rev'  ";
 			$query .= "where hw_mac = '$ipmi_mac'";
 			$result = $myconn->run_query($query);
+			DEBUG($verbose, "UPDATING THE HARDWEARE INFO");
 			DEBUG($verbose, $query, $result);
 			
 		}
@@ -319,9 +322,8 @@
 		print "IPMI_GATEWAY $ipmi_gateway\n";
 
 		print "IPMI name is $ipmi_name  address is $ipmi_addr\n";
-
-		print shell_exec("PYTHONPATH=/usr/local/tashi/src  zoni --addDns $ipmi_name $ipmi_addr");
-		print shell_exec("PYTHONPATH=/usr/local/tashi/src zoni --addDhcp $ipmi_name $ipmi_addr $mac_addr");
+		print shell_exec("PYTHONPATH=$PYTHONPATH  zoni --addDns $ipmi_name $ipmi_addr");
+		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDhcp $ipmi_name $ipmi_addr $mac_addr");
         #print shell_exec("cd /var/www/cluster-admin/scripts-prs/; sudo ./remove_dns ${location}-ipmi");
         #print shell_exec("cd /var/www/cluster-admin/scripts-prs/; sudo ./remove_rdns ${location}-ipmi $ipmi_addr");
         #print shell_exec("cd /var/www/cluster-admin/scripts-prs/; sudo ./add_dns ${location}-ipmi $ipmi_addr");
@@ -378,8 +380,9 @@
 		DEBUG($verbose, "doing the dns and dhcp updates");
 		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDns $location $ip_addr");
 		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDhcp $location $ip_addr $mac_addr");
-		print shell_exec("PYTHONPATH=/usr/local/tashi/src  zoni --addDns $location $ip_addr");
-		print shell_exec("PYTHONPATH=/usr/local/tashi/src zoni --addDhcp $location $ip_addr $mac_addr");
+		#print "location is " + $location + " and ip is " + $ip_addr;
+		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDns $location $ip_addr");
+		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDhcp $location $ip_addr $mac_addr");
 	}
 
 	#  set next boot image after allocation setup

@@ -1,4 +1,5 @@
 #! /usr/bin/env python 
+
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -19,7 +20,6 @@
 #
 #  $Id$
 #
-
 import os
 import sys
 import optparse
@@ -49,10 +49,13 @@ from zoni.hardware.raritanpdu import raritanDominionPx
 from zoni.hardware.delldrac import dellDrac
 from zoni.agents.dhcpdns import DhcpDns
 
+from zoni.hardware.systemmanagement import SystemManagement
+
 
 from zoni.extra.util import * 
 from zoni.version import *
 
+from tashi.util import instantiateImplementation, signalHandler
 #import zoni.data.usermanagement 
 #from usermanagement import UserManagement
 
@@ -91,6 +94,7 @@ def main():
 	group.add_option("--reboot", "--reboot", dest="REBOOTNODE", help="Reboot node (Soft)", action="store_true", default=False)
 	group.add_option("--powerCycle", "--powercycle", dest="POWERCYCLE", help="Power Cycle (Hard)", action="store_true", default=False)
 	group.add_option("--powerOff", "--poweroff", dest="POWEROFF", help="Power off node", action="store_true", default=False)
+	group.add_option("--powerOffSoft", "--poweroffsoft", dest="POWEROFFSOFT", help="Power off node (soft)", action="store_true", default=False)
 	group.add_option("--powerOn", "--poweron", dest="POWERON", help="Power on node", action="store_true", default=False)
 	group.add_option("--powerReset", "--powerreset", dest="POWERRESET", help="Power reset node", action="store_true", default=False)
 	group.add_option("--console", dest="CONSOLE", help="Console mode", action="store_true", default=False)
@@ -101,6 +105,7 @@ def main():
 	group.add_option("-R", "--showReservation", "--showreservation", dest="showReservation", help="Show current node reservations", action="store_true", default=False)
 	group.add_option("-A", "--showAllocation", "--showallocation", dest="showAllocation", help="Show current node allocation", action="store_true", default=False)
 	group.add_option("-S", "--showResources", dest="showResources", help="Show available resources to choose from", action="store_true", default=False)
+	group.add_option("--getResources", "--getresources", dest="getResources", help="Get available resources to choose from", action="store_true", default=False)
 	group.add_option("-p", "--procs", dest="numProcs", help="Set number of processors" )
 	group.add_option("-c", "--clock", dest="clockSpeed", help="Processor clock" )
 	group.add_option("--memory", dest="numMemory", help="Amount of memory (Bytes)" )
@@ -114,11 +119,12 @@ def main():
 	#  Admin Interface
 	group = optparse.OptionGroup(parser, "Admin Interface", "Administration Interface:")
 	group.add_option("--admin", dest="ADMIN", help="Enter Admin mode", action="store_true", default=False)
+	group.add_option("--setPortMode", "--setportmode", dest="setPortMode", help="Set port mode to access, trunk, or general")
 	group.add_option("--enableHostPort", "--enablehostport", dest="enableHostPort", help="Enable a switch port", action="store_true", default=False)
 	group.add_option("--disableHostPort", "--disablehostport", dest="disableHostPort", help="Disable a switch port", action="store_true", default=False)
-	group.add_option("--destroyVlan", "--destroyvlan", dest="removeVlanId", help="Remove vlan from all switches")
+	group.add_option("--destroyVlan", "--destroyvlan", dest="destroyVlanId", help="Remove vlan from all switches")
 	group.add_option("--createVlan", "--createvlan", dest="createVlanId", help="Create a vlan on all switches")
-	group.add_option("--addNodeToVlan", "--addnodetovlan", dest="add2Vlan", help="Add node to a vlan")
+	group.add_option("--addNodeToVlan", "--addnodetovlan", dest="add2Vlan", help="Add node to a vlan (:tagged)")
 	group.add_option("--removeNodeFromVlan", "--removenodefromvlan", dest="removeFromVlan", help="Remove node from a vlan")
 	group.add_option("--setNativeVlan", "--setnativevlan", dest="setNative", help="Configure native vlan")
 	group.add_option("--restoreNativeVlan", "--restorenativevlan", dest="restoreNative", help="Restore native vlan", action="store_true", default=False)
@@ -127,6 +133,8 @@ def main():
 	group.add_option("--interactiveSwitchConfig", "--interactiveswitchconfig", dest="interactiveSwitchConfig", help="Interactively configure a switch.  switchhname")
 	group.add_option("--showSwitchConfig", "--showswitchconfig", dest="showSwitchConfig", help="Show switch config for node", action="store_true", default=False)
 	group.add_option("--register", dest="register", help="Register hardware to Zoni", action="store_true", default=False)
+	group.add_option("--labelPort", dest="labelPort", help="Label switch port", action="store_true", default=False)
+	group.add_option("--saveConfig", dest="saveConfig", help="SWITCHNAME - Save Switch Config")
 	parser.add_option_group(group)
 
 
@@ -144,16 +152,18 @@ def main():
 	group.add_option("--addDomain", "--adddomain", dest="addDomain", help="Add new domain to Zoni", action="store_true", default=False)
 	group.add_option("--removeDomain", "--removedomain", dest="removeDomain", help="remove a domain from Zoni", action="store_true", default=False)
 	group.add_option("-V", "--showVlans", "--showvlans", dest="showVlans", help="Show an from Zoni", action="store_true", default=False)
-	group.add_option("--addVlan", "--addvlan", dest="addVlan", help="Add new vlan to Zoni", action="store_true", default=False)
-	group.add_option("--removeVlan", "--removevlan", dest="removeVlan", help="Remove an from Zoni", action="store_true", default=False)
+	#group.add_option("--addVlan", "--addvlan", dest="addVlan", help="Add new vlan to Zoni", action="store_true", default=False)
+	#group.add_option("--removeVlan", "--removevlan", dest="removeVlan", help="Remove an from Zoni", action="store_true", default=False)
 	group.add_option("--assignVlan", "--assignvlan", dest="assignVlan", help="Assign vlan to a domain")
 	parser.add_option_group(group)
 
 	#  Allocation Interface
 	group = optparse.OptionGroup(parser, "Allocation Interface", "Change current systems allocations:")
+	#group.add_option("--addReservation", "--addreservation", dest="addReservation", help="Add a Reservation", action="store_true", default=False)
 	group.add_option("--addImage", "--addimage", dest="addImage", help="Add image to Zoni - amd64-image:dist:dist_ver")
 	group.add_option("--delImage", "--delimage", dest="delImage", help="Delete PXE image")
 	#group.add_option("--addPxeImage", "--addpxeimage", dest="imageName", help="Add PXE image to database", action="store_true", default=False)
+	group.add_option("--assignImage", "--assignimage", dest="assignImage", help="Assign image to resource")
 	group.add_option("--imageName", "--imagename", dest="imageName", help="Assign image to resource")
 
 	group.add_option("--allocateNode", "--allocatenode", dest="allocateNode", help="Assign node to a user", action="store_true", default=False)
@@ -165,10 +175,13 @@ def main():
 	group.add_option("--releaseNode", "--releasenode", dest="releaseNode", help="Release current node allocation", action="store_true", default=False)
 	group.add_option("--reservationDuration", "--reservationduration", dest="reservationDuration", help="Specify duration of node reservation - YYYYMMDD format")
 	group.add_option("-r", "--reservationId", "--reservationid", dest="reservationId", help="Reservation ID")
-	group.add_option("--addReservation", "--addreservation", dest="addReservation", help="Add a Reservation", action="store_true", default=False)
 	group.add_option("--updateReservation", "--updatereservation", dest="updateReservation", help="Update Reservation", action="store_true", default=False)
 	group.add_option("--delReservation", "--delreservation", dest="delReservation", help="Delete Reservation")
 	group.add_option("--rgasstest", dest="rgasstest", help="Debug testing function", action="store_true", default=False)
+	parser.add_option_group(group)
+
+	group = optparse.OptionGroup(parser, "Reservation Interface", "Change current systems reservations:")
+	group.add_option("--createReservation", "--createreservation", dest="createReservation", help="Create a new Reservation", action="store_true", default=False)
 	parser.add_option_group(group)
 
 	#  Zoni Helpers
@@ -187,42 +200,42 @@ def main():
 	cmdargs = {}
 
 	#  setup db connection
-	query = zoni.data.resourcequerysql.ResourceQuerySql(configs, options.verbosity)
+	#print "starting tread"
+	#threading.Thread(daemon=True, target=self.dbKeepAlive()).start()
+	#print "after tread"
+
+	data = instantiateImplementation("zoni.data.resourcequerysql.ResourceQuerySql", configs, options.verbosity)
+	reservation = instantiateImplementation("zoni.data.reservation.reservationMysql", configs, data, options.verbosity)
+	#query = zoni.data.resourcequerysql.ResourceQuerySql(configs, options.verbosity)
 
 	#  Get host info
 	host=None
 	if options.nodeName:
-		host = query.getHostInfo(options.nodeName)
+		host = data.getHostInfo(options.nodeName)
 		#print host
 	
 
 	#  Hardware control
-	if options.hardwareType:
-
-		if (options.hardwareType) and options.hardwareType not in configs['hardware_control']:
-			mesg = "Non support hardware type specified\n"
-			mesg += "Supported types:\n"
-			mesg += str(configs['hardware_control'])
-			mesg += "\n\n"
-			sys.stdout.write(mesg)
-			exit()
-
-		if (options.hardwareType) and options.nodeName:
-			#host = query.getHostInfo(options.nodeName)
-			if options.hardwareType == "ipmi":
-				hw = Ipmi(options.nodeName, host["ipmi_user"], host["ipmi_password"])
-
-			if options.hardwareType == "pdu":
-				hw = raritanDominionPx(configs, host)
-
-			if options.hardwareType == "drac":
-				#  Check if node has drac card
-				if "drac_name" in host:
-					hw = dellDrac(host)
-				else:
-					mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
-					sys.stdout.write(mesg)
-					exit(1)
+	if options.hardwareType and options.nodeName:
+		host = data.getHostInfo(options.nodeName)
+		if options.hardwareType == "ipmi":
+		#hardware = zoni.hardware.systemmanagement.SystemManagement(configs,data)
+			hw = Ipmi(configs, options.nodeName, host)
+#
+		if options.hardwareType == "pdu":
+			hw = raritanDominionPx(configs, options.nodeName, host)
+#
+		if options.hardwareType == "drac":
+			##  Check if node has drac card
+			if "drac_name" in host:
+				hw= dellDrac(configs, options.nodeName, host)
+			else:
+				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
+				sys.stdout.write(mesg)
+				exit(1)
+		if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or options.POWEROFFSOFT or \
+			options.POWERON or options.POWERSTATUS or options.CONSOLE or \
+			options.POWERRESET) and options.nodeName:
 
 			if options.verbosity:
 				hw.setVerbose(True)
@@ -235,6 +248,9 @@ def main():
 				exit()
 			if options.POWEROFF:
 				hw.powerOff()
+				exit()
+			if options.POWEROFFSOFT:
+				hw.powerOffSoft()
 				exit()
 			if options.POWERON:
 				hw.powerOn()
@@ -249,20 +265,51 @@ def main():
 				hw.activateConsole()
 				exit()
 			hw.getPowerStatus()
-
-
-		if (options.hardwareType) and not options.nodeName:
-			mesg = "\nMISSSING OPTION:  Node name required -n or --nodeName\n"
-			parser.print_help();
-			sys.stderr.write(mesg)
 			exit()
+	else:
+		hw = zoni.hardware.systemmanagement.SystemManagement(configs,data)
+
+	if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or options.POWEROFFSOFT or \
+		options.POWERON or options.POWERSTATUS or options.CONSOLE or \
+		options.POWERRESET) and options.nodeName:
+
+		if options.verbosity:
+			hw.setVerbose(True)
+
+		if options.REBOOTNODE:
+			hw.powerReset(options.nodeName)
+			exit()
+		if options.POWERCYCLE: 
+			hw.powerCycle(options.nodeName)
+			exit()
+		if options.POWEROFFSOFT:
+			hw.powerOffSoft(options.nodeName)
+			exit()
+		if options.POWEROFF:
+			hw.powerOff(options.nodeName)
+			exit()
+		if options.POWERON:
+			hw.powerOn(options.nodeName)
+			exit()
+		if options.POWERRESET:
+			hw.powerReset(options.nodeName)
+			exit()
+		if options.POWERSTATUS:
+			hw.getPowerStatus(options.nodeName)
+			exit()
+		if options.CONSOLE:
+			hw.activateConsole(options.nodeName)
+			exit()
+		hw.getPowerStatus(options.nodeName)
+
+
 
 	if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or \
 		options.POWERON or options.POWERSTATUS or options.CONSOLE or \
-		options.POWERRESET) and not options.hardwareType:
+		options.POWERRESET) and not options.nodeName:
 		parser.print_help()
-		usage = "\nMISSING OPTION: When specifying hardware parameters, you need the --hw option\n"
-		print usage
+		mesg = "\nMISSSING OPTION:  Node name required -n or --nodeName\n"
+		print mesg
 		exit()
 
 	#  Query Interface
@@ -285,6 +332,13 @@ def main():
 			parser.print_help()	
 			exit()
 
+	if options.getResources:
+		print "ALL resources"
+		print data.getAvailableResources()
+		key = "3Lf7Qy1oJZue1q/e3ZQbfg=="
+		print "Tashi Resources"
+		print data.getMyResources(key)
+
 	#  Show current allocations 
 	if (options.showAllocation) or (options.show and re.match(".lloca.*", args[0])):
 		if options.uid:
@@ -292,7 +346,7 @@ def main():
 		else: 
 			nameorid = options.userName
 
-		query.showAllocation(nameorid)
+		data.showAllocation(nameorid)
 		exit()
 
 	#  Show current reservation
@@ -302,20 +356,20 @@ def main():
 		else: 
 			nameorid = options.userName
 
-		query.showReservation(nameorid)
+		data.showReservation(nameorid)
 
 	#  Print all Resources
 	if options.showResources or (options.show and re.match(".esour.*", args[0])):
-		query.showResources(cmdargs)
+		data.showResources(cmdargs)
 
 	#  Show PXE images
 	#if (options.show and re.match(".esour.*", args[0])):
 	if options.showPxeImages or (options.show and re.match("pxei.*", args[0])):
-		query.showPxeImages()
+		data.showPxeImages()
 
 	#  Show machine to PXE image mapping
 	if options.showPxeImageMap or (options.show and re.match("pxem.*", args[0])):
-		query.showPxeImagesToSystemMap(cmdargs)
+		data.showPxeImagesToSystemMap(cmdargs)
 
 	if (len(sys.argv) == 1):
 		parser.print_help()
@@ -324,37 +378,46 @@ def main():
 
 	#  Delete reservation
 	if (options.delReservation):
-		query.removeReservation(options.delReservation)
+		data.removeReservation(options.delReservation)
 		exit()
 
 	#  Specify usermanagement, ldap or files
-	usermgt = usermanagement.ldap()
+	if configs['userManagement'] == "ldap":
+		usermgt = usermanagement.ldap()
+	elif configs['userManagement'] == "files":
+		usermgt = usermanagement.files()
+	else:
+		print "User management problem"
+		exit()
 
 
 	if (options.rgasstest):
+		#data.getHardwareCapabilities(options.nodeName)
 		#pdu = raritanDominionPx(host)
 		#print pdu
 		#bootit = pxe.Pxe(configs, options.verbosity)
-		#bootit.createPxeUpdateFile(query.getPxeImages())
+		#bootit.createPxeUpdateFile(data.getPxeImages())
 		#bootit.updatePxe()
 		#print "host is ", host
 		#drac = dellDrac("drac-r2r1c3", 1)
+		drac = dellDrac(configs, options.nodeName, host)
 		#drac.getPowerStatus()
 		#drac.powerOff()
 		#drac.powerOn()
 		#drac.powerCycle()
-		#drac.powerReset()
+		drac.setVerbose(options.verbosity)
+		drac.powerReset()
 		#drac.getPowerStatus()
-		print "host is ", host
-		pdu = raritanDominionPx(configs, host)
-		print "pdu", pdu
-		pdu.getPowerStatus()
-		exit()
+		#print "host is ", host
+		#pdu = raritanDominionPx(configs, options.nodeName, host)
+		#print "pdu", pdu
+		#pdu.getPowerStatus()
+		#exit()
 
 	#  Create a reservation for a user
-	if (options.addReservation):
+	if (options.createReservation):
 		if not (options.userName or options.uid):
-			mesg = "ERROR:  AddReservation requires the following arguments...\n"
+			mesg = "ERROR:  CreateReservation requires the following arguments...\n"
 			if not (options.userName or options.uid):
 				mesg += "  Username:  --userName=username or --uid 1000\n"
 
@@ -364,19 +427,23 @@ def main():
 			exit()
 
 		userId = options.uid
-		if not options.uid:
+		if not userId:
 			userId = usermgt.getUserId(options.userName)
 
-		reservationId = query.addReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
+		if userId:
+			reservationId = reservation.createReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
 
+		else:
+			print "user doesn't exist"
+			exit()
 
 	#  Allocate node to user
 	if (options.allocateNode):
 		if options.reservationId and options.domain and options.vlanInfo and options.nodeName and options.imageName:
-			host = query.getHostInfo(options.nodeName)
+			host = data.getHostInfo(options.nodeName)
 			#  optparse does not pass multiple args that are quoted anymore?  
 			#  Used to work with python 2.5.2.  Doesn't work with python 2.6.5.  
-			query.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.myNotes + " " + str(string.join(args[0:len(args)])))
+			data.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.myNotes + " " + str(string.join(args[0:len(args)])))
 		else:
 			mesg = "USAGE: %s --allocateNode --nodeName nodeName --domain domainname --reservationId ID --vlanInfo vlanNums:info, --imageName imagename [--notes]\n" % (sys.argv[0])
 			mesg += "Options\n"
@@ -405,7 +472,7 @@ def main():
 			exit()
 
 		print host['sys_id']
-		query.allocateNode(options.reservationId, host['sys_id'], options.hostName,  vlanNum, options.ipAddr, options.Notes)
+		data.allocateNode(options.reservationId, host['sys_id'], options.hostName,  vlanNum, options.ipAddr, options.Notes)
 		exit()
 
 	#  Update allocation
@@ -430,7 +497,7 @@ def main():
 				userId = usermgt.getUserId(options.userName)
 
 		print options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes
-		query.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes)
+		data.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes)
 
 	#  Release node allocation
 	if (options.releaseNode):
@@ -441,71 +508,73 @@ def main():
 
 			sys.stderr.write(mesg)		
 			exit()
-		query.releaseNode(options.nodeName)
+		data.releaseNode(options.nodeName)
 		
 	#  Assign image to host
-	#if (options.assignImage):
-		#if not options.nodeName:
-			#usage = "Node not specified.  Please specify a node with --nodeName or -n"
-			#print usage
-			#exit()
-		#if query.assignImagetoHost(host, options.assignImage):
+	if (options.assignImage):
+		if not options.nodeName:
+			usage = "Node not specified.  Please specify a node with --nodeName or -n"
+			print usage
+			exit()
+		#  need to fix this later
+		#if data.assignImagetoHost(host, options.assignImage):
 			#print "ERROR"
 			#exit()
-#
+
 		#  Update PXE 
-		#bootit = pxe.Pxe(configs, options.verbosity)
-		#bootit.createPxeUpdateFile(query.getPxeImages())
+		bootit = Pxe(configs, data, options.verbosity)
+		bootit.setBootImage(host['mac_addr'], options.assignImage)
+		#bootit.createPxeUpdateFile(data.getPxeImages())
 		#bootit.updatePxe()
 		
 	
 	#  Add image to database
 	if (options.addImage):
-		query.addImage(options.addImage)
+		data.addImage(options.addImage)
 	#  Delete PXE image 
 	if (options.delImage):
-		query.delImage(options.delImage)
+		data.delImage(options.delImage)
 
 	#  Domain interface
 	if (options.showDomains):
-		query.showDomains()
+		data.showDomains()
 	if (options.addDomain):
 		if len(args) > 2 and options.reservationId:
-			query.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
+			data.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
 		else:
 			mesg = "USAGE: %s --addDomain domainname domaindesc --reservationId ID\n" % (sys.argv[0])
 			sys.stdout.write(mesg)
 			exit()
 	if (options.removeDomain):
 		if len(args) > 0:
-			query.removeDomain(args[0])
+			data.removeDomain(args[0])
 		else:
 			mesg = "USAGE: %s --removeDomain domainname \n" % (sys.argv[0])
 			sys.stdout.write(mesg)
 			exit()
 
 	if (options.showVlans):
-		query.showVlans()
-	if (options.addVlan):
-		print len(args)
-		if len(args) > 0:
-			query.addVlan(args[0], string.join(args[1:len(args)]))
-		else:
-			mesg = "USAGE: %s --addVlan vlanNumber [VlanDesc]\n" % (sys.argv[0])
-			sys.stdout.write(mesg)
-			exit()
-	if (options.removeVlan):
-		if len(args) > 1:
-			query.removeVlan(args[0])
-		else:
-			mesg = "USAGE: %s --removeVlan VlanNumber\n" % (sys.argv[0])
-			sys.stdout.write(mesg)
-			exit()
+		data.showVlans()
+	#if (options.addVlan):
+		#print len(args)
+		#if len(args) > 0:
+			#data.addVlan(args[0], string.join(args[1:len(args)]))
+		#else:
+			#mesg = "USAGE: %s --addVlan vlanNumber [VlanDesc]\n" % (sys.argv[0])
+			#sys.stdout.write(mesg)
+			#exit()
+	#if (options.removeVlan):
+		#if len(args) > 0:
+			#data.removeVlan(args[0])
+		#else:
+			#mesg = "USAGE: %s --removeVlan VlanNumber\n" % (sys.argv[0])
+			#sys.stdout.write(mesg)
+			#exit()
 
 	if (options.assignVlan):
 		print len(args)
 		if len(args) > 0:
-			query.assignVlan(options.assignVlan, args[0], options.forcefully)
+			data.assignVlan(options.assignVlan, args[0], options.forcefully)
 		else:
 			mesg = "USAGE: %s --assignVlan vlannum DomainName\n" % (sys.argv[0])
 			sys.stdout.write(mesg)
@@ -514,8 +583,9 @@ def main():
 	#  Admin Interface
 	#  snmpwalk -v2c -c zoni-domain sw0-r1r1 .1.3.6.1.2.1.17.7.1.4.3.1.5    
 	if (options.ADMIN):
+			
 
-		if not options.nodeName and not  options.createVlanId and not options.removeVlanId and not options.switchPort and not options.interactiveSwitchConfig:
+		if not options.nodeName and not  options.createVlanId and not options.destroyVlanId and not options.switchPort and not options.interactiveSwitchConfig and not options.saveConfig:
 			mesg = "\nERROR:  nodeName or switch not specified.  Please specify nodename with -n or --nodeName or --switchport\n"
 			parser.print_help()
 			sys.stderr.write(mesg)
@@ -523,34 +593,56 @@ def main():
 
 		#  We can specify port/switch combinations here
 		if options.switchPort:
-			host = query.getSwitchInfo(options.switchPort.split(":")[0])
+			host = data.getSwitchInfo(options.switchPort.split(":")[0])
 			if len(options.switchPort.split(":")) > 1:
 				host['hw_port'] = options.switchPort.split(":")[1]
 
 			host['location'] = options.switchPort
 
 		if options.interactiveSwitchConfig:
-			host = query.getSwitchInfo(options.interactiveSwitchConfig)
+			host = data.getSwitchInfo(options.interactiveSwitchConfig)
 
 		HwSwitch = HwDellSwitch
 		hwswitch = HwSwitch(configs, host)
 		if options.verbosity:
 			hwswitch.setVerbose(True)
 
-		#print "create vlan", options.createVlanId
-		if options.enableHostPort and options.nodeName:
+		if options.setPortMode:
+			hwswitch.setPortMode(options.setPortMode)
+
+		if options.saveConfig:
+			hwswitch.saveConfig(options.saveConfig, data)
+		if options.labelPort:
+			mydesc = None
+			if len(args) > 0:
+				mydesc = " ".join(["%s" % i for i in args])
+			hwswitch.labelPort(mydesc)
+			
+		if options.enableHostPort and (options.nodeName or options.switchPort):
 			hwswitch.enableHostPort()
 		if options.disableHostPort and (options.nodeName or options.switchPort):
 			hwswitch.disableHostPort()
+		#  Create a new vlan on all switches and add to db
 		if options.createVlanId:
-			hwswitch.createVlans(options.createVlanId, query.getAllSwitches(), query)
-		if options.removeVlanId:
-			hwswitch.removeVlans(options.removeVlanId, query.getAllSwitches(), query)
+			print options.createVlanId
+			hwswitch.createVlans(options.createVlanId, data.getAllSwitches(), data)
+			data.addVlan(options.createVlanId, string.join(args[1:len(args)]))
+		#  Remove vlan on all switches and remove from db
+		if options.destroyVlanId:
+			hwswitch.removeVlans(options.destroyVlanId, data.getAllSwitches(), data)
+			data.removeVlan(options.destroyVlanId)
 
 		if options.add2Vlan and (options.nodeName or options.switchPort):
-			hwswitch.addNodeToVlan(options.add2Vlan)
+			tag=None
+			vlan = options.add2Vlan
+			if ":" in options.add2Vlan:
+				print options.add2Vlan
+				vlan = options.add2Vlan.split(":")[0]
+				tag = options.add2Vlan.split(":")[1]
 
-		if options.removeFromVlan and options.nodeName:
+			hwswitch.addNodeToVlan(vlan, tag)
+
+		if options.removeFromVlan and (options.nodeName or options.switchPort): 
 			hwswitch.removeNodeFromVlan(options.removeFromVlan)
 		if options.setNative and (options.nodeName or options.switchPort):
 			hwswitch.setNativeVlan(options.setNative)
@@ -569,14 +661,14 @@ def main():
 	#  Register hardware
 	if options.register: 
 
-		supported_hardware = ['dell', 'raritan']
+		supported_hardware = ['dellswitch', 'raritan']
 		if len(args) < 3:
 			mesg = "ERROR:  Expecting username and ip address of hardware to be registered\n"
 			mesg += os.path.basename(sys.argv[0]) + " --register HARDWARE username ipaddr\n"
 			mesg += "Supported hardware " + str(supported_hardware) + "\n"
 			sys.stderr.write(mesg)
 		else:
-			if string.lower(args[0]) == "dell":
+			if string.lower(args[0]) == "dellswitch":
 				HwSwitch = HwDellSwitch
 				hw = HwSwitch(configs)
 			elif string.lower(args[0]) == "raritan":
@@ -594,7 +686,7 @@ def main():
 			data = hw.registerToZoni(args[1], password, args[2])
 
 			#  Register to DB
-			#query.registerHardware(data)
+			#data.registerHardware(data)
 			
 	#  Zoni Helper
 	if options.addDns or options.removeDns or options.addDhcp or options.removeDhcp or options.addCname or options.removeCname:
@@ -697,7 +789,7 @@ def main():
 		if options.addCname:
 			if len(args) < 2:
 				mesg = "ERROR:  Incorrect number of arguments\n"
-				mesg += "Example:  " + os.path.basename(sys.argv[0]) + " " + thisone + "cname existing_name"
+				mesg += "Example: %s %s cname existing_name" % (os.path.basename(sys.argv[0]), thisone) 
 				print mesg
 				exit()
 			hostName = args[1]
@@ -707,10 +799,10 @@ def main():
 			dhcpdns = DhcpDns(configs, verbose=options.verbosity)
 			dhcpdns.addCname(cname, hostName)
 			if dhcpdns.error: 
-				mesg = "[FAIL]  \n" + str(dhcpdns.error) + "\n" 
+				mesg = "[FAIL]  \n %s\n" % str(dhcpdns.error)
 				sys.stdout.write(mesg) 
 			else: 
-				mesg = "[SUCCESS]" + "\n" 
+				mesg = "[SUCCESS]\n"
 				sys.stdout.write(mesg) 
 
 if __name__ == "__main__":

@@ -25,12 +25,13 @@ import datetime
 import subprocess
 import MySQLdb
 import traceback
+import logging
 
-from zoni.extra.util import logit
+from zoni.extra.util import normalizeMac
 from zoni.bootstrap.bootstrapinterface import BootStrapInterface
 
 class Pxe(BootStrapInterface):
-	def __init__(self, config, verbose=None):
+	def __init__(self, config, data, verbose=None):
 		self.verbose  = verbose
 		self.host = config['dbHost']
 		self.user = config['dbUser']
@@ -43,19 +44,26 @@ class Pxe(BootStrapInterface):
 		self.tftpUpdateFile = config['tftpUpdateFile']
 		self.tftpBaseFile = config['tftpBaseFile']
 		self.tftpBaseMenuFile = config['tftpBaseMenuFile']
+		self.initrdRoot = config['initrdRoot']
+		self.kernelRoot = config['kernelRoot']
 
-		self.logFile = config['logFile']
+		self.log = logging.getLogger(os.path.basename(__file__))
+
 
 		if config['dbPort'] == "":
 			config['dbPort'] = 3306
 
 		self.port = config['dbPort']
 
-		self.vlan_max = config['vlan_max']
-		self.vlan_reserved = config['vlan_reserved']
+		self.vlan_max = config['vlanMax']
 		
+		self.data = data
+		#self.vlan_reserved = config['vlanReserved']
+		
+		#data = instantiateImplementation("zoni.data.resourcequerysql.ResourceQuerySql", configs, options.verbosity)
 		#  Connect to DB
-		self.conn = MySQLdb.connect(host = self.host, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
+		#self.conn = MySQLdb.connect(host = self.ho st, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
+
 		#cursor.execute ("SELECT VERSION()")
 		#print "server version:", row[0]
 		#mysql -Dirp-cluster -hrodimus -u reader -e "select * from hostinfo;"
@@ -97,4 +105,73 @@ class Pxe(BootStrapInterface):
 			os.system(cmd)
 		except Exception:
 			traceback.print_exc(sys.exc_info())
+
+	def generateBootOptions(self, image):
+		name = self.tftpBootOptionsDir + "/" + image
+		tftpdir = os.path.basename(self.tftpImageDir)
+		bootdir = os.path.basename(self.tftpBootOptionsDir)
+		imagedir = os.path.join(tftpdir, bootdir, image)
+
+		#  Write out boot image file
+		val = "DISPLAY boot-screens/boot.txt\n"
+		val += "DEFAULT vesamenu.c32\n"
+		val += "MENU BACKGROUND boot-screens/zoni_pxe.jpg\n"
+		val += "PROMPT 0\n"
+		
+		val += "MENU COLOR border 49;37 #00FFFFFF #00FFFFFF none\n"
+		val += "MENU INCLUDE %s-menu\n" % imagedir
+		f = open(name, "w")
+		f.write(val)
+		f.close()
+
+		
+		#  Write out the menu file
+		#  Eventually iterate over all images this machine should be able to select from
+		name = self.tftpBootOptionsDir + "/" + image + "-menu"
+		kOpt= self.data.getKernelOptions(image)
+		kernelPath = os.path.join(self.kernelRoot, kOpt['kernel_arch'], kOpt['kernel_name'])
+		initrdPath = os.path.join(self.initrdRoot, kOpt['kernel_arch'], kOpt['initrd_name'])
+		val = "DISPLAY boot-screens/boot.txt\n\n"
+		val += "LABEL %s\n" % kOpt['image_name']
+		val += "	MENU DEFAULT\n"
+		val += "	kernel %s\n" % kernelPath
+		val += "	append initrd=%s %s\n" % (initrdPath, kOpt['initrd_options'])
+
+		f = open(name, "w")
+		f.write(val)
+		f.close()
+
+		
+
+	def setBootImage(self, mac, image):
+		mac_addr = "01-" + string.replace(normalizeMac(mac), ":", "-")
+		maclink = self.tftpImageDir + "/" + mac_addr
+		self.generateBootOptions(image)
+		#  Check if it exists first
+		if os.path.exists(maclink):
+			try:
+				os.unlink(maclink)
+			except Exception, e:
+				traceback.print_exc(sys.exc_info())
+				if OSError:
+					print OSError, e
+					mesg = "ERROR : %s\n" % e
+					self.log.error(mesg)
+					return 1
+				return 1
+		#  Create the boot option file
+		#  Relink
+		newlink = os.path.basename(self.tftpBootOptionsDir) + "/" + image
+		try:
+			os.symlink(newlink, maclink)
+			mesg = "Image assignment Successful %s -> %s " % (mac, image)
+			self.log.info(mesg)
+		except Exception, e:
+			if OSError:
+				#mesg = "Cannot modify file.  Please use sudo\n"
+				mesg = "ERROR : %s\n" % e
+				self.log.info(mesg)
+				return 1
+			return 1
+
 		
