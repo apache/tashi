@@ -500,30 +500,57 @@ def main():
 		usage()
 	function = matchFunction(sys.argv[1])
 	(config, configFiles) = getConfig(["Client"])
-	possibleArgs = argLists[function]
+
+	# build a structure of possible arguments
+	possibleArgs = {}
+	argList = argLists[function]
+	for i in range(0, len(argList)):
+		possibleArgs[argList[i][0]]=argList[i]
+
 	args = sys.argv[2:]
-	for arg in args:
-		if (arg == "--help" or arg == "--examples"):
-			usage(function)
+
+	vals = {}
+
 	try:
-		vals = {}
+		# create client handle
 		client = createClient(config)
-		for parg in possibleArgs:
+
+		# set defaults
+		for parg in possibleArgs.values():
 			(parg, conv, default, required) = parg
-			val = None
-			for i in range(0, len(args)):
-				arg = args[i]
-				if (arg.startswith("--") and arg[2:] == parg):
-					val = conv(args[i+1])
-			if (val == None):
-				val = default()
-			vals[parg] = val
-		for arg in args:
+			if (required is False):
+				vals[parg] = default()
+
+		while (len(args) > 0):
+			arg = args.pop(0)
+
+			if (arg == "--help" or arg == "--examples"):
+				usage(function)
+				# this exits
+
 			if (arg.startswith("--hide-")):
 				show_hide.append((False, arg[7:]))
+				continue
+
 			if (arg.startswith("--show-")):
 				show_hide.append((True, arg[7:]))
+				continue
+
+			if (arg.startswith("--")):
+				if (arg[2:] in possibleArgs):
+					(parg, conv, default, required) = possibleArgs[arg[2:]]
+					val = conv(args.pop(0))
+					if (val == None):
+						val = default()
+
+					vals[parg] = val
+					continue
+
+			raise ValueError("Unknown argument %s" % (arg)) 
+
+		
 		f = getattr(client, function, None)
+
 		if (f is None):
 			f = extraViews[function][0]
 		if (function in convertArgs):
