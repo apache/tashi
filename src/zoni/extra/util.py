@@ -39,7 +39,7 @@ def loadConfigFile(parser):
 	config['logFile'] = parser.get("logging", "LOG_FILE").split()[0]
 	
 	#  Management
-	#config['userManagement'] = parser.get("management", "USER_MANAGEMENT").split()[0]
+	config['userManagement'] = parser.get("management", "USER_MANAGEMENT").split()[0]
 	#config['infoStore'] = parser.get("management", "INFO_STORE").split()[0]
 	config['pickleFile'] = parser.get("management", "PICKLE_FILE").split()[0]
 	

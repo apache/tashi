@@ -63,17 +63,17 @@ SVC_TAG=$1
 REQUEST=$2
 
 res=""
-if [[ "$REQUEST" == "location" ]]; then
+if [ "$REQUEST" = "location" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $2}'`
-elif [[ "$REQUEST" == "switchinfo" ]]; then
+elif [ "$REQUEST" = "switchinfo" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $3}'`
-elif [[ "$REQUEST" == "pduinfo" ]]; then
+elif [ "$REQUEST" = "pduinfo" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $4}'`
-elif [[ "$REQUEST" == "image" ]]; then
+elif [ "$REQUEST" = "image" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $5}'`
 fi
 
-if [[ `echo -n $res | wc -c` -gt 1 ]]; then
+if [ `echo -n $res | wc -c` -gt 1 ]; then
     echo $res
     exit 0
 else

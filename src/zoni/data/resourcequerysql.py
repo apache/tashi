@@ -102,6 +102,17 @@ class ResourceQuerySql(InfoStore):
 			self.log.error(mesg)
 		
 
+	def getDomainMembership(self, sys_id):
+		query = "select v.vlan_num, q.vlan_type from allocationinfo a, vlanmembermap q, vlaninfo v where q.vlan_id = v.vlan_id and a.allocation_id = q.allocation_id and sys_id = '%s'" % (sys_id)
+		result = self.selectDb(query)
+		data = {}
+		if result.rowcount:
+			for i in result.fetchall():
+				data[int(i[0])] = i[1]
+			return data
+		else:
+			return -1
+
 	def removeDomain(self, name):
 		mesg = "Removing domain %s" % (name)
 		self.log.info(mesg)
@@ -479,6 +490,7 @@ class ResourceQuerySql(InfoStore):
 		else:
 			print "%-10s%-10s%-13s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
 
+		print "ros ", result.rowcount
 		for i in result.fetchall():
 			uid = i[0]
 			domain = i[1]
@@ -914,7 +926,8 @@ class ResourceQuerySql(InfoStore):
 #
 		#self.insertDb(query)
 
-	def allocateNode(self, reservationId, domain, sysId, vlanInfo, imageName, notes=None):
+
+	def allocateNode(self, reservationId, domain, sysId, vlanInfo, imageName, newHostName=None, notes=None):
 		print "reservationId", reservationId, domain, sysId, vlanInfo, imageName, notes
 
 		#  Check if node is already allocated
@@ -956,7 +969,7 @@ class ResourceQuerySql(InfoStore):
 		nodeName = self.getLocationFromSysId(sysId)
 		mesg = "allocateNode %s : domain %s : reservation %s(%s)" % (nodeName, domain, reservationId, resinfo[4])
 		self.log.info(mesg)
-		query = "insert into allocationinfo (sys_id, reservation_id, domain_id, notes) values ('%s', '%s', '%s', '%s')" % (sysId, reservationId, domainId, notes)
+		query = "insert into allocationinfo (sys_id, reservation_id, domain_id, hostname, notes) values ('%s', '%s', '%s', '%s', '%s')" % (sysId, reservationId, domainId, newHostName, notes)
 		result = self.insertDb(query)
 		allocationId = result.lastrowid
 
@@ -976,6 +989,7 @@ class ResourceQuerySql(InfoStore):
 		result = self.insertDb(query)
 	
 		self.__updateSysState(sysId, 1)
+
 
 		
 	def __updateSysState(self, sysId, stateId):
