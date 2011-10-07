@@ -289,14 +289,23 @@ class ResourceQuerySql(InfoStore):
 		for i in defaultFields.split(","):
 			#line += string.strip(str(i)) + "\t"
 			line += str(i.center(20))
+		#  header
 		print line
 
+		sum = {}
 		for row in result.fetchall():
 			line = ""
+			sum['totProc'] = sum.get('totProc', 0)
+			sum['totProc'] += int(row[2])
+			sum['totCores'] = sum.get('totCores', 0)
+			sum['totCores'] += int(row[3])
+			sum['totMemory'] = sum.get('totMemory', 0)
+			sum['totMemory'] += int(row[5])
 			for val in row:
 				line += str(val).center(20)
+			
 			print line
-		print str(result.rowcount) + " systems returned"
+		print "\n%s systems registered -  %d procs | %d cores | %d bytes RAM" % (str(result.rowcount), sum['totProc'], sum['totCores'], sum['totMemory'],)
 
 	def getAvailableResources(self):
 		#  Maybe should add a status flag?
@@ -324,7 +333,6 @@ class ResourceQuerySql(InfoStore):
 				res[location][desc[4][0]] = int(i[4])
 				res[location][desc[5][0]] = int(i[5])
 				res[location][desc[6][0]] = i[6]
-			
 		return res
 
 	def getMyResources(self, key):
@@ -464,14 +472,11 @@ class ResourceQuerySql(InfoStore):
 		#  specify usermanagement - ldap or files
 		usermgt = eval("usermanagement.%s" % (self.config['userManagement']) + "()")
 
-		query = "select r.user_id, d.domain_name, s.location, s.num_cores, \
-				s.mem_total, r.reservation_expiration, r.notes, r.reservation_id, a.hostname, \
-				a.notes, i.image_name from \
-				sysinfo s, imageinfo i, \
-				allocationinfo a, domaininfo d, reservationinfo r, imagemap j where \
-				i.image_id = j.image_id \
-				and r.reservation_id = a.reservation_id \
-				and d.domain_id = a.domain_id and s.sys_id = a.sys_id "
+		#select a.reservation_id, a.sys_id, r.user_id, s.location, s.num_cores, s.mem_total, a.hostname, ii.image_name 
+		#from allocationinfo a, reservationinfo r, sysinfo s, imageinfo ii, imagemap im 
+		#where r.reservation_id = a.reservation_id and a.sys_id = s.sys_id and im.image_id = ii.image_id and im.allocation_id = a.allocation_id;
+
+		query = "select r.user_id, d.domain_name, s.location, s.num_cores, s.mem_total, r.reservation_expiration, r.notes, r.reservation_id,  a.hostname, a.notes, ii.image_name, a.allocation_id from sysinfo s, imageinfo ii, allocationinfo a, domaininfo d, reservationinfo r, imagemap im where  im.image_id = ii.image_id and r.reservation_id = a.reservation_id and  d.domain_id = a.domain_id and s.sys_id = a.sys_id and im.allocation_id = a.allocation_id"
 		if userId:
 			myid = userId
 			if type(userId) == str:
@@ -480,17 +485,17 @@ class ResourceQuerySql(InfoStore):
 				
 			query += " and user_id = '%s' " % (myid)
 
-		query += "order by r.reservation_id asc, s.location"
+		query += " order by r.reservation_id asc, s.location"
 
 		result = self.selectDb(query)
 		
 		print "NODE ALLOCATION\n"
+		sum = {}
 		if self.verbose:
-			print "%-5s%-10s%-10s%-13s%-12s%-15s%-18s%-24s%-20s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Hostname", "IP Addr", "Boot Image Name", "Vlan Member", "Notes")
+			print "%-5s%-10s%-10s%-13s%-12s%-10s%-34s%-20s%s" % ("Res", "User", "Host", "Cores/Mem","Expiration", "Hostname", "Boot Image Name", "Vlan Member", "Notes")
 		else:
 			print "%-10s%-10s%-13s%-12s%s" % ("User", "Node", "Cores/Mem","Expiration", "Notes")
 
-		print "ros ", result.rowcount
 		for i in result.fetchall():
 			uid = i[0]
 			domain = i[1]
@@ -507,21 +512,27 @@ class ResourceQuerySql(InfoStore):
 				hostname = host
 			anotes = i[9]
 			image_name = i[10]
+			allocation_id = i[11]
 			userName = usermgt.getUserName(uid)
 			combined_notes = str(rnotes) + "|" + str(anotes)
+			sum['totCores'] = sum.get('totCores', 0)
+			sum['totCores'] += cores
+			sum['totMemory'] = sum.get('totMemory', 0)
+			sum['totMemory'] += memory
 			if self.verbose:
-				query = "select vlan_num from vlaninfo v, domainmembermap m, domaininfo d where v.vlan_id = m.vlan_id and d.domain_id = m.domain_id and d.domain_name = '%s'" % (domain);
+				#query = "select vlan_num from vlaninfo v, domainmembermap m, domaininfo d where v.vlan_id = m.vlan_id and d.domain_id = m.domain_id and d.domain_name = '%s'" % (domain);
+				#query = "select vlan_num from vlaninfo v, vlanmembermap m, domaininfo d, allocationinfo a where v.vlan_id = m.vlan_id and a.reservation_id = d.reservation_id"
+				query = "select v.vlan_num from vlaninfo v, vlanmembermap m where v.vlan_id = m.vlan_id and allocation_id = '%d'" % allocation_id
 				vlanRes = self.selectDb(query)
 				vlanList = []
 				for i in vlanRes.fetchall():
 					vlanList.append(str(i[0]))
 				
 				vlanMember = string.join(vlanList, ",")
-				ip_addr = "10.0.0.10"
-				print "%-5s%-10s%-10s%-2s/%-10s%-12s%-15s%-18s%-24s%-20s%s" % (resId, userName, host, cores, memory,expire, hostname, ip_addr, image_name, vlanMember,combined_notes)
+				print "%-5s%-10s%-10s%-2s/%-10s%-12s%-10s%-34s%-20s%s" % (resId, userName, host, cores, memory,expire, hostname, image_name, vlanMember,combined_notes)
 			else:
 				print "%-10s%-10s%-2s/%-10s%-12s%s" % (userName, host, cores, memory,expire, combined_notes)
-		print "\n%s systems returned" % (str(result.rowcount))
+		print "\n%s systems allocated - %d cores| %d bytes RAM" % (str(result.rowcount), sum['totCores'], sum['totMemory'])
 
 	def showReservation(self, userId=None):
 		#from IPython.Shell import IPShellEmbed
@@ -975,20 +986,38 @@ class ResourceQuerySql(InfoStore):
 
 		#  Parse vlan info and add to vlanmembermap
 		for i in vlanInfo.split(","):
-			print i
 			v = i.split(":")[0]
-			vId = self.getVlanId(v)
 			t = i.split(":")[1]
-			query = "insert into vlanmembermap (allocation_id, vlan_id, vlan_type) values ('%s', '%s', '%s')" % (allocationId, vId, t)
-			result = self.insertDb(query)
-			mesg = "Adding vlan %s to node %s" % (v, nodeName)
-			self.log.info(mesg)
+			self.addnodetovlan(nodeName, v, t)
 
 		#  Insert into imagemap
 		query = "insert into imagemap (allocation_id, image_id) values ('%s', '%s')" % (allocationId, imageId)
 		result = self.insertDb(query)
 	
 		self.__updateSysState(sysId, 1)
+
+	def addNodeToVlan(self, nodeName, v, t):
+		sysId = self.getSysIdFromLocation(nodeName)	
+		allocationId = self.__getSomething("allocation_id", "allocationinfo", "sys_id", sysId)
+		vId = self.getVlanId(v)
+		if self.__checkDup("vlanmembermap", "vlan_id", vId, "allocation_id", allocationId):
+			self.log.error("Vlan %s already exists" % (v))
+			return -1
+		query = "insert into vlanmembermap (allocation_id, vlan_id, vlan_type) values ('%s', '%s', '%s')" % (allocationId, vId, t)
+
+		result = self.insertDb(query)
+		mesg = "Adding vlan %s to node %s" % (v, nodeName)
+		self.log.info(mesg)
+
+	def removeNodeFromVlan(self, nodeName, v):
+		sysId = self.getSysIdFromLocation(nodeName)	
+		allocationId = self.__getSomething("allocation_id", "allocationinfo", "sys_id", sysId)
+		vId = self.getVlanId(v)
+		query = "delete from vlanmembermap where allocation_id = '%s' and vlan_id = '%s'" % (allocationId, vId)
+
+		result = self.insertDb(query)
+		mesg = "Removing vlan %s from node %s" % (v, nodeName)
+		self.log.info(mesg)
 
 
 		

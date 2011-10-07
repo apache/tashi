@@ -647,7 +647,7 @@ def main():
 			data.removeVlan(options.destroyVlanId)
 
 		if options.add2Vlan and (options.nodeName or options.switchPort):
-			tag=None
+			tag="untagged"
 			vlan = options.add2Vlan
 			if ":" in options.add2Vlan:
 				print options.add2Vlan
@@ -655,9 +655,12 @@ def main():
 				tag = options.add2Vlan.split(":")[1]
 
 			hwswitch.addNodeToVlan(vlan, tag)
+			data.addNodeToVlan(host['location'], vlan, tag)
+			exit()
 
 		if options.removeFromVlan and (options.nodeName or options.switchPort): 
 			hwswitch.removeNodeFromVlan(options.removeFromVlan)
+			data.removeNodeFromVlan(options.nodeName, options.removeFromVlan)
 		if options.setNative and (options.nodeName or options.switchPort):
 			hwswitch.setNativeVlan(options.setNative)
 		if options.restoreNative and options.nodeName:
