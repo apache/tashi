@@ -271,6 +271,10 @@ class HwDellSwitch(HwSwitchInterface):
 		child.terminate()
 
 	def addNodeToVlan(self, vlan, tag="untagged"):
+		if tag == "native":
+			self.setNativeVlan(vlan)
+			tag = "untagged"
+		
 		mesg = "Adding switchport (%s:%s) to vlan %s:%s" % (str(self.host['hw_name']), str(self.host['hw_port']), str(vlan), str(tag))
 		self.log.info(mesg)
 		

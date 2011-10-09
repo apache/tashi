@@ -553,10 +553,11 @@ def main():
 	if (options.showDomains):
 		data.showDomains()
 	if (options.addDomain):
-		if len(args) > 2 and options.reservationId:
-			data.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
+		if len(args) > 2 and options.vlanInfo:
+			data.addDomain(args[0], string.join(args[1:len(args)]), options.vlanInfo)
 		else:
-			mesg = "USAGE: %s --addDomain domainname domaindesc --reservationId ID\n" % (sys.argv[0])
+			mesg = "USAGE: %s --addDomain domainname \"domain desc\" --vlanInfo vlan:type,vlan:type\n" % (sys.argv[0])
+			mesg += "Options\n\n  --vlanInfo 999:native,1000:untagged,1001:tagged\n"
 			sys.stdout.write(mesg)
 			exit()
 	if (options.removeDomain):
@@ -663,6 +664,7 @@ def main():
 			data.removeNodeFromVlan(options.nodeName, options.removeFromVlan)
 		if options.setNative and (options.nodeName or options.switchPort):
 			hwswitch.setNativeVlan(options.setNative)
+			data.addNodeToVlan(host['location'], options.setNative, "native")
 		if options.restoreNative and options.nodeName:
 			hwswitch.restoreNativeVlan()
 		if options.removeAllVlans and (options.nodeName or options.switchPort):
