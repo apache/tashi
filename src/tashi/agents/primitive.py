@@ -119,7 +119,7 @@ class Primitive(object):
 				allowElsewhere = False
 			# has a host preference been expressed?
 			if (targetHost != None):
-				for h in hosts.values():
+				for h in self.hosts.values():
 					# if this is not the host we are looking for, continue
 					if ((str(h.id) != targetHost and h.name != targetHost)):
 						continue
