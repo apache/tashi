@@ -105,6 +105,7 @@ class Qemu(VmControlInterface):
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
+		self.scratchVg = self.config.get("Qemu", "scratchVg")
 		# XXXstroucki revise
 		self.scratchDir = self.config.get("Qemu", "scratchDir")
 		if len(self.scratchDir) == 0:
@@ -178,11 +179,15 @@ class Qemu(VmControlInterface):
 						f.write(i)
 					f.close()
 				#XXXstroucki remove scratch storage
-				scratch_name = child.instance.name
-				log.info("Removing scratch for " + scratch_name)
-				#cmd = "/sbin/lvremove -f vgscratch/lv" + scratch_name
-				cmd = "/sbin/lvremove -f vgscratch"
-    				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				try:
+					if self.scratchVg is not None:
+						scratch_name = child.instance.name
+						log.info("Removing scratch for " + scratch_name)
+						cmd = "/sbin/lvremove -f %s" % self.scratchVg
+    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				except:
+					pass
+
 				try:
 					if (not child.migratingOut):
 						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
@@ -396,17 +401,19 @@ class Qemu(VmControlInterface):
 
 		try:
 			if scratchSize > 0:
+				if self.scratchVg is None:
+					raise Exception, "No scratch volume group defined"
 				# create scratch disk
 				# XXXstroucki: needs to be cleaned somewhere
 				# XXXstroucki: clean user provided instance name
 				scratch_name = "lv" + instance.name
 				# XXXstroucki hold lock
 				# XXXstroucki check for capacity
-				cmd = "/sbin/lvcreate -n" + scratch_name + " -L" + str(scratchSize) + "G vgscratch"
+				cmd = "/sbin/lvcreate -n" + scratch_name + " -L" + str(scratchSize) + "G " + self.scratchVg
 				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
 
-				thisDiskList = [ "file=/dev/vgscratch/%s" % scratch_name ]
+				thisDiskList = [ "file=/dev/%s/%s" % (self.scratchVg, scratch_name) ]
 				thisDiskList.append("if=%s" % diskInterface)
 				thisDiskList.append("index=%d" % index)
 				thisDiskList.append("cache=off")

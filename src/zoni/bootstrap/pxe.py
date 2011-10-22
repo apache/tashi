@@ -115,8 +115,9 @@ class Pxe(BootStrapInterface):
 		#  Write out boot image file
 		val = "DISPLAY boot-screens/boot.txt\n"
 		val += "DEFAULT vesamenu.c32\n"
-		val += "MENU BACKGROUND boot-screens/zoni_pxe.jpg\n"
+		val += "TIMEOUT 2\n"
 		val += "PROMPT 0\n"
+		val += "MENU BACKGROUND boot-screens/zoni_pxe.jpg\n"
 		
 		val += "MENU COLOR border 49;37 #00FFFFFF #00FFFFFF none\n"
 		val += "MENU INCLUDE %s-menu\n" % imagedir

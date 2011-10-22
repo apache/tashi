@@ -27,6 +27,7 @@ import socket
 import logging.config
 import getpass
 import re
+import subprocess
 
 
 
@@ -443,7 +444,7 @@ def main():
 			host = data.getHostInfo(options.nodeName)
 			#  optparse does not pass multiple args that are quoted anymore?  
 			#  Used to work with python 2.5.2.  Doesn't work with python 2.6.5.  
-			data.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.myNotes + " " + str(string.join(args[0:len(args)])))
+			data.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.hostName, options.myNotes + " " + str(string.join(args[0:len(args)])))
 		else:
 			mesg = "USAGE: %s --allocateNode --nodeName nodeName --domain domainname --reservationId ID --vlanInfo vlanNums:info, --imageName imagename [--notes]\n" % (sys.argv[0])
 			mesg += "Options\n"
@@ -456,7 +457,6 @@ def main():
 			sys.stdout.write(mesg)
 			exit()
 		
-		exit()  #remove this
 		if not (options.reservationId) or not options.nodeName: 
 			mesg = "ERROR:  AllocateNode requires the following arguments...\n"
 			if not (options.nodeName):
@@ -471,8 +471,23 @@ def main():
 			sys.stderr.write(mesg)		
 			exit()
 
-		print host['sys_id']
-		data.allocateNode(options.reservationId, host['sys_id'], options.hostName,  vlanNum, options.ipAddr, options.Notes)
+		#  Reconfigure switchports
+		memberMap = data.getDomainMembership(host['sys_id'])
+		HwSwitch = HwDellSwitch
+		hwswitch = HwSwitch(configs, host)
+		for vlan, tag in memberMap.iteritems():
+			hwswitch.addNodeToVlan(vlan, tag)
+		#  Register node in DNS
+		if options.hostName:
+			#  Add cname
+			cmd = "zoni --addCname %s %s" % (options.hostName, host['location'])
+			subprocess.Popen(string.split(cmd))
+			
+		
+
+	
+		#data.allocateNode(options.reservationId, options.domain, host['sys_id'], options.vlanInfo, options.imageName, options.hostName, options.myNotes + " " + str(string.join(args[0:len(args)])))
+		#data.allocateNode(options.reservationId, host['sys_id'], options.hostName,  vlanNum, options.ipAddr, options.myNotes)
 		exit()
 
 	#  Update allocation
@@ -490,14 +505,13 @@ def main():
 			exit()
 
 		userId = None
-		if options.uid and options.userName:
+		if options.uid or options.userName:
 			#  Get the username from uid 
 			userId = options.uid
 			if not options.uid:
 				userId = usermgt.getUserId(options.userName)
 
-		print options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes
-		data.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.Notes)
+		data.updateReservation(options.reservationId, userId, options.reservationDuration, options.vlanIsolate, options.myNotes)
 
 	#  Release node allocation
 	if (options.releaseNode):
@@ -539,10 +553,11 @@ def main():
 	if (options.showDomains):
 		data.showDomains()
 	if (options.addDomain):
-		if len(args) > 2 and options.reservationId:
-			data.addDomain(args[0], string.join(args[1:len(args)]), options.reservationId)
+		if len(args) > 2 and options.vlanInfo:
+			data.addDomain(args[0], string.join(args[1:len(args)]), options.vlanInfo)
 		else:
-			mesg = "USAGE: %s --addDomain domainname domaindesc --reservationId ID\n" % (sys.argv[0])
+			mesg = "USAGE: %s --addDomain domainname \"domain desc\" --vlanInfo vlan:type,vlan:type\n" % (sys.argv[0])
+			mesg += "Options\n\n  --vlanInfo 999:native,1000:untagged,1001:tagged\n"
 			sys.stdout.write(mesg)
 			exit()
 	if (options.removeDomain):
@@ -633,7 +648,7 @@ def main():
 			data.removeVlan(options.destroyVlanId)
 
 		if options.add2Vlan and (options.nodeName or options.switchPort):
-			tag=None
+			tag="untagged"
 			vlan = options.add2Vlan
 			if ":" in options.add2Vlan:
 				print options.add2Vlan
@@ -641,11 +656,15 @@ def main():
 				tag = options.add2Vlan.split(":")[1]
 
 			hwswitch.addNodeToVlan(vlan, tag)
+			data.addNodeToVlan(host['location'], vlan, tag)
+			exit()
 
 		if options.removeFromVlan and (options.nodeName or options.switchPort): 
 			hwswitch.removeNodeFromVlan(options.removeFromVlan)
+			data.removeNodeFromVlan(options.nodeName, options.removeFromVlan)
 		if options.setNative and (options.nodeName or options.switchPort):
 			hwswitch.setNativeVlan(options.setNative)
+			data.addNodeToVlan(host['location'], options.setNative, "native")
 		if options.restoreNative and options.nodeName:
 			hwswitch.restoreNativeVlan()
 		if options.removeAllVlans and (options.nodeName or options.switchPort):

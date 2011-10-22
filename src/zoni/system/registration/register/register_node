@@ -23,6 +23,7 @@
 DEBUG () {
 	if [ $VERBOSE ] && [ $VERBOSE -eq 1 ];then 
 		echo DEBUG: $*
+		echo DEBUG: $* >> /tmp/output.log
 	fi
 }
 
@@ -134,7 +135,7 @@ wget -O- "http://${IMAGE_URL}/zoni-register.php?action=register_system&mac=$MAC&
 
 #  Get more info either from cheat file or from user entered info
 ec=1
-if [[ -e /register_automate ]]; then
+if [ -e /register_automate ]; then
 	switchinfo=`/register_automate $SYSTEM_SERIAL_NUMBER switchinfo`
 	switchport=$(echo $switchinfo | cut -d ":" -f 2)
 	switch=$(echo $switchinfo | cut -d ":" -f 1)
@@ -159,9 +160,9 @@ fi
 #if [ $val -gt 0 ];then
 
 #  No automate entry found, prompt user for info
-if [[ $ec -ne 0 ]]; then
+if [ $ec -ne 0 ]; then
 	ans=n;
-	while [ $ans == "n" ] || [ $ans == "N" ]; do
+	while [ $ans = "n" ] || [ $ans = "N" ]; do
 		echo -n "Please enter the location/hostname for this node: "
 		read location
 		#echo -n "Please enter the IP address for this node: "

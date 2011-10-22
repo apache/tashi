@@ -131,7 +131,7 @@ class files(UserManagementInterface):
 		cmd = "cat /etc/passwd "
 		a = os.popen(cmd)
 		for line in a.readlines():
-			if userName in line :
+			if str(userId) in line :
 				return line.split(":")[0]
 
 		return 0

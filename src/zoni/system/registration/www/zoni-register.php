@@ -26,6 +26,7 @@
 	$PYTHONPATH=$G['ZONI_BASE_DIR'] . "/src";
     $verbose = (isset($_GET['verbose'])) ? $_GET['verbose']: 0;
 
+	print "verbose is $verbose";
     DEBUG($verbose, "<pre>");
     DEBUG($verbose, $G);
 
@@ -168,10 +169,9 @@
 			$query .= "chassis_serial_number = '$chassis_serial_number', ";
 			$query .= "system_uuid = '$system_uuid', ";
             $query .= "cpu_flags = '$cpu_flags', ";
-			$query .= "last_update = now() ";
+            $query .= "last_update = now() ";
             $query .= " where system_serial_number = '$system_serial_number'";
             DEBUG($verbose, "<br>query is $query <br>\n");
-			file_put_contents("/tmp/updatequery.txt", $query);
             $result = mysql_query($query)
                 or die('Update system query failed: ' . mysql_error());
 		}
@@ -210,7 +210,6 @@
 	if ($action == "addip") {
 		$query = "update sysinfo set ip_addr = '$ip_addr' where mac_addr = '$mac_addr'";
 		DEBUG($verbose, "addip query is $query <br>\n");
-		#file_put_contents("/tmp/updatequery.txt", $query);
 		$result = $myconn->run_query($query);
 	}
 	#  add the location
@@ -218,7 +217,6 @@
 		$query = "update sysinfo set location = '$location' where mac_addr = '$mac_addr'";
 		#DEBUG($verbose, "addip query is $query <br>\n");
 		print "query is $query";
-		#file_put_contents("/tmp/updatequery.txt", $query);
 		$result = $myconn->run_query($query);
 	}
 
@@ -232,28 +230,30 @@
         DEBUG($verbose, $results);
         $num_rows = $myconn->get_num_rows();
 		DEBUG($verbose, "num rows is $num_rows<br>\n");
+		$sys_id = $myconn->get_sys_id($mac_addr);
+		$allocation_id = $myconn->get_something("allocation_id", "allocationinfo", "sys_id", $sys_id);
 
         if ($num_rows == 1) {
 			$image_id = $results[0][0];
+			DEBUG($verbose, "imageid is $image_id,m allocation is $allocation_id");
 
-            if ($myconn->check_dup("imagemap", "mac_addr", $mac_addr)) {
+            if ($myconn->check_dup("imagemap", "allocation_id", $allocation_id)) {
                 $query = "delete from imagemap ";
-                $query .= "where mac_addr = '$mac_addr' ";
+                $query .= "where allocation_id = '$allocation_id' ";
+				DEBUG($verbose, "check_dup query is $query");
                 $result = $myconn->run_query($query);
             }
-		}else {
-			$query = "insert into imagemap ";
-			$query .= "(mac_addr, image_id) ";
-			$query .= "values ('$mac_addr', '$image_id')";
-			DEBUG($verbose, "inserting $query<br>\n");
-			$result = $myconn->run_query($query);
 		}
+		$query = "insert into imagemap ";
+		$query .= "(allocation_id, image_id) ";
+		$query .= "values ('$allocation_id', '$image_id')";
+		$result = $myconn->run_query($query);
 
 		$sys_id = $myconn->get_sys_id($mac_addr);
 		$location = $myconn->get_location($sys_id);
 
 		DEBUG($verbose, "creating link in pxe");
-		print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --assignimage $image_name --nodeName $location");
+		print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo zoni --assignimage $image_name --nodeName $location");
 		DEBUG($verbose, "finished linking in pxe");
 	}
 
@@ -378,9 +378,6 @@
 		}
 		DEBUG($verbose, "location is $location");
 		DEBUG($verbose, "doing the dns and dhcp updates");
-		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDns $location $ip_addr");
-		#print shell_exec("cd {$G['ZONI_BASE_DIR']}; sudo ./bin/zoni-cli.py --addDhcp $location $ip_addr $mac_addr");
-		#print "location is " + $location + " and ip is " + $ip_addr;
 		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDns $location $ip_addr");
 		print shell_exec("PYTHONPATH=$PYTHONPATH zoni --addDhcp $location $ip_addr $mac_addr");
 	}
@@ -414,7 +411,8 @@
 
 			echo "creating link in pxe";
 			#  Try to use prs to do this...
-			print shell_exec("cd /home/rgass/projects/prs/; sudo ./zoni-client.py --assignimage $next_image --nodeName $location");
+			#  Old version, need to fix later
+			#print shell_exec("cd /home/rgass/projects/prs/; sudo ./zoni-client.py --assignimage $next_image --nodeName $location");
 			#print shell_exec("cd /var/www/cluster/scripts/; sudo ./add_pxe_from_db $location");
 			DEBUG($verbose, "finished linking in pxe");
         }

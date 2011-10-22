@@ -21,11 +21,12 @@
 function DEBUG($verbose, $val) {
 	if ($verbose == 1) {
 		if (is_array($val)) {
-			print "DEBUG:";
-			print_r($val);
+			$mesg = "DEBUG: " . print_r($val,true) . "<br>\n";
 		} else {
-			print "DEBUG: $val<br>\n";
+			$mesg = "DEBUG: " . $val . "<br>\n";
+			
 		}
+		file_put_contents("/tmp/zoni_register.log", $mesg, FILE_APPEND);
 
 	}
 }

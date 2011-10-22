@@ -163,11 +163,12 @@ def createTables(conn):
 	sys.stdout.write("Success\n")
 	#  Create domaininfo
 	sys.stdout.write("    Creating domaininfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_key` varchar(1024) NULL, `domain_desc` varchar(256) NOT NULL, `reservation_id` int(11) unsigned NOT NULL,  PRIMARY KEY  (`domain_id`), INDEX (reservation_id), FOREIGN KEY (reservation_id) REFERENCES reservationinfo(reservation_id) on DELETE CASCADE) ENGINE=INNODB")
+	#execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_key` varchar(1024) NULL, `domain_desc` varchar(256) NOT NULL, `reservation_id` int(11) unsigned NOT NULL,  PRIMARY KEY  (`domain_id`), INDEX (reservation_id), FOREIGN KEY (reservation_id) REFERENCES reservationinfo(reservation_id) on DELETE CASCADE) ENGINE=INNODB")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domaininfo` ( `domain_id` int(11) unsigned NOT NULL auto_increment, `domain_name` varchar(64) NOT NULL, `domain_key` varchar(1024) NULL, `domain_desc` varchar(256) NOT NULL, PRIMARY KEY (`domain_id`)) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create domainmap
 	sys.stdout.write("    Creating domainmembermap...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domainmembermap` (`domain_id` int(11) unsigned NOT NULL, `vlan_id` int(11) unsigned NOT NULL, INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo(domain_id) on DELETE CASCADE) ENGINE=INNODB")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `domainmembermap` (`domain_id` int(11) unsigned NOT NULL, `vlan_id` int(11) unsigned NOT NULL, `vlan_type` varchar(20) NULL, INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo(domain_id) on DELETE CASCADE) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create system, domain member map
 	sys.stdout.write("    Creating sysdomainmembermap...")
@@ -175,7 +176,7 @@ def createTables(conn):
 	sys.stdout.write("Success\n")
  	#  Create allocationinfo
 	sys.stdout.write("    Creating allocationinfo...")
-	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, `expire_time` timestamp default 0 NOT NULL, PRIMARY KEY  (`allocation_id`), INDEX (domain_id), FOREIGN KEY (domain_id) REFERENCES domaininfo (domain_id) on DELETE CASCADE) ENGINE=INNODB")
+	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, `expire_time` timestamp default 0 NOT NULL, PRIMARY KEY  (`allocation_id`)) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
 	#  Create imagemap
 	sys.stdout.write("    Creating imagemap...")
@@ -230,33 +231,34 @@ def createRegistration(conn, config):
 		sys.stdout.write("    Success\n")
 
 	#  Initrd
-	checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64")
-	sys.stdout.write("    Checking existence of initrd...")
-	if not checkVal:
-		sys.stdout.write("No\n") 
-		optionList = "initrd=" + config['initrdRoot'] + "/x86_64/zoni-register-64.gz pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register" 
-		sys.stdout.write("    Inserting default register image into DB...")
-		r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64','x86_64', '" + optionList + "')")
-		initrdId = str(r.lastrowid)
-		sys.stdout.write("Success\n")
-	else:
-		sys.stdout.write("Yes\n")    
-		initrdId = str(checkVal[1][0][0])
+	#checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64")
+	#sys.stdout.write("    Checking existence of initrd...")
+	#if not checkVal:
+		#sys.stdout.write("No\n") 
+#1,'initrd.img-2.6.38-10-server','x86_64','pxeserver=10.10.0.10 imageserver=10.10.0.10 defaultimage=x86_64-natty-hadoop-tashi_nm registerfile=register_node mode=register zoniroot=zoni configipmi=1 verbose=0'
+		#optionList = "pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register zoniroot="  + config['registrationBaseDir'] + "configipmi=1 verbose=0
+		#sys.stdout.write("    Inserting default register image into DB...")
+		#r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64','x86_64', '" + optionList + "')")
+		#initrdId = str(r.lastrowid)
+		#sys.stdout.write("Success\n")
+	#else:
+		#sys.stdout.write("Yes\n")    
+		#initrdId = str(checkVal[1][0][0])
 		
 	#  Interactive Registration
-	checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64-interactive")
-	sys.stdout.write("    Checking existence of interactive initrd...")
-	if not checkVal:
-		sys.stdout.write("No\n") 
-		sys.stdout.write("    Inserting default register-interactive image into DB...")
-		optionList = "initrd=" + config['initrdRoot'] + "/x86_64/zoni-register-64-interactive.gz pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register verbose=1" 
-		r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64-interactive','x86_64', '" + optionList + "')")
-		initrdIdInteractive = str(r.lastrowid)
-		sys.stdout.write("Success\n")
-	else:
-		sys.stdout.write("Yes\n")    
-		initrdIdInteractive = str(checkVal[1][0][0])
-
+	#checkVal =  entryExists(conn, "initrdinfo", "initrd_name", "zoni-register-64-interactive")
+	#sys.stdout.write("    Checking existence of interactive initrd...")
+	#if not checkVal:
+		#sys.stdout.write("No\n") 
+		#sys.stdout.write("    Inserting default register-interactive image into DB...")
+		#optionList = "initrd=" + config['initrdRoot'] + "/x86_64/zoni-register-64-interactive.gz pxeserver=" + config['pxeServerIP'] + " imageserver=" + config['imageServerIP'] + " defaultimage=amd64-tashi_nm registerfile=register_node mode=register verbose=1" 
+		#r = execQuery(conn, "INSERT into `initrdinfo` (initrd_name, initrd_arch, initrd_options) values ('zoni-register-64-interactive','x86_64', '" + optionList + "')")
+		#initrdIdInteractive = str(r.lastrowid)
+		#sys.stdout.write("Success\n")
+	#else:
+		#sys.stdout.write("Yes\n")    
+		#initrdIdInteractive = str(checkVal[1][0][0])
+#
 	#  Insert disk option
 	sys.stdout.write("    Adding Disk to imageinfo...")
 	query = "select * from imageinfo where image_name = 'disk'"
@@ -266,18 +268,18 @@ def createRegistration(conn, config):
 		sys.stdout.write("Success\n")
 
 	#  Link initrd and kernel to image
-	sys.stdout.write("    Registering initrd and kernel to registration image...")
-	query = "select * from imageinfo where image_name = 'zoni-register-64' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
-	r = execQuery(conn, query)
-	if len(r.fetchall()) < 1:
-		execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdId + ")")
-
-	query = "select * from imageinfo where image_name = 'zoni-register-64-interactive' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
-	r = execQuery(conn, query)
-	if len(r.fetchall()) < 1:
-		execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64-interactive', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdIdInteractive + ")")
-	sys.stdout.write("Success\n")
-
+	#sys.stdout.write("    Registering initrd and kernel to registration image...")
+	#query = "select * from imageinfo where image_name = 'zoni-register-64' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
+	#r = execQuery(conn, query)
+	#if len(r.fetchall()) < 1:
+		#execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdId + ")")
+#
+	#query = "select * from imageinfo where image_name = 'zoni-register-64-interactive' and kernel_id = " + kernelId + " and initrd_id = " + initrdId
+	#r = execQuery(conn, query)
+	#if len(r.fetchall()) < 1:
+		#execQuery(conn, "INSERT into `imageinfo` (image_name, dist, dist_ver, kernel_id, initrd_id) values ('zoni-register-64-interactive', 'Ubuntu', 'Hardy', " + kernelId + ", " + initrdIdInteractive + ")")
+	#sys.stdout.write("Success\n")
+#
 
 def addInitialConfig(conn, config):
 	sys.stdout.write("    Adding initial configuration info into DB...\n")
@@ -313,7 +315,7 @@ def addInitialConfig(conn, config):
 		#  Get the domainId 
 		domainId = str(checkVal[1][0][0])
 	else:
-		r = execQuery(conn, "INSERT into `domaininfo` (domain_name, domain_desc, reservation_id) values ('Zoni', 'Zoni Home Domain',1)")
+		r = execQuery(conn, "INSERT into `domaininfo` (domain_name, domain_desc) values ('Zoni', 'Zoni Home Domain')")
 		domainId = str(r.lastrowid)
 		sys.stdout.write("Success\n")
 
