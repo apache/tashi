@@ -334,7 +334,8 @@ class Qemu(VmControlInterface):
 		cmd = "head -n 1 /proc/meminfo"		
 		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
 		if (memoryStr[2] == "kB"):
-			host.memory = int(memoryStr[1])/1024
+			# XXXstroucki should have parameter for reserved mem
+			host.memory = (int(memoryStr[1])/1024) - 512
 		else:
 			log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0

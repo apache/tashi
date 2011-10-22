@@ -105,6 +105,12 @@ class Primitive(object):
 			minMax = None
 			minMaxHost = None
 			minMaxCtr = None
+
+			densePack = inst.hints.get("densePack", None)
+			if (densePack is None):
+				densePack = self.densePack
+			else:
+				densePack = boolean(densePack)
 			
 			targetHost = inst.hints.get("targetHost", None)
 			try:
@@ -151,7 +157,7 @@ class Primitive(object):
 					# minMax has not been modified  or
 					# the number of vms here is greater than minmax if we're dense packing or
 					# the number of vms here is less than minmax if we're not dense packing
-					if (minMax is None or (self.densePack and len(self.load[h.id]) > minMax) or (not self.densePack and len(self.load[h.id]) < minMax)):
+					if (minMax is None or (densePack and len(self.load[h.id]) > minMax) or (not densePack and len(self.load[h.id]) < minMax)):
 						if self.__checkCapacity(h, inst):
 							minMax = len(self.load[h.id])
 							minMaxHost = h

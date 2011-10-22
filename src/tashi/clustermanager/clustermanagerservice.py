@@ -72,6 +72,8 @@ class ClusterManagerService(object):
 		threading.Thread(target=self.monitorCluster).start()
 
 	def stateTransition(self, instance, old, cur):
+		if cur == InstanceState.Running:
+			self.log.exception("%d was made running here" % instance.id)
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
 		instance.state = cur
@@ -532,7 +534,9 @@ class ClusterManagerService(object):
 		if ('__resume_source' in instance.hints):
 			self.stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
 		else:
-			self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+			# XXXstroucki should held VMs be continually tried? Or be explicitly set back to pending?
+			#self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+			self.stateTransition(instance, None, InstanceState.Activating)
 
 		instance.hostId = host.id
 		self.data.releaseInstance(instance)
