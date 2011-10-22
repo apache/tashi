@@ -532,7 +532,9 @@ class ClusterManagerService(object):
 		if ('__resume_source' in instance.hints):
 			self.stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
 		else:
-			self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+			# XXXstroucki should held VMs be continually tried? Or be explicitly set back to pending?
+			#self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+			self.stateTransition(instance, None, InstanceState.Activating)
 
 		instance.hostId = host.id
 		self.data.releaseInstance(instance)
