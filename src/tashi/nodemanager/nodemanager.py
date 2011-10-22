@@ -55,7 +55,7 @@ def main():
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)
-	t.logger.quiet = True
+	t.logger.setLevel(logging.ERROR)
 	t.service.service = service
 	t.service._type = 'NodeManagerService'
 
