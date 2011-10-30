@@ -53,6 +53,7 @@ class Primitive(object):
 		self.instances = {}
 		self.muffle = {}
 		self.lastScheduledHost = 0
+		self.clearHints = {}
 					
 					
 	def __getState(self):
@@ -99,8 +100,15 @@ class Primitive(object):
 			return True
 		
 		return False
+
+	def __clearHints(self, hint, name):
+		#  remove the clearHint if the host comes back to normal mode
+		if name in self.clearHints[hint]:
+			popit = self.clearHints[hint].index(name)
+			self.clearHints[hint].pop(popit)
 	
 	def __scheduleInstance(self, inst):
+
 		try:
 			minMax = None
 			minMaxHost = None
@@ -112,7 +120,15 @@ class Primitive(object):
 			else:
 				densePack = boolean(densePack)
 			
+			#  Grab the targetHost config options if passed
 			targetHost = inst.hints.get("targetHost", None)
+			#  Check to see if we have already handled this hint
+			clearHints = self.clearHints
+			clearHints["targetHost"] = clearHints.get("targetHost", [])
+			#  If we handled the hint, don't look at it anymore
+			if targetHost in clearHints["targetHost"]:
+				targetHost = None
+
 			try:
 				allowElsewhere = boolean(inst.hints.get("allowElsewhere", "False"))
 			except Exception, e:
@@ -120,6 +136,8 @@ class Primitive(object):
 			# has a host preference been expressed?
 			if (targetHost != None):
 				for h in self.hosts.values():
+					if (h.state == HostState.Normal):
+						self.__clearHints("targetHost", h.name)
 					# if this is not the host we are looking for, continue
 					if ((str(h.id) != targetHost and h.name != targetHost)):
 						continue
@@ -140,6 +158,9 @@ class Primitive(object):
 			# If we don't have a host yet, find one here
 			if ((targetHost == None or allowElsewhere) and minMaxHost == None):
 				# cycle list
+				#  Adding this to catch if this gets set to None.  Fix
+				if self.lastScheduledHost == None:
+					self.lastScheduledHost = 0
 				for ctr in range(self.lastScheduledHost, len(self.hosts)) + range(0, self.lastScheduledHost):
 					h = self.hosts[ctr]
 
@@ -151,6 +172,9 @@ class Primitive(object):
 					#  find another machine
 					if (h.state != HostState.Normal):
 						continue
+					else:
+						#  If the host is back to normal, get rid of the entry in clearHints
+						self.__clearHints("targetHost", h.name)
 		
 					# if it's reserved, see if we can use it
 					if ((len(h.reserved) > 0) and inst.userId not in h.reserved):
@@ -170,21 +194,29 @@ class Primitive(object):
 		
 			if (minMaxHost):
 				# found a host
-				self.lastScheduledHost = minMaxCtr
 				if (not inst.hints.get("__resume_source", None)):
 					# only run preCreate hooks if newly starting
 					for hook in self.hooks:
 						hook.preCreate(inst)
 				self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
-				rv = self.cm.activateVm(inst.id, minMaxHost)
+				rv = "fail"
+				try:
+					rv = self.cm.activateVm(inst.id, minMaxHost)
+					if rv == "success":
+						self.lastScheduledHost = minMaxCtr
+						self.load[minMaxHost.id] = self.load[minMaxHost.id] + [inst.id]
+						# get rid of its possible entry in muffle if VM is scheduled to a host
+						if (inst.name in self.muffle):
+							self.muffle.pop(inst.name)
+					else:
+						self.log.warning("Instance %s failed to activate on host %s" % (inst.name, minMaxHost.name))
+				except TashiException, e :
+					#  If we try to activate the VM and get errno 10, host not in normal mode, add it to the list
+					#  check for other errors later
+					if e.errno == Errors.HostStateError:
+						self.clearHints["targetHost"] = self.clearHints.get("targetHost", [])
+						self.clearHints["targetHost"].append(targetHost)
 
-				if rv == "success":
-					self.load[minMaxHost.id] = self.load[minMaxHost.id] + [inst.id]
-					# get rid of its possible entry in muffle if VM is scheduled to a host
-					if (inst.name in self.muffle):
-						self.muffle.pop(inst.name)
-				else:
-					self.log.warning("Instance %s failed to activate on host %s" % (inst.name, minMaxHost.name))
 			else:
 				# did not find a host
 				if (inst.name not in self.muffle):
