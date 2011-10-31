@@ -20,5 +20,5 @@ lastChangeDate = "$LastChangedDate$"
 lastChangeRevision = "$Rev: 964467 $"
 revision = lastChangeRevision
 #version="$LastChangedDate$"
-version = "HEAD"
+version = "201104"
 
