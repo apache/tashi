@@ -235,16 +235,16 @@ class Primitive(object):
 		while True:
 			try:
 				self.__getState()
+				
 				# Check for VMs that have exited and call
 				# postDestroy hook
 				for i in oldInstances:
 					# XXXstroucki what about paused and saved VMs?
 					# XXXstroucki: do we need to look at Held VMs here?
-					if (i not in self.instances and oldInstances[i].state == InstanceState.Running):
+					if (i not in self.instances and (oldInstances[i].state == InstanceState.Running or oldInstances[i].state == InstanceState.Destroying)):
 						self.log.info("VM exited: %s" % (oldInstances[i].name))
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
-
 
 				oldInstances = self.instances
 
