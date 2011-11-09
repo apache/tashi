@@ -207,6 +207,8 @@ def getMyInstances():
 # Used to define default views on functions and to provide extra functionality (getVmLayout)
 extraViews = {
 'getSlots': (getSlots, None),
+'getImages': (None, ['id', 'imageName']), 
+'copyImage': (None, None), 
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
@@ -227,6 +229,8 @@ argLists = {
 'pauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'unpauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'getSlots': [('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False)],
+'getImages': [],
+'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
 'getUsers': [],
 'getNetworks': [],
@@ -252,6 +256,7 @@ convertArgs = {
 'vmmSpecificCall': '[instance, arg]',
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
+'copyImage' : '[src, dst]',
 }
 
 # Descriptions
@@ -275,6 +280,8 @@ description = {
 'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
 'vmmSpecificCall': 'Direct access to VM manager specific functionality',
 'unregisterHost' : 'Unregisters host. Registration happens when starting node manager',
+'getImages' : 'Gets a list of available VM images',
+'copyImage' : 'Copies a VM image',
 }
 
 # Example use strings
@@ -296,6 +303,8 @@ examples = {
 'getInstances': [''],
 'getMyInstances': [''],
 'getVmLayout': [''],
+'getImages': [''],
+'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
 'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc'],
 'unregisterHost' : ['--hostId 2'],
 }

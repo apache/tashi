@@ -1,4 +1,4 @@
- # Licensed to the Apache Software Foundation (ASF) under one
+# Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
 # regarding copyright ownership.  The ASF licenses this file
@@ -230,7 +230,8 @@ class ClusterManagerService(object):
 				self.__checkInstances()
 			except:
 				self.log.exception('monitorCluster iteration failed')
-			self.log.info("Sleeping for %d seconds" % sleepFor)
+			#  XXXrgass too chatty.  Remove
+			#self.log.info("Sleeping for %d seconds" % sleepFor)
 			time.sleep(sleepFor)
 
 
@@ -414,7 +415,23 @@ class ClusterManagerService(object):
 	
 	def getInstances(self):
 		return self.data.getInstances().values()
+
+	def getImages(self):
+		return self.data.getImages()
 	
+	def copyImage(self, src, dst):
+		imageSrc = self.dfs.getLocalHandle("images/" + src)
+		imageDst = self.dfs.getLocalHandle("images/" + dst)
+		try:
+			#  Attempt to restrict to the image directory
+			if ".." not in imageSrc and ".." not in imageDst:
+				self.dfs.copy(imageSrc, imageDst)
+				self.log.info('DFS image copy: %s->%s' % (imageSrc, imageDst))
+			else:
+				self.log.warning('DFS image copy bad path: %s->%s' % (imageSrc, imageDst))
+		except Exception, e:
+			self.log.exception('DFS image copy failed: %s (%s->%s)' % (e, imageSrc, imageDst))
+
 	def vmmSpecificCall(self, instanceId, arg):
 		instance = self.data.getInstance(instanceId)
 		hostname = self.data.getHost(instance.hostId).name
@@ -457,9 +474,10 @@ class ClusterManagerService(object):
 			oldHost.state = HostState.Normal
 
 		# let the host communicate what it is running
-		for instance in instances:
-			self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
-			self.instanceLastContactTime.setdefault(instance.id, 0)
+		# XXXrgass - This is too chatty for the console, I think we should remove this.
+		#for instance in instances:
+			#self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
+			#self.instanceLastContactTime.setdefault(instance.id, 0)
 
 		self.data.releaseHost(oldHost)
 		return host.id
