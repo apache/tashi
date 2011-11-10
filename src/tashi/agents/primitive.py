@@ -110,6 +110,7 @@ class Primitive(object):
 	def __scheduleInstance(self, inst):
 
 		try:
+
 			minMax = None
 			minMaxHost = None
 			minMaxCtr = None
@@ -191,7 +192,20 @@ class Primitive(object):
 							minMax = len(self.load[h.id])
 							minMaxHost = h
 							minMaxCtr = ctr
-		
+
+					#  check that VM image isn't mounted persistent already
+					#  Should set a status code to alert user
+					#  Tried to update the state of the instance and set persistent=False but 
+					#  couldn't do it, should work until we find a better way to do this
+					if inst.disks[0].persistent == True:
+						count = 0
+						myDisk = inst.disks[0].uri
+						for i in self.cm.getInstances():
+							if myDisk == i.disks[0].uri and i.disks[0].persistent == True:
+								count += 1
+						if count > 1:
+								minMaxHost = None
+
 			if (minMaxHost):
 				# found a host
 				if (not inst.hints.get("__resume_source", None)):
