@@ -207,7 +207,7 @@ def getMyInstances():
 # Used to define default views on functions and to provide extra functionality (getVmLayout)
 extraViews = {
 'getSlots': (getSlots, None),
-'getImages': (None, ['id', 'imageName']), 
+'getImages': (None, ['id', 'imageName', 'imageSize']), 
 'copyImage': (None, None), 
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'destroyMany': (destroyMany, None),

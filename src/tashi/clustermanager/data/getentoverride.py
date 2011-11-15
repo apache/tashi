@@ -20,7 +20,7 @@ import time
 import os
 from tashi.rpycservices.rpyctypes import User, LocalImages
 from tashi.clustermanager.data import DataInterface
-from tashi.util import instantiateImplementation
+from tashi.util import instantiateImplementation, humanReadable
 
 class GetentOverride(DataInterface):
 	def __init__(self, config):
@@ -74,7 +74,7 @@ class GetentOverride(DataInterface):
 		for i in self.dfs.list("images"):
 			myFile = self.dfs.getLocalHandle("images/" + i)
 			if os.path.isfile(myFile):
-				image = LocalImages(d={'id':count, 'imageName':i})
+				image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
 				myList.append(image)
 				count += 1
 		return myList

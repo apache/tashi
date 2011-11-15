@@ -148,6 +148,7 @@ class LocalImages(object):
 		self.id = None
 		self.userId = None
 		self.imageName = None
+		self.imageSize = None
 		self.isPublic = None
 		self.explicitUserIds = None
 		if isinstance(d, dict):
@@ -157,6 +158,8 @@ class LocalImages(object):
 				self.userId = d['userId']
 			if 'imageName' in d:
 				self.imageName = d['imageName']
+			if 'imageSize' in d:
+				self.imageSize = d['imageSize']
 			if 'isPublic' in d:
 				self.isPublic = d['isPublic']
 			if 'explicitUserIds' in d:
