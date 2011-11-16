@@ -475,9 +475,10 @@ class ClusterManagerService(object):
 
 		# let the host communicate what it is running
 		# XXXrgass - This is too chatty for the console, I think we should remove this.
-		#for instance in instances:
-			#self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
-			#self.instanceLastContactTime.setdefault(instance.id, 0)
+		# XXXstroucki - My install depends on this, but I output to log files. This should be handled by a separate accounting server in future.
+		for instance in instances:
+			self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
+			self.instanceLastContactTime.setdefault(instance.id, 0)
 
 		self.data.releaseHost(oldHost)
 		return host.id
