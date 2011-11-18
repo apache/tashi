@@ -157,8 +157,24 @@ def getVmLayout():
 			hosts[i.hostId].usedCores += i.cores
 	return hosts.values()
 
+def getSlots(cores, memory):
+	hosts = getVmLayout()
+	count = 0
+
+	for h in hosts:
+		countbycores = int((h.cores - h.usedCores) / cores)
+		countbymemory = int((h.memory - h.usedMemory) / memory)
+		count += min(countbycores, countbymemory)
+
+	print "%d" % (count),
+	print (lambda:"instances", lambda:"instance")[count == 1](),
+	print "with %d" % (cores),
+	print (lambda:"cores", lambda:"core")[cores == 1](),
+	print "and %d MB memory could be created." % (memory)
+	
 def createMany(instance, count):
-	l = len(str(count))
+	# will create instances from 0 to count-1
+	l = len(str(count - 1))
 	basename = instance.name
 	instances = []
 	for i in range(0, count):
@@ -190,6 +206,9 @@ def getMyInstances():
 
 # Used to define default views on functions and to provide extra functionality (getVmLayout)
 extraViews = {
+'getSlots': (getSlots, None),
+'getImages': (None, ['id', 'imageName', 'imageSize']), 
+'copyImage': (None, None), 
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
@@ -209,6 +228,9 @@ argLists = {
 'migrateVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('targetHostId', int, lambda: requiredArg('targetHostId'), True)],
 'pauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'unpauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
+'getSlots': [('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False)],
+'getImages': [],
+'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
 'getUsers': [],
 'getNetworks': [],
@@ -219,7 +241,7 @@ argLists = {
 'unregisterHost': [('hostId', int, lambda: requiredArg('hostId'), True)],
 }
 
-# Used to convert the dictionary built from the arguments into an object that can be used by thrift
+# Used to convert the dictionary built from the arguments into an object that can be used by rpyc
 convertArgs = {
 'createVm': '[Instance(d={"userId":userId,"name":name,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints})]',
 'createMany': '[Instance(d={"userId":userId,"name":basename,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), count]',
@@ -233,6 +255,8 @@ convertArgs = {
 'unpauseVm': '[instance]',
 'vmmSpecificCall': '[instance, arg]',
 'unregisterHost' : '[hostId]',
+'getSlots' : '[cores, memory]',
+'copyImage' : '[src, dst]',
 }
 
 # Descriptions
@@ -247,14 +271,17 @@ description = {
 'migrateVm': 'Live-migrates a VM to a different host',
 'pauseVm': 'Pauses a running VM',
 'unpauseVm': 'Unpauses a paused VM',
+'getSlots': 'Get a count of how many VMs could be started in the cluster',
 'getHosts': 'Gets a list of hosts running Node Managers',
 'getUsers': 'Gets a list of users',
 'getNetworks': 'Gets a list of available networks for VMs to be placed on',
-'getInstances': 'Gets a list of all VMs in Tashi',
+'getInstances': 'Gets a list of all VMs in the cluster',
 'getMyInstances': 'Utility function that only lists VMs owned by the current user',
 'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
-'vmmSpecificCall': 'Direct access to VMM-specific functionality',
+'vmmSpecificCall': 'Direct access to VM manager specific functionality',
 'unregisterHost' : 'Unregisters host. Registration happens when starting node manager',
+'getImages' : 'Gets a list of available VM images',
+'copyImage' : 'Copies a VM image',
 }
 
 # Example use strings
@@ -266,15 +293,18 @@ examples = {
 'destroyMany': ['--basename foobar'],
 'suspendVm': ['--instance 12345', '--instance foobar'],
 'resumeVm': ['--instance 12345', '--instance foobar'],
-'migrateVm': ['--instanc 12345 --targetHostId 73', '--instance foobar --targetHostId 73'],
+'migrateVm': ['--instance 12345 --targetHostId 73', '--instance foobar --targetHostId 73'],
 'pauseVm': ['--instance 12345', '--instance foobar'],
-'unpauseVm': ['---instance 12345', '--instance foobar'],
+'unpauseVm': ['--instance 12345', '--instance foobar'],
+'getSlots': ['--cores 1 --memory 128'],
 'getHosts': [''],
 'getUsers': [''],
 'getNetworks': [''],
 'getInstances': [''],
 'getMyInstances': [''],
 'getVmLayout': [''],
+'getImages': [''],
+'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
 'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc'],
 'unregisterHost' : ['--hostId 2'],
 }
@@ -359,7 +389,6 @@ def makeTable(list, keys=None):
 		stdout = os.popen("stty size")
 		r = stdout.read()
 		stdout.close()
-		(consoleHeight, consoleWidth) = map(lambda x: int(x.strip()), r.split())
 	except:
 		pass
 	for obj in list:
@@ -480,30 +509,57 @@ def main():
 		usage()
 	function = matchFunction(sys.argv[1])
 	(config, configFiles) = getConfig(["Client"])
-	possibleArgs = argLists[function]
+
+	# build a structure of possible arguments
+	possibleArgs = {}
+	argList = argLists[function]
+	for i in range(0, len(argList)):
+		possibleArgs[argList[i][0]]=argList[i]
+
 	args = sys.argv[2:]
-	for arg in args:
-		if (arg == "--help" or arg == "--examples"):
-			usage(function)
+
+	vals = {}
+
 	try:
-		vals = {}
+		# create client handle
 		client = createClient(config)
-		for parg in possibleArgs:
+
+		# set defaults
+		for parg in possibleArgs.values():
 			(parg, conv, default, required) = parg
-			val = None
-			for i in range(0, len(args)):
-				arg = args[i]
-				if (arg.startswith("--") and arg[2:] == parg):
-					val = conv(args[i+1])
-			if (val == None):
-				val = default()
-			vals[parg] = val
-		for arg in args:
+			if (required is False):
+				vals[parg] = default()
+
+		while (len(args) > 0):
+			arg = args.pop(0)
+
+			if (arg == "--help" or arg == "--examples"):
+				usage(function)
+				# this exits
+
 			if (arg.startswith("--hide-")):
 				show_hide.append((False, arg[7:]))
+				continue
+
 			if (arg.startswith("--show-")):
 				show_hide.append((True, arg[7:]))
+				continue
+
+			if (arg.startswith("--")):
+				if (arg[2:] in possibleArgs):
+					(parg, conv, default, required) = possibleArgs[arg[2:]]
+					val = conv(args.pop(0))
+					if (val == None):
+						val = default()
+
+					vals[parg] = val
+					continue
+
+			raise ValueError("Unknown argument %s" % (arg)) 
+
+		
 		f = getattr(client, function, None)
+
 		if (f is None):
 			f = extraViews[function][0]
 		if (function in convertArgs):
@@ -526,8 +582,8 @@ def main():
 		print "TashiException:"
 		print e.msg
 		exitCode = e.errno
-	except Exception, e:
-		print e
+# 	except Exception, e:
+# 		print e
 		# XXXstroucki: exception may be unrelated to usage of function
 		# so don't print usage on exception as if there were a problem
 		# with the arguments

@@ -67,7 +67,7 @@ class LdapOverride(DataInterface):
 	
 	def getNetwork(self, id):
 		return self.baseDataObject.getNetwork(id)
-	
+
 	def fetchFromLdap(self):
 		now = time.time()
 		if (now - self.lastUserUpdate > self.fetchThreshold):

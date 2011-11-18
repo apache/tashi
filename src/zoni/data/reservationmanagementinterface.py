@@ -14,11 +14,45 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.    
+#
+#  $Id:$
+#
 
-id = "$Id: version.py 964467 2010-07-15 15:31:02Z rgass $"
-lastChangeDate = "$LastChangedDate$"
-lastChangeRevision = "$Rev: 964467 $"
-revision = lastChangeRevision
-#version="$LastChangedDate$"
-version = "201111"
+import sys
+import os 
+
+
+class ReservationManagementInterface(object):
+	"""  Interface description for reservation management
+    """
+	def __init__(self, config):
+		self.config = config
+
+
+	def createDomain (self, domain):
+		raise NotImplementedError
+
+	def destroyDomain (self, domain):
+		raise NotImplementedError
+
+	def addNode2Domain(self, userId):
+		raise NotImplementedError
+
+	def addVlan2Domain(self, userId):
+		raise NotImplementedError
+
+	def addReservation (self, userId):
+		raise NotImplementedError
+
+	def updateReservation (self, userId):
+		raise NotImplementedError
+
+	def delReservation (self, userId):
+		raise NotImplementedError
+	
+	def defineReservation():
+		raise NotImplementedError
+
+	def showReservation():
+		raise NotImplementedError
 

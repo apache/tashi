@@ -1,4 +1,11 @@
 #! /bin/sh
+#
+#  $Id:$
+#
+# This program takes two args:
+# register_automate <svg_tag|mac_addr> <"location"|"switchinfo"|"pduinfo"">
+#
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,16 +22,27 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-#  $Id:$
-#
-# This program takes two args:
-# register_automate <svg_tag|mac_addr> <"location"|"switchinfo"|"pduinfo"">
-#
+
 # Based on the the service tag or the mac address of the machine, it returns 
 # the intented location, hostname, or IP address of the machine, respectively.
 # It is intented to short-circuit the question phase of registration.
 #
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+# 
+#   http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 #  Example Chassis r2r1c1 : note, the line must begin with a "#"
 #  tag|mac|uuid location switchname:portnum pduname:portnum
@@ -45,17 +63,17 @@ SVC_TAG=$1
 REQUEST=$2
 
 res=""
-if [[ "$REQUEST" == "location" ]]; then
+if [ "$REQUEST" = "location" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $2}'`
-elif [[ "$REQUEST" == "switchinfo" ]]; then
+elif [ "$REQUEST" = "switchinfo" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $3}'`
-elif [[ "$REQUEST" == "pduinfo" ]]; then
+elif [ "$REQUEST" = "pduinfo" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $4}'`
-elif [[ "$REQUEST" == "image" ]]; then
+elif [ "$REQUEST" = "image" ]; then
     res=`cat /register_automate | grep -i "^#$SVC_TAG" | awk '{print $5}'`
 fi
 
-if [[ `echo -n $res | wc -c` -gt 1 ]]; then
+if [ `echo -n $res | wc -c` -gt 1 ]; then
     echo $res
     exit 0
 else

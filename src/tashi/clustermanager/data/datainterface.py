@@ -63,7 +63,7 @@ class DataInterface(object):
 	
 	def getUser(self, id):
 		raise NotImplementedError
-		
+
 	def registerHost(self, hostname, memory, cores, version):
 		raise NotImplementedError
 	

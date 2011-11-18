@@ -71,12 +71,9 @@ class NodeManagerService(object):
 	
 	def loadVmInfo(self):
 		try:
-			f = open(self.infoFile, "r")
-			data = f.read()
-			f.close()
-			self.instances = cPickle.loads(data)
+			self.instances = self.vmm.getInstances()
 		except Exception, e:
-			self.log.warning('Failed to load VM info from %s' % (self.infoFile))
+			self.log.exception('Failed to obtain VM info')
 			self.instances = {}
 	
 	def saveVmInfo(self):
@@ -94,6 +91,12 @@ class NodeManagerService(object):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
 		if (cur == InstanceState.Exited):
 			del self.instances[vmId]
+			return True
+
+		if (instance.state == cur):
+			# Don't do anything if state is what it should be
+			return True
+
 		instance.state = cur
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
@@ -168,6 +171,8 @@ class NodeManagerService(object):
 			try:
 				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
+				#import pprint
+				#self.log.warning("Instances: " + pprint.saferepr(instances))
 				self.id = cm.registerNodeManager(host, instances)
 			except Exception, e:
 				self.log.exception('Failed to register with the CM')
@@ -291,6 +296,9 @@ class NodeManagerService(object):
 	
 	def listVms(self):
 		return self.instances.keys()
+
+	def liveCheck(self):
+		return "alive"
 	
 	def statsThread(self):
 		if (self.statsInterval == 0):

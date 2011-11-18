@@ -124,7 +124,7 @@ def ZoniWebSetup(config):
 	zoniInstallDir = config['installBaseDir']
 
 	zoniWebRoot = os.path.join(docRoot, baseDir )
-	createDir(zoniWebRoot, 1)
+	if not (createDir(zoniWebRoot, 1)):  print "Please use sudo"; exit()
 	zoniIncludeDir = os.path.join(zoniWebRoot, "include")
 	createDir(zoniIncludeDir)
 	zoniRegisterDir = os.path.join(zoniWebRoot, "register")

@@ -37,18 +37,20 @@ from zoni.hardware.systemmanagementinterface import SystemManagementInterface
 		#self.proto = proto
 
 class raritanDominionPx(SystemManagementInterface):
-	def __init__(self, config, host=None):
+	def __init__(self, config, nodeName, hostInfo):
 		#  Register
 		self.config = config
+		self.nodeName = nodeName
 		self.log = logging.getLogger(__name__)
 		self.verbose = False
+		self.powerStatus = None
 
-		if host != None:
-			self.host = host['location']
-			self.pdu_name = host['pdu_name']
-			self.port = host['pdu_port']
-			self.user = host['pdu_userid']
-			self.password = host['pdu_password']
+		if hostInfo != None:
+			self.host = nodeName
+			self.pdu_name = hostInfo['pdu_name']
+			self.port = hostInfo['pdu_port']
+			self.user = hostInfo['pdu_userid']
+			self.password = hostInfo['pdu_password']
 
 			self.oid = "1,3,6,1,4,1,13742,4,1,2,2,1"
 			self.oid_name = ",2"
@@ -56,7 +58,7 @@ class raritanDominionPx(SystemManagementInterface):
 			self.oid_status = ",3"
 
 			if self.getOffset():
-				self.port = host['pdu_port'] - 1
+				self.port = hostInfo['pdu_port'] - 1
 
 
 		#  this works
@@ -98,12 +100,13 @@ class raritanDominionPx(SystemManagementInterface):
 			return 1
 
 
-	def getPowerStatus(self):
+	def __setPowerStatus(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port))
 		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 0), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
 		output = varBinds[0][1]
+		print output, varBinds
 		
 		if output == 1:
 			self.powerStatus = 1
@@ -111,8 +114,8 @@ class raritanDominionPx(SystemManagementInterface):
 		if output == 0:
 			self.powerStatus = 0
 			powerstat = "off"
-
-		print "PDU Power for %s is %s" % (self.host, powerstat)
+		print "pwerstat", powerstat 
+		self.log.info("hardware setPowerStatus %s : %s" % (powerstat, self.nodeName))
 
 		if output:
 			return 1
@@ -121,12 +124,13 @@ class raritanDominionPx(SystemManagementInterface):
 
 	def isPowered(self):
 		if self.powerStatus == None:
-			self.getPowerStatus()
+			self.__setPowerStatus()
 		if self.powerStatus:
 			return 1;
-		if not self.powerStatus:
-			return 0;
+		return 0;
 	
+	def getPowerStatus(self):
+		return self.isPowered()
 
 	def powerOn(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port)) 
@@ -134,7 +138,7 @@ class raritanDominionPx(SystemManagementInterface):
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('1')))
-		self.getPowerStatus()
+		return self.getPowerStatus()
 
 	def powerOff(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port)) 
@@ -142,7 +146,7 @@ class raritanDominionPx(SystemManagementInterface):
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('0')))
-		self.getPowerStatus()
+		return self.getPowerStatus()
 
 	def powerCycle(self):
 		self.powerOff()

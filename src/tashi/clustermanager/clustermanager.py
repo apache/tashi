@@ -30,7 +30,7 @@ import tashi
 
 from tashi.rpycservices import rpycservices
 from rpyc.utils.server import ThreadedServer
-from rpyc.utils.authenticators import VdbAuthenticator
+from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
 def startClusterManager(config):
 	global service, data
@@ -47,11 +47,11 @@ def startClusterManager(config):
 				users[user.name] = user.passwd
 		users[config.get('AllowedUsers', 'nodeManagerUser')] = config.get('AllowedUsers', 'nodeManagerPassword')
 		users[config.get('AllowedUsers', 'agentUser')] = config.get('AllowedUsers', 'agentPassword')
-		authenticator = VdbAuthenticator.from_dict(users)
+		authenticator = TlsliteVdbAuthenticator.from_dict(users)
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False)
-	t.logger.quiet = True
+	t.logger.setLevel(logging.ERROR)
 	t.service.service = service
 	t.service._type = 'ClusterManagerService'
 
