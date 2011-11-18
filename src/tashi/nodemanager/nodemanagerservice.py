@@ -91,6 +91,12 @@ class NodeManagerService(object):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
 		if (cur == InstanceState.Exited):
 			del self.instances[vmId]
+			return True
+
+		if (instance.state == cur):
+			# Don't do anything if state is what it should be
+			return True
+
 		instance.state = cur
 		newInst = Instance(d={'state':cur})
 		success = lambda: None

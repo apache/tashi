@@ -301,7 +301,8 @@ class Qemu(VmControlInterface):
 		res = self.consumeAvailable(child)
 		os.write(child.monitorFd, command + "\n")
 		if (expectPrompt):
-			self.consumeUntil(child, command)
+			# XXXstroucki: receiving a vm can take a long time
+			self.consumeUntil(child, command, timeout=timeout)
 			res = self.consumeUntil(child, "(qemu) ", timeout=timeout)
 		return res
 
@@ -505,7 +506,8 @@ class Qemu(VmControlInterface):
 		child.monitor = os.fdopen(child.monitorFd)
 		self.saveChildInfo(child)
 		if (issueContinue):
-			self.enterCommand(child, "c")
+			# XXXstroucki: receiving a vm can take a long time
+			self.enterCommand(child, "c", timeout=None)
 	
 	def stopVm(self, vmId, target, stopFirst):
 		"""Universal function to stop a VM -- used by suspendVM, migrateVM """
@@ -515,7 +517,7 @@ class Qemu(VmControlInterface):
 		if (target):
 			retry = self.migrationRetries
 			while (retry > 0):
-				res = self.enterCommand(child, "migrate %s" % (target), timeout=self.migrateTimeout)
+				res = self.enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
 				if (res.find("migration failed") == -1):
 					retry = -1

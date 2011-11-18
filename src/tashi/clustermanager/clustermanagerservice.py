@@ -74,7 +74,12 @@ class ClusterManagerService(object):
 	def stateTransition(self, instance, old, cur):
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
+		if (instance.state == cur):
+			# don't do anything if we're already at current state
+			return
+
 		instance.state = cur
+		# pass something down to the NM?
 
 	def __now(self):
 		return time.time()
