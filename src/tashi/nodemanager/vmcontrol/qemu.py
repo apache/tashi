@@ -140,6 +140,13 @@ class Qemu(VmControlInterface):
 		"""Will return a dict of instances by vmId to the caller"""
 		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
 
+	def setInstance(self, instance):
+		"""Sets data in an instance object"""
+		vmId = instance.vmId
+		child = self.getChildFromPid(vmId)
+                child.instance = instance
+                self.saveChildInfo(child)
+
 	def matchSystemPids(self, controlledVMs):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
 		if self.nm is None:
@@ -301,7 +308,7 @@ class Qemu(VmControlInterface):
 		res = self.consumeAvailable(child)
 		os.write(child.monitorFd, command + "\n")
 		if (expectPrompt):
-			self.consumeUntil(child, command)
+			self.consumeUntil(child, command, timeout=timeout)
 			res = self.consumeUntil(child, "(qemu) ", timeout=timeout)
 		return res
 
@@ -339,8 +346,8 @@ class Qemu(VmControlInterface):
 		cmd = "head -n 1 /proc/meminfo"		
 		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
 		if (memoryStr[2] == "kB"):
-			# XXXstroucki should have parameter for reserved mem
-			host.memory = (int(memoryStr[1])/1024) - 512
+                        # XXXstroucki should have parameter for reserved mem
+                        host.memory = (int(memoryStr[1])/1024) - 512
 		else:
 			log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0
@@ -505,7 +512,8 @@ class Qemu(VmControlInterface):
 		child.monitor = os.fdopen(child.monitorFd)
 		self.saveChildInfo(child)
 		if (issueContinue):
-			self.enterCommand(child, "c")
+			#XXXstroucki: receiving a vm can take a long time
+			self.enterCommand(child, "c", timeout=None)
 	
 	def stopVm(self, vmId, target, stopFirst):
 		"""Universal function to stop a VM -- used by suspendVM, migrateVM """
@@ -515,7 +523,7 @@ class Qemu(VmControlInterface):
 		if (target):
 			retry = self.migrationRetries
 			while (retry > 0):
-				res = self.enterCommand(child, "migrate %s" % (target), timeout=self.migrateTimeout)
+				res = self.enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
 				if (res.find("migration failed") == -1):
 					retry = -1
@@ -562,6 +570,7 @@ class Qemu(VmControlInterface):
 		(vmId, cmd) = self.startVm(instance, "exec:zcat %s" % (fn))
 		child = self.getChildFromPid(vmId)
 		child.cmd = cmd
+		self.saveChildInfo(child)
 		return vmId
 	
 	def prepReceiveVm(self, instance, source):

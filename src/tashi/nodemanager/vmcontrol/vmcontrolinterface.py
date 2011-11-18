@@ -31,6 +31,10 @@ class VmControlInterface(object):
         def getInstances(self):
                 """Will return a dict of instances by vmId to the caller"""
 		raise NotImplementedError
+
+        def setInstance(self, instance):
+                """Sets data in an instance object"""
+		raise NotImplementedError
 	
 	def instantiateVm(self, instance):
 		"""Takes an InstanceConfiguration, creates a VM based on it, 

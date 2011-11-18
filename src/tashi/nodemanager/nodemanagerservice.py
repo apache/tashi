@@ -91,17 +91,19 @@ class NodeManagerService(object):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
 		if (cur == InstanceState.Exited):
 			del self.instances[vmId]
+			return True
+
+		if (instance.state == cur):
+			# don't do anything if state is what it should be
+			return True
+
 		instance.state = cur
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
-		try:
-			cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
-			cm.vmUpdate(instance.id, newInst, old)
-		except Exception, e:
-			self.log.exception('RPC failed for vmUpdate on CM')
-			self.notifyCM.append((instance.id, newInst, old, success))
-		else:
-			success()
+		self.notifyCM.append((instance.id, newInst, old, success))
+		self.setInstance(instance)
+
+		success()
 		return True
 	
 	def backupVmInfoAndFlushNotifyCM(self):
@@ -179,6 +181,9 @@ class NodeManagerService(object):
 		if (instance is None):
 			raise TashiException(d={'errno':Errors.NoSuchVmId,'msg':"There is no vmId %d on this host" % (vmId)})
 		return instance
+
+	def setInstance(self, instance):
+		self.vmm.setInstance(instance)
 	
 	def instantiateVm(self, instance):
 		vmId = self.vmm.instantiateVm(instance)
@@ -245,6 +250,8 @@ class NodeManagerService(object):
 		instance.vmId = vmId
 		self.instances[vmId] = instance
 		newInstance = Instance(d={'id':instance.id,'state':instance.state,'vmId':instance.vmId,'hostId':instance.hostId})
+		import pprint
+		self.log.info("Debug: %s" % (pprint.pformat(newInstance)))
 		success = lambda: None
 		try:
 			cm.vmUpdate(newInstance.id, newInstance, InstanceState.MigrateTrans)

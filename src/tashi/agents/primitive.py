@@ -146,6 +146,11 @@ class Primitive(object):
 					# XXXstroucki if it's down, find another machine
 					if (h.up == False):
 						continue
+
+					#  If the host not in normal operating state, 
+					#  find another machine
+					if (h.state != HostState.Normal):
+						continue
 		
 					# if it's reserved, see if we can use it
 					if ((len(h.reserved) > 0) and inst.userId not in h.reserved):

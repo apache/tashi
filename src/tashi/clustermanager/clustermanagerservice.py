@@ -72,11 +72,19 @@ class ClusterManagerService(object):
 		threading.Thread(target=self.monitorCluster).start()
 
 	def stateTransition(self, instance, old, cur):
-		if cur == InstanceState.Running:
-			self.log.exception("%d was made running here" % instance.id)
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
+		if (instance.state == cur):
+			return
+
 		instance.state = cur
+		try:
+			host = self.data.getHost(instance.hostId)
+			vmId = instance.vmId
+			self.proxy[host.name].vmStateChange(vmId, old, cur)
+		except:
+			#XXXstroucki append to a list?
+			pass
 
 	def __now(self):
 		return time.time()
@@ -341,6 +349,8 @@ class ClusterManagerService(object):
 		except:
 			self.data.releaseInstance(instance)
 			raise
+		from pprint import pformat
+		self.log.info("A: %s" % (pformat(instance)))
 		self.stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
 		self.data.releaseInstance(instance)
 		try:
@@ -349,11 +359,14 @@ class ClusterManagerService(object):
 			self.proxy[sourceHost.name].prepSourceVm(instance.vmId)
 			self.log.info("migrateVm: Calling prepReceiveVm on target host %s" % targetHost.name)
 			cookie = self.proxy[targetHost.name].prepReceiveVm(instance, sourceHost)
+			self.log.info("Debug: here")
 		except Exception, e:
 			self.log.exception('prepReceiveVm failed')
 			raise
 		instance = self.data.acquireInstance(instance.id)
+		self.log.info("B: %s" % (pformat(instance)))
 		self.stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)
+		self.log.info("C: %s" % (pformat(instance)))
 		self.data.releaseInstance(instance)
 		try:
 			# Send the VM
@@ -370,6 +383,7 @@ class ClusterManagerService(object):
 		try:
 			# Notify the target
 			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
+			self.log.info("D: %s notified" % targetHost.name)
 		except Exception, e:
 			self.log.exception('receiveVm failed')
 			raise
