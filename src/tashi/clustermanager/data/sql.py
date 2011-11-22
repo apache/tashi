@@ -19,15 +19,18 @@ import logging
 import threading
 import time
 import types
+# XXXstroucki getImages needs os?
+import os
 from tashi.rpycservices.rpyctypes import *
 from tashi.clustermanager.data.datainterface import DataInterface
-from tashi.util import stringPartition, boolean
+from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 
 class SQL(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
 		self.uri = self.config.get("SQL", "uri")
 		self.log = logging.getLogger(__name__)
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 
 		if (self.uri.startswith("sqlite://")):
 			import sqlite
@@ -282,6 +285,17 @@ class SQL(DataInterface):
 		r = cur.fetchone()
 		network = Network(d={'id':r[0], 'name':r[1]})
 		return network
+
+        def getImages(self):
+                count = 0
+                myList = []
+                for i in self.dfs.list("images"):
+                        myFile = self.dfs.getLocalHandle("images/" + i)
+                        if os.path.isfile(myFile):
+                                image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+                                myList.append(image)
+                                count += 1
+                return myList
 	
 	def getUsers(self):
 		cur = self.executeStatement("SELECT * from users")
