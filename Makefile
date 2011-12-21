@@ -65,15 +65,20 @@ src/utils/nmd: src/utils/nmd.py
 rmnmd:
 	echo Removing nmd...; rm -f bin/nmd.py
 
-bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py bin/zoni-cli.py
+bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py bin/zoni-cli.py bin/accounting.py
 bindir:
 	if test ! -d bin; then mkdir bin; fi
-rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive rmzoni-cli
+rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive rmzoni-cli rmaccounting
 	if test -d bin; then rmdir bin; fi
 bin/getInstances: 
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
 rmclients:
 	if test -e bin/getInstances; then (echo Removing client symlinks...; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --rmsyms; cd ..); fi
+bin/accounting.py: src/tashi/accounting/accounting.py
+	@echo Symlinking in Accounting server...
+	(cd bin; ln -s ../src/tashi/accounting/accounting.py .)
+rmaccounting:
+	if test -e bin/accounting.py; then echo Removing Accounting server symlink...; rm bin/accounting.py; fi
 bin/clustermanager.py: src/tashi/clustermanager/clustermanager.py
 	@echo Symlinking in clustermanager...
 	(cd bin; ln -s ../src/tashi/clustermanager/clustermanager.py .)

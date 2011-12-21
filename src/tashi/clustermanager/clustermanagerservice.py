@@ -236,6 +236,8 @@ class ClusterManagerService(object):
 			except:
 				self.log.exception('monitorCluster iteration failed')
 			#  XXXrgass too chatty.  Remove
+			# XXXstroucki the risk is that a deadlock in obtaining
+			# data could prevent this loop from continuing.
 			#self.log.info("Sleeping for %d seconds" % sleepFor)
 			time.sleep(sleepFor)
 
@@ -479,10 +481,8 @@ class ClusterManagerService(object):
 			oldHost.state = HostState.Normal
 
 		# let the host communicate what it is running
-		# XXXrgass - This is too chatty for the console, I think we should remove this.
-		# XXXstroucki - My install depends on this, but I output to log files. This should be handled by a separate accounting server in future.
+		# and note that the information is not stale
 		for instance in instances:
-			self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, host.id, instance.vmId, instance.userId, instance.cores, instance.memory))
 			self.instanceLastContactTime.setdefault(instance.id, 0)
 
 		self.data.releaseHost(oldHost)
