@@ -54,7 +54,16 @@ class NodeManagerService(object):
 		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
 		self.id = None
 		self.notifyCM = []
+
+
+		# XXXstroucki: loadVmInfo probably once came from
+		# pickle store. Now the following check is redundant
+		# is there a need to maintain state on this level?
+
+		# get VMs from VMM
 		self.loadVmInfo()
+
+		# get VMs from VMM
 		vmList = self.vmm.listVms()
 		for vmId in vmList:
 			if (vmId not in self.instances):
@@ -64,11 +73,17 @@ class NodeManagerService(object):
 			if (vmId not in vmList):
 				self.log.warning('vmcontrol backend does not report %d' % (vmId))
 				self.vmStateChange(vmId, None, InstanceState.Exited)
+
+		# XXXstroucki is there a config for this to have effect?
 		self.registerHost()
+
+
+		# start service threads
 		threading.Thread(target=self.backupVmInfoAndFlushNotifyCM).start()
 		threading.Thread(target=self.registerWithClusterManager).start()
 		threading.Thread(target=self.statsThread).start()
 	
+	# XXXstroucki is this still useful?
 	def loadVmInfo(self):
 		try:
 			self.instances = self.vmm.getInstances()
@@ -76,6 +91,7 @@ class NodeManagerService(object):
 			self.log.exception('Failed to obtain VM info')
 			self.instances = {}
 	
+	# XXXstroucki is this still useful?
 	def saveVmInfo(self):
 		try:
 			data = cPickle.dumps(self.instances)
@@ -105,11 +121,15 @@ class NodeManagerService(object):
 			cm.vmUpdate(instance.id, newInst, old)
 		except Exception, e:
 			self.log.exception('RPC failed for vmUpdate on CM')
+			# XXXstroucki things are pretty messed if CM is unreachable
+			# should see if this fn is used purely imperatively or
+			# purely advisory
 			self.notifyCM.append((instance.id, newInst, old, success))
 		else:
 			success()
 		return True
 	
+	# service thread function
 	def backupVmInfoAndFlushNotifyCM(self):
 		cm = None
 		cmUseCount = 0
@@ -130,6 +150,9 @@ class NodeManagerService(object):
 				self.saveVmInfo()
 			except Exception, e:
 				self.log.exception('Failed to save VM info')
+
+			# send data to the CM, adding message to buffer if
+			# it fails
 			try:
 				notifyCM = []
 				try:
@@ -154,6 +177,7 @@ class NodeManagerService(object):
 			if (toSleep > 0):
 				time.sleep(toSleep)
 	
+	# service thread function
 	def registerWithClusterManager(self):
 		cm = None
 		cmUseCount = 0
@@ -169,6 +193,7 @@ class NodeManagerService(object):
 			cmUseCount = cmUseCount + 1
 			start = time.time()
 			try:
+				# XXXstroucki this fn could be in this level maybe?
 				host = self.vmm.getHostInfo(self)
 				instances = self.instances.values()
 				#import pprint
