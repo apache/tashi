@@ -61,6 +61,7 @@ class NodeManagerService(object):
 
 		self.notifyCM = []
 		
+		self.id = None
 		# XXXstroucki this fn could be in this level maybe?
 		self.host = self.vmm.getHostInfo(self)
 
@@ -77,7 +78,7 @@ class NodeManagerService(object):
 		threading.Thread(target=self.__registerWithClusterManager).start()
 		threading.Thread(target=self.__statsThread).start()
 	
-	def loadVmInfo(self):
+	def __loadVmInfo(self):
 		try:
 			self.instances = self.vmm.getInstances()
 		except Exception, e:
@@ -87,6 +88,7 @@ class NodeManagerService(object):
 	# send data to CM
 	# XXXstroucki adapt this for accounting?
 	def __flushNotifyCM(self):
+		start = time.time()
 		# send data to CM, adding message to buffer if
 		# it fails
 		try:
@@ -95,7 +97,7 @@ class NodeManagerService(object):
 				while (len(self.notifyCM) > 0):
 					(instanceId, newInst, old, success) = self.notifyCM.pop(0)
 					try:
-						cm.vmUpdate(instanceId, newInst, old)
+						self.cm.vmUpdate(instanceId, newInst, old)
 					except TashiException, e:
 						notifyCM.append((instanceId, newInst, old, success))
 						if (e.errno != Erors.IncorrectVmState):
@@ -118,7 +120,7 @@ class NodeManagerService(object):
 	# Called from VMM to update self.instances
 	# but only changes are Exited, MigrateTrans and Running
 	def vmStateChange(self, vmId, old, cur):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		if (old and instance.state != old):
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
 		if (cur == InstanceState.Exited):
@@ -203,7 +205,7 @@ class NodeManagerService(object):
 	
 	# remote
 	def suspendVm(self, vmId, destination):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.Suspending
 		threading.Thread(target=self.vmm.suspendVm, args=(vmId, destination)).start()
 	
@@ -237,7 +239,7 @@ class NodeManagerService(object):
 
 	# remote
 	def prepSourceVm(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.MigratePrep
 
 	# called by migrateVm as thread
@@ -246,7 +248,7 @@ class NodeManagerService(object):
 		del self.instances[instance.vmId]
 		
 	def migrateVm(self, vmId, target, transportCookie):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.MigrateTrans
 		threading.Thread(target=self.migrateVmHelper, args=(instance, target, transportCookie)).start()
 		return
@@ -276,33 +278,33 @@ class NodeManagerService(object):
 
 	# remote
 	def pauseVm(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.Pausing
 		self.vmm.pauseVm(vmId)
 		instance.state = InstanceState.Paused
 
 	# remote
 	def unpauseVm(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.Unpausing
 		self.vmm.unpauseVm(vmId)
 		instance.state = InstanceState.Running
 
 	# remote
 	def shutdownVm(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.ShuttingDown
 		self.vmm.shutdownVm(vmId)
 
 	# remote
 	def destroyVm(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		instance.state = InstanceState.Destroying
 		self.vmm.destroyVm(vmId)
 
 	# remote
 	def getVmInfo(self, vmId):
-		instance = self.getInstance(vmId)
+		instance = self.__getInstance(vmId)
 		return instance
 
 	# remote
