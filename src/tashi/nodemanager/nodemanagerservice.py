@@ -363,7 +363,7 @@ class NodeManagerService(object):
 	# remote
 	def destroyVm(self, vmId):
 		instance = self.__getInstance(vmId)
-		self.ACCOUNT("NM VM DESTROY", instance=instance)
+		self.__ACCOUNT("NM VM DESTROY", instance=instance)
 		instance.state = InstanceState.Destroying
 		self.instance[vmId] = instance
 		self.vmm.destroyVm(vmId)
