@@ -98,12 +98,12 @@ class ClusterManagerService(object):
 		hostText = None
 
 		if instance is not None:
-			instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory))
+			instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
 
 		if host is not None:
 			hostText = "Host(id %d memory %d cores %d)" % (host.id, host.memory, host.cores)
 
-		secondary = ','.join(hostText, instanceText)
+                secondary = ','.join(filter(None, (hostText, instanceText)))
 
 		line = "%s|%s|%s" % (now, text, secondary)
 
