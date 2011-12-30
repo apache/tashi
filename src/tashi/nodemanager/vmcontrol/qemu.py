@@ -136,6 +136,7 @@ class Qemu(VmControlInterface):
 				pass
 		return pids
 
+	# extern
 	def getInstances(self):
 		"""Will return a dict of instances by vmId to the caller"""
 		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
@@ -333,6 +334,7 @@ class Qemu(VmControlInterface):
 		cPickle.dump((child.instance, child.pid, child.ptyFile), info)
 		info.close()
 	
+	# extern
 	def getHostInfo(self, service):
 		host = Host()
 		host.id = service.id
@@ -350,7 +352,7 @@ class Qemu(VmControlInterface):
 		host.decayed = False
 		host.version = version
 		return host
-	
+
 	def startVm(self, instance, source):
 		"""Universal function to start a VM -- used by instantiateVM, resumeVM, and prepReceiveVM"""
 
@@ -456,10 +458,12 @@ class Qemu(VmControlInterface):
 		if (source):
 			cmd = cmd + ["-incoming", source]
 			strCmd = strCmd + " -incoming %s" % (source)
+
 		log.info("QEMU command: %s" % (strCmd))
 		(pipe_r, pipe_w) = os.pipe()
 		pid = os.fork()
 		if (pid == 0):
+			# child process
 			pid = os.getpid()
 			os.setpgid(pid, pid)
 			os.close(pipe_r)
@@ -474,10 +478,13 @@ class Qemu(VmControlInterface):
 					os.close(i)
 				except:
 					pass
+
 			# XXXstroucki unfortunately no kvm option yet
 			os.environ['TMPDIR'] = self.scratchDir
 			os.execl(self.QEMU_BIN, *cmd)
 			sys.exit(-1)
+
+		# parent process
 		os.close(pipe_w)
 		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = True, OSchild = True)
 		child.ptyFile = None
@@ -529,7 +536,8 @@ class Qemu(VmControlInterface):
 				raise RuntimeError
 		self.enterCommand(child, "quit", expectPrompt=False)
 		return vmId
-	
+
+	# extern	
 	def instantiateVm(self, instance):
 		(vmId, cmd) = self.startVm(instance, None)
 		child = self.getChildFromPid(vmId)
@@ -538,6 +546,7 @@ class Qemu(VmControlInterface):
 		self.saveChildInfo(child)
 		return vmId
 	
+	# extern
 	def suspendVm(self, vmId, target):
 		child = self.getChildFromPid(vmId)
 		tmpTarget = "/tmp/tashi_qemu_suspend_%d_%d" % (os.getpid(), vmId)
@@ -546,6 +555,7 @@ class Qemu(VmControlInterface):
 		self.dfs.copyTo(tmpTarget, target)
 		return vmId
 	
+	# extern
 	def resumeVmHelper(self, instance, source):
 		child = self.getChildFromPid(instance.vmId)
 		try:
@@ -559,6 +569,7 @@ class Qemu(VmControlInterface):
 			status = self.enterCommand(child, "info status")
 			time.sleep(1)
 	
+	# extern
 	def resumeVm(self, instance, source):
 		fn = self.dfs.getLocalHandle("%s" % (source))
 		(vmId, cmd) = self.startVm(instance, "exec:zcat %s" % (fn))
@@ -566,6 +577,7 @@ class Qemu(VmControlInterface):
 		child.cmd = cmd
 		return vmId
 	
+	# extern
 	def prepReceiveVm(self, instance, source):
 		self.usedPortsLock.acquire()
 		port = int(random.random()*1000+19000)
@@ -591,6 +603,7 @@ class Qemu(VmControlInterface):
 				time.sleep(1.0)
 		return transportCookie
 	
+	# extern
 	def migrateVm(self, vmId, target, transportCookie):
 		self.migrationSemaphore.acquire()
 		try:
@@ -605,6 +618,7 @@ class Qemu(VmControlInterface):
 			self.migrationSemaphore.release()
 		return res
 	
+	# extern
 	def receiveVm(self, transportCookie):
 		(port, vmId, _hostname) = cPickle.loads(transportCookie)
 		try:
@@ -623,25 +637,30 @@ class Qemu(VmControlInterface):
 		self.usedPortsLock.release()
 		return vmId
 	
+	# extern
 	def pauseVm(self, vmId):
 		child = self.getChildFromPid(vmId)
 		self.enterCommand(child, "stop")
 	
+	# extern
 	def unpauseVm(self, vmId):
 		child = self.getChildFromPid(vmId)
 		self.enterCommand(child, "c")
 	
+	# extern
 	def shutdownVm(self, vmId):
 		"""'system_powerdown' doesn't seem to actually shutdown the VM on some versions of KVM with some versions of Linux"""
 		child = self.getChildFromPid(vmId)
 		self.enterCommand(child, "system_powerdown")
 	
+	# extern
 	def destroyVm(self, vmId):
 		child = self.getChildFromPid(vmId)
 		child.migratingOut = False
 		# XXX: the child could have exited between these two points, but I don't know how to fix that since it might not be our child process
 		os.kill(child.pid, signal.SIGKILL)
 	
+	# extern
 	def vmmSpecificCall(self, vmId, arg):
 		arg = arg.lower()
 		if (arg == "startvnc"):
@@ -689,9 +708,11 @@ class Qemu(VmControlInterface):
 		else:
 			return "Unknown arg %s" % (arg)
 	
+	# extern
 	def listVms(self):
 		return self.controlledVMs.keys()
-	
+
+	# thread
 	def statsThread(self):
 		ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
 		netStats = {}
@@ -764,6 +785,7 @@ class Qemu(VmControlInterface):
 				log.exception("statsThread threw an exception")
 			last = now
 			time.sleep(self.statsInterval)
-	
+
+	# extern	
 	def getStats(self, vmId):
 		return self.stats.get(vmId, {})
