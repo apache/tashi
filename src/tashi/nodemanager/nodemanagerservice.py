@@ -103,7 +103,7 @@ class NodeManagerService(object):
 						self.cm.vmUpdate(instanceId, newInst, old)
 					except TashiException, e:
 						notifyCM.append((instanceId, newInst, old, success))
-						if (e.errno != Erors.IncorrectVmState):
+						if (e.errno != Errors.IncorrectVmState):
 							raise
 					except:
 						notifyCM.append((instanceId, newInst, old, success))
@@ -327,6 +327,7 @@ class NodeManagerService(object):
 	# XXXstroucki migrate in?
 	def receiveVm(self, instance, transportCookie):
 		instance.state = InstanceState.MigrateTrans
+		vmId = instance.vmId
 		self.instances[vmId] = instance
 		self.__ACCOUNT("NM VM MIGRATE RECEIVE", instance=instance)
 		threading.Thread(target=self.__receiveVmHelper, args=(instance, transportCookie)).start()

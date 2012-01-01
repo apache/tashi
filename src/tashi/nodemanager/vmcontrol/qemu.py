@@ -480,7 +480,7 @@ class Qemu(VmControlInterface):
 				if (self.useMigrateArgument):
 					thisDiskList.append("migrate=%s" % migrate)
 
-				diskstring = "%s-drive %s " % (diskString, ",".join(thisDiskList))
+				diskString = "%s-drive %s " % (diskString, ",".join(thisDiskList))
 
 		except:
 			log.exception('caught exception in scratch disk formation')
@@ -616,11 +616,10 @@ class Qemu(VmControlInterface):
 			return vmId
 		except:
 			log.exception("instantiateVm failed")
-			return None
+			raise
 	
 	# extern
 	def suspendVm(self, vmId, target):
-		child = self.__getChildFromPid(vmId)
 		tmpTarget = "/%s/tashi_qemu_suspend_%d_%d" % (self.scratchDir, os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
 		vmId = self.__stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
@@ -901,6 +900,7 @@ class Qemu(VmControlInterface):
 										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
 					self.stats[vmId]['cpuLoad'] = cpuLoad
 					self.stats[vmId]['rss'] = rss
+					self.stats[vmId]['vsize'] = vsize
 					self.stats[vmId]['recvMBs'] = sendMBs
 					self.stats[vmId]['sendMBs'] = recvMBs
 			except:
