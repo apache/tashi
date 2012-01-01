@@ -539,7 +539,6 @@ class Qemu(VmControlInterface):
 		return vmId
 	
 	def suspendVm(self, vmId, target):
-		child = self.getChildFromPid(vmId)
 		tmpTarget = "/tmp/tashi_qemu_suspend_%d_%d" % (os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
 		vmId = self.stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
@@ -758,6 +757,7 @@ class Qemu(VmControlInterface):
 										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
 					self.stats[vmId]['cpuLoad'] = cpuLoad
 					self.stats[vmId]['rss'] = rss
+					self.stats[vmId]['vsize'] = vsize
 					self.stats[vmId]['recvMBs'] = sendMBs
 					self.stats[vmId]['sendMBs'] = recvMBs
 			except:

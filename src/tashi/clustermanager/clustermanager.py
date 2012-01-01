@@ -32,6 +32,8 @@ from tashi.rpycservices import rpycservices
 from rpyc.utils.server import ThreadedServer
 from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
+log = None
+
 def startClusterManager(config):
 	global service, data
 	
@@ -64,6 +66,8 @@ def startClusterManager(config):
 
 @signalHandler(signal.SIGTERM)
 def handleSIGTERM(signalNumber, stackFrame):
+	global log
+
 	log.info('Exiting cluster manager after receiving a SIGINT signal')
 	sys.exit(0)
 	

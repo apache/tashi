@@ -111,6 +111,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		self.transientDir = self.config.get('XenPV', 'transientDir')
 		self.defaultVmType = self.config.get('XenPV', 'defaultVmType') 
 		self.disktype = self.config.get('XenPV', 'defaultDiskType')
+		# XXXstroucki default disktype vhd?
 		self.newvms = listVms(self.vmNamePrefix)
 		self.hostId = -1
 		self.sleeptime = 5
@@ -133,7 +134,7 @@ class XenPV(VmControlInterface, threading.Thread):
 				# If the vm had transient disks, delete them
 				for i in range(len(a.disks)):
 					if a.disks[i].persistent == False:
-						diskname = self.transientDisk(a.id, i, disktype)
+						diskname = self.transientDisk(a.id, i, self.disktype)
 						try:
 							os.unlink(diskname)
 						except:
@@ -150,7 +151,7 @@ class XenPV(VmControlInterface, threading.Thread):
 			time.sleep(self.sleeptime)
 			self.cron()
 ########################################
-# This is an ugly function, but the muti-line string literal makes it
+# This is an ugly function, but the multi-line string literal makes it
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
@@ -167,12 +168,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		vmType = hints.get('vmtype', self.defaultVmType)
 		print 'starting vm with type: ', vmType
 
-                try:
-                   disktype = self.config.get('XenPV', 'defaultDiskType')
-                except:
-                   disktype = 'vhd'
-
-                disk0 = 'tap:%s'%disktype
+                disk0 = 'tap:%s' % self.disktype
 		diskU = 'xvda1'
 
 		try:
@@ -216,7 +212,7 @@ kernel = "%s"
      ramdisk)
 
 		elif vmType == 'hvm':
-			disk0 = 'tap:%s'%disktype
+			disk0 = 'tap:%s' % self.disktype
 			diskU = 'hda1'
 
 
