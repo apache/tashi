@@ -120,15 +120,8 @@ class Qemu(VmControlInterface):
 		except:
 			pass
 
-		# As of 2011-12-30, nm is None when this is called, and
-		# is set later by the NM. Things further down require
-		# access to the NM, so wait until it is set.
-
-		while self.nm is None:
-			log.info("Waiting for NM initialization")
-			time.sleep(2)
-
 		self.__scanInfoDir()
+
 		threading.Thread(target=self.__pollVMsLoop).start()
 		if (self.statsInterval > 0):
 			threading.Thread(target=self.statsThread).start()
@@ -262,6 +255,18 @@ class Qemu(VmControlInterface):
 	# service thread
 	def __pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
+
+		# As of 2011-12-30, nm is None when this is called, and
+		# is set later by the NM. Things further down require
+		# access to the NM, so wait until it is set.
+		# Moved into __pollVMsLoop since putting it in this thread
+		# will allow the init to complete and nm to be actually
+		# set.
+
+		while self.nm is None:
+			log.info("Waiting for NM initialization")
+			time.sleep(2)
+
 		while True:
 			try:
 				time.sleep(self.POLL_DELAY)

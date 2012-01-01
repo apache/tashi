@@ -42,6 +42,7 @@ class ClusterManagerService(object):
 		self.dfs = dfs
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
+		self.log.setLevel(logging.ERROR)
 		self.hostLastContactTime = {}
 		#self.hostLastUpdateTime = {}
 		self.instanceLastContactTime = {}
@@ -195,7 +196,7 @@ class ClusterManagerService(object):
 			if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
 				host.decayed = True
 
-				self.log.info('Fetching state from host %s because it is decayed' % (host.name))
+				self.log.debug('Fetching state from host %s because it is decayed' % (host.name))
 				
 				myInstancesThisHost = [i for i in myInstances.values() if i.hostId == host.id]
 
@@ -246,7 +247,7 @@ class ClusterManagerService(object):
 					continue
 
 				instance.decayed = True
-				self.log.info('Fetching state on instance %s because it is decayed' % (instance.name))
+				self.log.debug('Fetching state on instance %s because it is decayed' % (instance.name))
 				if instance.hostId is None: raise AssertionError
 
 				# XXXstroucki check if host is down?
