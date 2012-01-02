@@ -56,7 +56,7 @@ class ClusterManagerService(object):
 		self.__initAccounting()
 		self.__initCluster()
 
-		threading.Thread(target=self.monitorCluster).start()
+		threading.Thread(target=self.__monitorCluster).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
@@ -193,7 +193,13 @@ class ClusterManagerService(object):
 		for hostId in self.hostLastContactTime.keys():
 			#self.log.warning("iterate %d" % hostId)
 			host = self.data.acquireHost(hostId)
-			if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
+			# XXXstroucki: timing has changed with the message
+			# buffering in the NM, so this wasn't being run any-
+			# more because the time check was passing.
+			# I should think a bit more about this, but
+			# the "if True" is probably appropriate.
+			#if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
+			if True:
 				host.decayed = True
 
 				self.log.debug('Fetching state from host %s because it is decayed' % (host.name))
@@ -507,8 +513,7 @@ class ClusterManagerService(object):
 
 		if oldHost.up == False:
 			self.__upHost(oldHost)
-		self.hostLastContactTime[host.id] = time.time()
-		#self.hostLastUpdateTime[host.id] = time.time()
+		self.hostLastContactTime[host.id] = self.__now()
 		oldHost.version = host.version
 		oldHost.memory = host.memory
 		oldHost.cores = host.cores
@@ -668,9 +673,8 @@ class ClusterManagerService(object):
                 self.log.info("Host %s was unregistered" % hostId)
                 return
 
-	# This function runs in a separate thread to monitor the state
-	# of the cluster
-	def monitorCluster(self):
+	# service thread
+	def __monitorCluster(self):
 		while True:
 			sleepFor = min(self.expireHostTime, self.allowDecayed)
 

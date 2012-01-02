@@ -149,6 +149,7 @@ class NodeManagerService(object):
 
 	# service thread function
 	def __registerWithClusterManager(self):
+		while True:
 			start = time.time()
 			try:
 				instances = self.instances.values()
