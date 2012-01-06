@@ -98,7 +98,8 @@ class NodeManagerService(object):
 			notifyCM = []
 			try:
 				while (len(self.notifyCM) > 0):
-					(instanceId, newInst, old, success) = self.notifyCM.pop(0)
+					value = self.notifyCM.pop(0)
+					(instanceId, newInst, old, success) = value
 					try:
 						self.cm.vmUpdate(instanceId, newInst, old)
 					except TashiException, e:
@@ -111,7 +112,8 @@ class NodeManagerService(object):
 					else:
 						success()
 			finally:
-				self.notifyCM.append(notifyCM)
+				if len(notifyCM) > 0:
+					self.notifyCM.append(notifyCM)
 		except Exception, e:
 			self.log.exception('Failed to send data to the CM')
 
@@ -301,7 +303,7 @@ class NodeManagerService(object):
 		instance = self.__getInstance(vmId)
 		self.__ACCOUNT("NM VM MIGRATE SOURCE PREP", instance=instance)
 		instance.state = InstanceState.MigratePrep
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 
 	# called by migrateVm as thread
 	# XXXstroucki migrate out?
@@ -347,27 +349,27 @@ class NodeManagerService(object):
 		instance = self.__getInstance(vmId)
 		self.__ACCOUNT("NM VM PAUSE", instance=instance)
 		instance.state = InstanceState.Pausing
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 		self.vmm.pauseVm(vmId)
 		instance.state = InstanceState.Paused
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 
 	# remote
 	def unpauseVm(self, vmId):
 		instance = self.__getInstance(vmId)
 		self.__ACCOUNT("NM VM UNPAUSE", instance=instance)
 		instance.state = InstanceState.Unpausing
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 		self.vmm.unpauseVm(vmId)
 		instance.state = InstanceState.Running
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 
 	# remote
 	def shutdownVm(self, vmId):
 		instance = self.__getInstance(vmId)
 		self.__ACCOUNT("NM VM SHUTDOWN", instance=instance)
 		instance.state = InstanceState.ShuttingDown
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 		self.vmm.shutdownVm(vmId)
 
 	# remote
@@ -375,7 +377,7 @@ class NodeManagerService(object):
 		instance = self.__getInstance(vmId)
 		self.__ACCOUNT("NM VM DESTROY", instance=instance)
 		instance.state = InstanceState.Destroying
-		self.instance[vmId] = instance
+		self.instances[vmId] = instance
 		self.vmm.destroyVm(vmId)
 
 	# remote
