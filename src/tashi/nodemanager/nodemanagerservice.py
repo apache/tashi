@@ -113,16 +113,21 @@ class NodeManagerService(object):
 			finally:
 				self.notifyCM.append(notifyCM)
 		except Exception, e:
-			self.log.exception('Failed to register with the CM')
+			self.log.exception('Failed to send data to the CM')
 
 		toSleep = start - time.time() + self.registerFrequency
 		if (toSleep > 0):
 			time.sleep(toSleep)
 
         def __ACCOUNTFLUSH(self):
-                print "Called account flush"
-                self.accountLines = 0
-                self.accountBuffer = []
+		try:
+			from tashi.rpycservices import rpycservices
+			client=rpycservices.client("clustermanager", 31337)
+			client.record(self.accountBuffer)
+			self.accountLines = 0
+			self.accountBuffer = []
+		except:
+			self.log.exception("Failed to flush accounting data")
 
 
         def __ACCOUNT(self, text, instance=None, host=None):
@@ -143,19 +148,22 @@ class NodeManagerService(object):
                 self.accountBuffer.append(line)
                 self.accountLines += 1
 
-                if (self.accountLines > 5):
+		# XXXstroucki think about force flush every so often
+                if (self.accountLines > 0):
                         self.__ACCOUNTFLUSH()
 
 
 	# service thread function
 	def __registerWithClusterManager(self):
 		while True:
+			#self.__ACCOUNT("TESTING")
 			start = time.time()
 			try:
 				instances = self.instances.values()
 				self.id = self.cm.registerNodeManager(self.host, instances)
 			except Exception, e:
 				self.log.exception('Failed to register with the CM')
+
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):
 				time.sleep(toSleep)

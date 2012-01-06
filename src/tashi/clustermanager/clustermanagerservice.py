@@ -99,10 +99,17 @@ class ClusterManagerService(object):
 		hostText = None
 
 		if instance is not None:
-			instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
+			try:
+				instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
+			except:
+				self.log.exception("Invalid instance data")
+				raise
 
 		if host is not None:
-			hostText = "Host(id %d memory %d cores %d)" % (host.id, host.memory, host.cores)
+			try:
+				hostText = "Host(id %d memory %d cores %d)" % (host.id, host.memory, host.cores)
+			except:
+				self.log.exception("Invalid host data")
 
                 secondary = ','.join(filter(None, (hostText, instanceText)))
 
@@ -111,7 +118,8 @@ class ClusterManagerService(object):
 		self.accountBuffer.append(line)
 		self.accountLines += 1
 
-		if (self.accountLines > 5):
+		# XXXstroucki think about autoflush by time
+		if (self.accountLines > 0):
 			self.__ACCOUNTFLUSH()
 
 
@@ -546,7 +554,7 @@ class ClusterManagerService(object):
 
 		self.instanceLastContactTime[instanceId] = self.__now()
 		oldInstance.decayed = False
-		self.__ACCOUNT("CM VM UPDATE", instance=instance)
+		self.__ACCOUNT("CM VM UPDATE", instance=oldInstance)
 
 		if (instance.state == InstanceState.Exited):
 			# determine why a VM has exited

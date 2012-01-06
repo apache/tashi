@@ -21,6 +21,7 @@ import cPickle
 
 clusterManagerRPCs = ['createVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'migrateVm', 'pauseVm', 'unpauseVm', 'getHosts', 'getNetworks', 'getUsers', 'getInstances', 'vmmSpecificCall', 'registerNodeManager', 'vmUpdate', 'activateVm', 'registerHost', 'getImages', 'copyImage']
 nodeManagerRPCs = ['instantiateVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'prepReceiveVm', 'prepSourceVm', 'migrateVm', 'receiveVm', 'pauseVm', 'unpauseVm', 'getVmInfo', 'listVms', 'vmmSpecificCall', 'getHostInfo', 'liveCheck']
+accountingRPCs = ['record']
 
 def clean(args):
 	"""Cleans the object so cPickle can be used."""
@@ -61,7 +62,7 @@ class client:
 		"""Returns a function that makes the RPC call. No keyword arguments allowed when calling this function."""
 		if self.conn.closed == True:
 			self.conn = self.createConn()
-		if name not in clusterManagerRPCs and name not in nodeManagerRPCs:
+		if name not in clusterManagerRPCs and name not in nodeManagerRPCs and name not in accountingRPCs:
 			return None
 		def connectWrap(*args):
 			args = cPickle.dumps(clean(args))
@@ -81,6 +82,8 @@ class ManagerService(rpyc.Service):
 	# Note: self.service and self._type are set before rpyc.utils.server.ThreadedServer is started.
 	def checkValidUser(self, functionName, clientUsername, args):
 		"""Checks whether the operation requested by the user is valid based on clientUsername. An exception will be thrown if not valid."""
+		if self._type == 'AccountingService':
+			return
 		if self._type == 'NodeManagerService':
 			return
 		if clientUsername in ['nodeManager', 'agent', 'root']:
@@ -114,4 +117,7 @@ class ManagerService(rpyc.Service):
 			return makeCall
 		if self._type == 'NodeManagerService' and name in nodeManagerRPCs:
 			return makeCall
+		if self._type == 'AccountingService' and name in accountingRPCs:
+			return makeCall
+
 		raise AttributeError('RPC does not exist')
