@@ -394,11 +394,11 @@ class Qemu(VmControlInterface):
 		#  Capture __startVm Hints
 		#  CPU hints
 		cpuModel = instance.hints.get("cpumodel")
-		# clean off whitespace
-		cpuModel = self.__stripSpace(cpuModel)
 
 		cpuString = ""
 		if cpuModel:
+			# clean off whitespace
+			cpuModel = self.__stripSpace(cpuModel)
 			cpuString = "-cpu " + cpuModel 
 
 		#  Clock hints
@@ -616,6 +616,7 @@ class Qemu(VmControlInterface):
 			# otherwise on restart it will appear as Activating
 			# until we update the state in __matchSystemPids
 			child.instance.state = InstanceState.Running
+			self.nm.createInstance(child.instance)
 			self.nm.vmStateChange(vmId, None, InstanceState.Running)
 			self.__saveChildInfo(child)
 			return vmId

@@ -103,7 +103,6 @@ class ClusterManagerService(object):
 				instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
 			except:
 				self.log.exception("Invalid instance data")
-				raise
 
 		if host is not None:
 			try:

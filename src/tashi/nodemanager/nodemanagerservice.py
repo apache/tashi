@@ -138,10 +138,16 @@ class NodeManagerService(object):
                 hostText = None
 
                 if instance is not None:
-                        instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
+			try:
+                        	instanceText = 'Instance(%s)' % (instance)
+			except:
+				self.log.exception("Invalid instance data")
 
                 if host is not None:
-                        hostText = "Host(id %d memory %d cores %d)" % (host.id, host.memory, host.cores)
+			try:
+                        	hostText = "Host(%s)" % (host)
+			except:
+				self.log.exception("Invalid host data")
 
                 secondary = ','.join(filter(None, (hostText, instanceText)))
 
@@ -246,15 +252,21 @@ class NodeManagerService(object):
 			return True
 
 		return True
+
+	# remote
+	def createInstance(self, instance):
+		vmId = instance.vmId
+		self.instances[vmId] = instance
+		
 	
 	# remote
 	def instantiateVm(self, instance):
 		self.__ACCOUNT("NM VM INSTANTIATE", instance=instance)
 		try:
 			vmId = self.vmm.instantiateVm(instance)
-			instance.vmId = vmId
-			instance.state = InstanceState.Running
-			self.instances[vmId] = instance
+			#instance.vmId = vmId
+			#instance.state = InstanceState.Running
+			#self.instances[vmId] = instance
 			return vmId
 		except:
 			self.log.exception("Failed to start instance")
