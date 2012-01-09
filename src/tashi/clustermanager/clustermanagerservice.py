@@ -88,9 +88,14 @@ class ClusterManagerService(object):
 
 
 	def __ACCOUNTFLUSH(self):
-		print "Called account flush"
-		self.accountLines = 0
-		self.accountBuffer = []
+		try:
+			from tashi.rpycservices import rpycservices
+			client=rpycservices.client("clustermanager", 31337)
+			client.record(self.accountBuffer)
+			self.accountLines = 0
+			self.accountBuffer = []
+		except:
+			self.log.exception("Failed to flush accounting data")
 
 
 	def __ACCOUNT(self, text, instance=None, host=None):
@@ -100,13 +105,13 @@ class ClusterManagerService(object):
 
 		if instance is not None:
 			try:
-				instanceText = 'Instance(id %d host %d vmId %d user %d cores %d memory %d)' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory)
+				instanceText = 'Instance(%s)' % (instance)
 			except:
 				self.log.exception("Invalid instance data")
 
 		if host is not None:
 			try:
-				hostText = "Host(id %d memory %d cores %d)" % (host.id, host.memory, host.cores)
+				hostText = "Host(%s)" % (host)
 			except:
 				self.log.exception("Invalid host data")
 
