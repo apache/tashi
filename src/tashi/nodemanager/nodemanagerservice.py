@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 
+from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import Host, HostState, InstanceState, TashiException, Errors, Instance
 from tashi.nodemanager import RPC
 from tashi import boolean, vmStates, logged, ConnectionManager, timed
@@ -59,11 +60,12 @@ class NodeManagerService(object):
 			self.log.exception("Could not connect to CM")
 			return
 
+		self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
+		self.accountingPort = self.config.get('NodeManagerService', 'accountingPort')
 		self.notifyCM = []
 
-		self.accountLines = 0
-		self.accountBuffer = []
-		
+		self.__initAccounting()
+
 		self.id = None
 		# XXXstroucki this fn could be in this level maybe?
 		self.host = self.vmm.getHostInfo(self)
@@ -81,6 +83,17 @@ class NodeManagerService(object):
 		threading.Thread(target=self.__registerWithClusterManager).start()
 		threading.Thread(target=self.__statsThread).start()
 	
+	def __initAccounting(self):
+                self.accountBuffer = []
+                self.accountLines = 0
+                self.accountingClient = None
+                try:
+                        if (self.accountingHost is not None) and \
+                                    (self.accountingPort is not None):
+                                self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+                except:
+                        self.log.exception("Could not init accounting")
+			
 	def __loadVmInfo(self):
 		try:
 			self.instances = self.vmm.getInstances()
@@ -123,9 +136,8 @@ class NodeManagerService(object):
 
         def __ACCOUNTFLUSH(self):
 		try:
-			from tashi.rpycservices import rpycservices
-			client=rpycservices.client("clustermanager", 31337)
-			client.record(self.accountBuffer)
+			if (self.accountingClient is not None):
+				self.accountingClient.record(self.accountBuffer)
 			self.accountLines = 0
 			self.accountBuffer = []
 		except:

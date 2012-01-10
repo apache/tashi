@@ -32,11 +32,17 @@ class AccountingService(object):
             self.log = logging.getLogger(__name__)
             self.log.setLevel(logging.INFO)
 
+	    self.config = config
+
+	    self.pollsleep = self.config.get("AccountingService", "pollSleep")
+	    if self.pollsleep is None:
+		    self.pollsleep = 600
+
             self.cm = createClient(config)
             threading.Thread(target=self.__start).start()
 
+	# remote
         def record(self, strings):
-            print "here"
             for string in strings:
                 self.log.info("Remote: %s" % (string))
 
@@ -46,12 +52,10 @@ class AccountingService(object):
                     instances = self.cm.getInstances()
                     for instance in instances:
                         # XXXstroucki this currently duplicates what the CM was doing.
-                        # perhaps implement a diff-like log?    
                         self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory))
                 except:
                     self.log.warning("Accounting iteration failed")
 
                         
                 # wait to do the next iteration
-                # XXXstroucki make this configurable?                   
-                time.sleep(60)
+                time.sleep(self.pollsleep)

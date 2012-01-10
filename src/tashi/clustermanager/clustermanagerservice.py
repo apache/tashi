@@ -22,6 +22,7 @@ import logging
 import threading
 import time
 
+from tashi.rpycservices import rpycservices             
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
 from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
 
@@ -52,7 +53,10 @@ class ClusterManagerService(object):
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
-		
+
+		self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
+		self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+
 		self.__initAccounting()
 		self.__initCluster()
 
@@ -61,7 +65,14 @@ class ClusterManagerService(object):
 	def __initAccounting(self):
 		self.accountBuffer = []
 		self.accountLines = 0
+		self.accountingClient = None
+		try:
+			if (self.accountingHost is not None) and \
+				    (self.accountingPort is not None):
 
+				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+		except:
+			self.log.exception("Could not init accounting")
 
 	def __initCluster(self):
 		# initialize state of VMs if restarting
@@ -89,9 +100,8 @@ class ClusterManagerService(object):
 
 	def __ACCOUNTFLUSH(self):
 		try:
-			from tashi.rpycservices import rpycservices
-			client=rpycservices.client("clustermanager", 31337)
-			client.record(self.accountBuffer)
+			if (self.accountingClient is not None):
+				self.accountingClient.record(self.accountBuffer)
 			self.accountLines = 0
 			self.accountBuffer = []
 		except:

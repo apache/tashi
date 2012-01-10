@@ -69,7 +69,6 @@ class Accounting(object):
 			t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(self.config.get('AccountingService', 'port')), auto_register=False, authenticator=authenticator)
 		else:
 			t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(self.config.get('AccountingService', 'port')), auto_register=False)
-			print "ah"
 
 		t.logger.setLevel(logging.ERROR)
 		t.service.service = service
