@@ -54,8 +54,13 @@ class ClusterManagerService(object):
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
 
-		self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
-		self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+		self.accountingHost = None
+		self.accountingPort = None
+		try:
+			self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
+			self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+		except:
+			pass
 
 		self.__initAccounting()
 		self.__initCluster()

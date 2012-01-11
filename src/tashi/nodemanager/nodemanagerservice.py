@@ -60,8 +60,14 @@ class NodeManagerService(object):
 			self.log.exception("Could not connect to CM")
 			return
 
-		self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
-		self.accountingPort = self.config.get('NodeManagerService', 'accountingPort')
+		self.accountingHost = None
+		self.accountingPort = None
+		try:
+			self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
+			self.accountingPort = self.config.get('NodeManagerService', 'accountingPort')
+		except:
+			pass
+
 		self.notifyCM = []
 
 		self.__initAccounting()
