@@ -181,7 +181,6 @@ def boolean(value):
 def instantiateImplementation(className, *args):
 	"""Create an instance of an object with the given class name and list 
 	   of args to __init__"""
-	obj = None
 	if (className.rfind(".") != -1):
 		package = className[:className.rfind(".")]
 		cmd = "import %s\n" % (package)
