@@ -34,9 +34,16 @@ class AccountingService(object):
 
 	    self.config = config
 
-	    self.pollsleep = self.config.get("AccountingService", "pollSleep")
-	    if self.pollsleep is None:
-		    self.pollsleep = 600
+	    self.pollSleep = None
+
+	    # XXXstroucki new python has fallback values
+	    try:
+		    self.pollSleep = self.config.getint("AccountingService", "pollSleep")
+	    except:
+		    pass
+
+	    if self.pollSleep is None:
+		    self.pollSleep = 600
 
             self.cm = createClient(config)
             threading.Thread(target=self.__start).start()
@@ -58,4 +65,4 @@ class AccountingService(object):
 
                         
                 # wait to do the next iteration
-                time.sleep(self.pollsleep)
+                time.sleep(self.pollSleep)

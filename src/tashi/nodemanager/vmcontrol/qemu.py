@@ -612,12 +612,12 @@ class Qemu(VmControlInterface):
 			child = self.__getChildFromPid(vmId)
 			self.__getPtyInfo(child, False)
 			child.cmd = cmd
+			self.nm.createInstance(child.instance)
+			self.nm.vmStateChange(vmId, None, InstanceState.Running)
 			# XXXstroucki Should make sure Running state is saved
 			# otherwise on restart it will appear as Activating
 			# until we update the state in __matchSystemPids
 			child.instance.state = InstanceState.Running
-			self.nm.createInstance(child.instance)
-			self.nm.vmStateChange(vmId, None, InstanceState.Running)
 			self.__saveChildInfo(child)
 			return vmId
 		except:
