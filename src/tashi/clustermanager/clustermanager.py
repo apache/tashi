@@ -17,13 +17,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-import os
 import sys
-import threading
 import signal
 import logging.config
-from getopt import getopt, GetoptError
-from ConfigParser import ConfigParser
 
 from tashi.util import signalHandler, boolean, instantiateImplementation, getConfig, debugConsole
 import tashi

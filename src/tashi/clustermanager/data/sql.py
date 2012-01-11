@@ -17,11 +17,9 @@
 
 import logging
 import threading
-import time
-import types
 # XXXstroucki getImages needs os?
 import os
-from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration, ValueException
 from tashi.clustermanager.data.datainterface import DataInterface
 from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 

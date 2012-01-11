@@ -17,21 +17,15 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from socket import gethostname
-import os
-import socket
 import sys
-import threading
 import signal
-import time
-import random
 import logging.config
 
 from tashi.rpycservices import rpycservices
 from rpyc.utils.server import ThreadedServer
-from rpyc.utils.authenticators import TlsliteVdbAuthenticator
+#from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
-from tashi.rpycservices.rpyctypes import *
+#from tashi.rpycservices.rpyctypes import *
 from tashi.util import getConfig, createClient, instantiateImplementation, boolean, debugConsole, signalHandler
 import tashi
 
@@ -56,17 +50,9 @@ class Accounting(object):
 	def initAccountingServer(self):
 		service = instantiateImplementation(self.config.get("Accounting", "service"), self.config)
 
-		if boolean(self.config.get("Security", "authAndEncrypt")):
-			users = {}
-			userDatabase = data.getUsers()
-			for user in userDatabase.values():
-				if user.passwd != None:
-					users[user.name] = user.passwd
-			users[self.config.get('AllowedUsers', 'clusterManagerUser')] = self.config.get('AllowedUsers', 'clusterManagerPassword')
-			users[self.config.get('AllowedUsers', 'nodeManagerUser')] = self.config.get('AllowedUsers', 'nodeManagerPassword')
-			users[self.config.get('AllowedUsers', 'agentUser')] = self.config.get('AllowedUsers', 'agentPassword')
-			authenticator = TlsliteVdbAuthenticator.from_dict(users)
-			t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(self.config.get('AccountingService', 'port')), auto_register=False, authenticator=authenticator)
+		#if boolean(self.config.get("Security", "authAndEncrypt")):
+		if False:
+			pass
 		else:
 			t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(self.config.get('AccountingService', 'port')), auto_register=False)
 
@@ -79,13 +65,11 @@ class Accounting(object):
 		try:
 			t.start()
 		except KeyboardInterrupt:
-			handleSIGTERM(signal.SIGTERM, None)
+			self.handleSIGTERM(signal.SIGTERM, None)
 
 	@signalHandler(signal.SIGTERM)
-	def handleSIGTERM(signalNumber, stackFrame):
-		global log
-		
-		log.info('Exiting cluster manager after receiving a SIGINT signal')
+	def handleSIGTERM(self, signalNumber, stackFrame):
+		self.log.info('Exiting cluster manager after receiving a SIGINT signal')
 		sys.exit(0)
 
 def main():

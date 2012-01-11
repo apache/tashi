@@ -15,16 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from datetime import datetime
-from random import randint
-from socket import gethostname
 import logging
 import threading
 import time
 
 from tashi.rpycservices import rpycservices             
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
-from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
+from tashi import boolean, ConnectionManager, vmStates, version, scrubString
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -424,7 +421,7 @@ class ClusterManagerService(object):
 			self.proxy[sourceHost.name].prepSourceVm(instance.vmId)
 			self.log.info("migrateVm: Calling prepReceiveVm on target host %s" % targetHost.name)
 			cookie = self.proxy[targetHost.name].prepReceiveVm(instance, sourceHost)
-		except Exception, e:
+		except Exception:
 			self.log.exception('prepReceiveVm failed')
 			raise
 		instance = self.data.acquireInstance(instance.id)
@@ -433,7 +430,7 @@ class ClusterManagerService(object):
 		try:
 			# Send the VM
 			self.proxy[sourceHost.name].migrateVm(instance.vmId, targetHost, cookie)
-		except Exception, e:
+		except Exception:
 			self.log.exception('migrateVm failed')
 			raise
 		try:
@@ -445,7 +442,7 @@ class ClusterManagerService(object):
 		try:
 			# Notify the target
 			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
-		except Exception, e:
+		except Exception:
 			self.log.exception('receiveVm failed')
 			raise
 		return
@@ -641,7 +638,7 @@ class ClusterManagerService(object):
 				vmId = self.proxy[host.name].resumeVm(instance, instance.hints['__resume_source'])
 			else:
 				vmId = self.proxy[host.name].instantiateVm(instance)
-		except Exception, e:
+		except Exception:
 			instance = self.data.acquireInstance(instanceId)
 			if (instance.state is InstanceState.Destroying): # Special case for if destroyVm is called during initialization and initialization fails
 				self.data.removeInstance(instance)

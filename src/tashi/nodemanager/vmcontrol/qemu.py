@@ -27,11 +27,9 @@ import subprocess
 import sys
 import time
 
-# for scratch space support
-from os import system
-
-from tashi.rpycservices.rpyctypes import *
-from tashi.util import broken, logged, scrubString, boolean
+#from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import InstanceState, Host
+from tashi.util import scrubString, boolean
 from tashi import version, stringPartition
 from vmcontrolinterface import VmControlInterface
 
@@ -47,7 +45,7 @@ def controlConsole(child, port):
 		try:
 			listenSocket.listen(5)
 			ls = listenSocket.fileno()
-			input = child.monitorFd
+			#input = child.monitorFd
 			output = child.monitorFd
 			#print "listen"
 			select.select([ls], [], [])
@@ -214,8 +212,8 @@ class Qemu(VmControlInterface):
 				try:
 					if (not child.migratingOut):
 						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
-				except Exception, e:
-					log.exception("vmStateChange failed forVM %s" % (name))
+				except Exception:
+					log.exception("vmStateChange failed for VM %s" % (name))
 			else:
 				# VM is still running
 				try:
@@ -248,7 +246,7 @@ class Qemu(VmControlInterface):
 				child.instance.vmId = vmId
 				
 				self.controlledVMs[vmId] = child
-			except Exception, e:
+			except Exception:
 				log.exception("Failed to load VM info for %d", vmId)
 			else:
 				log.info("Loaded VM info for %d", vmId)
@@ -637,7 +635,7 @@ class Qemu(VmControlInterface):
 		child = self.__getChildFromPid(instance.vmId)
 		try:
 			self.__getPtyInfo(child, True)
-		except RuntimeError, e:
+		except RuntimeError:
 			log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise
@@ -717,7 +715,7 @@ class Qemu(VmControlInterface):
 			raise
 		try:
 			self.__getPtyInfo(child, True)
-		except RuntimeError, e:
+		except RuntimeError:
 			log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise

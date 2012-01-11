@@ -15,18 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-import cPickle
 import logging
-import os
 import socket
-import sys
 import threading
 import time
 
 from tashi.rpycservices import rpycservices
-from tashi.rpycservices.rpyctypes import Host, HostState, InstanceState, TashiException, Errors, Instance
-from tashi.nodemanager import RPC
-from tashi import boolean, vmStates, logged, ConnectionManager, timed
+from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
+from tashi import boolean, vmStates, ConnectionManager
 import tashi
 
 
@@ -103,7 +99,7 @@ class NodeManagerService(object):
 	def __loadVmInfo(self):
 		try:
 			self.instances = self.vmm.getInstances()
-		except Exception, e:
+		except Exception:
 			self.log.exception('Failed to obtain VM info')
 			self.instances = {}
 
@@ -187,7 +183,7 @@ class NodeManagerService(object):
 			try:
 				instances = self.instances.values()
 				self.id = self.cm.registerNodeManager(self.host, instances)
-			except Exception, e:
+			except Exception:
 				self.log.exception('Failed to register with the CM')
 
 			toSleep = start - time.time() + self.registerFrequency

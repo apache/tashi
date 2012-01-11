@@ -15,15 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from datetime import datetime
-from random import randint
-from socket import gethostname
 import logging
 import threading
 import time
 
-from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
-from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString, createClient
+from tashi import createClient
 
 class AccountingService(object):
         """RPC service for the Accounting service"""
