@@ -18,7 +18,7 @@
 import cPickle
 import os
 import threading
-from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import Instance, Host
 from tashi.clustermanager.data import FromConfig, DataInterface
 
 class Pickled(FromConfig):

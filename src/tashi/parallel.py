@@ -116,8 +116,8 @@ def synchronizedmethod(func):
 # Test Code
 ##############################
 import unittest
-import sys
-import time
+#import sys
+#import time
 
 class TestThreadPool(unittest.TestCase):
 	def setUp(self):

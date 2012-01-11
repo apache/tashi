@@ -15,15 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from datetime import datetime
-from random import randint
-from socket import gethostname
 import logging
 import threading
 import time
 
+from tashi.rpycservices import rpycservices             
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
-from tashi import boolean, convertExceptions, ConnectionManager, vmStates, timed, version, scrubString
+from tashi import boolean, ConnectionManager, vmStates, version, scrubString
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -42,6 +40,7 @@ class ClusterManagerService(object):
 		self.dfs = dfs
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
+		self.log.setLevel(logging.ERROR)
 		self.hostLastContactTime = {}
 		#self.hostLastUpdateTime = {}
 		self.instanceLastContactTime = {}
@@ -51,27 +50,97 @@ class ClusterManagerService(object):
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
-		now = self.__now()
+
+		self.accountingHost = None
+		self.accountingPort = None
+		try:
+			self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
+			self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+		except:
+			pass
+
+		self.__initAccounting()
+		self.__initCluster()
+
+		threading.Thread(target=self.__monitorCluster).start()
+
+	def __initAccounting(self):
+		self.accountBuffer = []
+		self.accountLines = 0
+		self.accountingClient = None
+		try:
+			if (self.accountingHost is not None) and \
+				    (self.accountingPort is not None):
+
+				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+		except:
+			self.log.exception("Could not init accounting")
+
+	def __initCluster(self):
+		# initialize state of VMs if restarting
 		for instance in self.data.getInstances().itervalues():
 			instanceId = instance.id
 			instance = self.data.acquireInstance(instanceId)
 			instance.decayed = False
 
 			if instance.hostId is None:
-				self.stateTransition(instance, None, InstanceState.Pending)
+				self.__stateTransition(instance, None, InstanceState.Pending)
 			else:
-				self.stateTransition(instance, None, InstanceState.Orphaned)
+				self.__stateTransition(instance, None, InstanceState.Orphaned)
 
 			self.data.releaseInstance(instance)
+
+		# initialize state of hosts if restarting
 		for host in self.data.getHosts().itervalues():
 			hostId = host.id
 			host = self.data.acquireHost(hostId)
 			host.up = False
 			host.decayed = False
 			self.data.releaseHost(host)
-		threading.Thread(target=self.monitorCluster).start()
 
-	def stateTransition(self, instance, old, cur):
+
+
+	def __ACCOUNTFLUSH(self):
+		try:
+			if (self.accountingClient is not None):
+				self.accountingClient.record(self.accountBuffer)
+			self.accountLines = 0
+			self.accountBuffer = []
+		except:
+			self.log.exception("Failed to flush accounting data")
+
+
+	def __ACCOUNT(self, text, instance=None, host=None):
+		now = self.__now()
+		instanceText = None
+		hostText = None
+
+		if instance is not None:
+			try:
+				instanceText = 'Instance(%s)' % (instance)
+			except:
+				self.log.exception("Invalid instance data")
+
+		if host is not None:
+			try:
+				hostText = "Host(%s)" % (host)
+			except:
+				self.log.exception("Invalid host data")
+
+                secondary = ','.join(filter(None, (hostText, instanceText)))
+
+		line = "%s|%s|%s" % (now, text, secondary)
+
+		self.accountBuffer.append(line)
+		self.accountLines += 1
+
+		# XXXstroucki think about autoflush by time
+		if (self.accountLines > 0):
+			self.__ACCOUNTFLUSH()
+
+
+
+	def __stateTransition(self, instance, old, cur):
 		if (old and instance.state != old):
 			raise TashiException(d={'errno':Errors.IncorrectVmState,'msg':"VmState is not %s - it is %s" % (vmStates[old], vmStates[instance.state])})
 		if (instance.state == cur):
@@ -104,7 +173,7 @@ class ClusterManagerService(object):
 			instance = self.data.acquireInstance(instanceId)
 			if instance.hostId == host.id:
 				instance.decayed = True
-				self.stateTransition(instance, None, InstanceState.Orphaned)
+				self.__stateTransition(instance, None, InstanceState.Orphaned)
 
 			self.data.releaseInstance(instance)
 
@@ -148,10 +217,16 @@ class ClusterManagerService(object):
 		for hostId in self.hostLastContactTime.keys():
 			#self.log.warning("iterate %d" % hostId)
 			host = self.data.acquireHost(hostId)
-			if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
+			# XXXstroucki: timing has changed with the message
+			# buffering in the NM, so this wasn't being run any-
+			# more because the time check was passing.
+			# I should think a bit more about this, but
+			# the "if True" is probably appropriate.
+			#if (self.hostLastContactTime[hostId] < (self.__now() - self.allowDecayed)):
+			if True:
 				host.decayed = True
 
-				self.log.info('Fetching state from host %s because it is decayed' % (host.name))
+				self.log.debug('Fetching state from host %s because it is decayed' % (host.name))
 				
 				myInstancesThisHost = [i for i in myInstances.values() if i.hostId == host.id]
 
@@ -202,7 +277,7 @@ class ClusterManagerService(object):
 					continue
 
 				instance.decayed = True
-				self.log.info('Fetching state on instance %s because it is decayed' % (instance.name))
+				self.log.debug('Fetching state on instance %s because it is decayed' % (instance.name))
 				if instance.hostId is None: raise AssertionError
 
 				# XXXstroucki check if host is down?
@@ -223,23 +298,6 @@ class ClusterManagerService(object):
 				self.instanceLastContactTime[instanceId] = self.__now()
 				instance.decayed = False
 				self.data.releaseInstance(instance)
-
-
-
-	def monitorCluster(self):
-		while True:
-			sleepFor = min(self.expireHostTime, self.allowDecayed)
-
-			try:
-				self.__checkHosts()
-				self.__checkInstances()
-			except:
-				self.log.exception('monitorCluster iteration failed')
-			#  XXXrgass too chatty.  Remove
-			# XXXstroucki the risk is that a deadlock in obtaining
-			# data could prevent this loop from continuing.
-			#self.log.info("Sleeping for %d seconds" % sleepFor)
-			time.sleep(sleepFor)
 
 
 	def normalize(self, instance):
@@ -276,12 +334,14 @@ class ClusterManagerService(object):
 		instance = self.normalize(instance)
 		instance = self.data.registerInstance(instance)
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM REQUEST", instance=instance)
 		return instance
 	
 	def shutdownVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Running, InstanceState.ShuttingDown)
+		self.__stateTransition(instance, InstanceState.Running, InstanceState.ShuttingDown)
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM SHUTDOWN", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
 		try:
 			self.proxy[hostname].shutdownVm(instance.vmId)
@@ -293,14 +353,17 @@ class ClusterManagerService(object):
 	def destroyVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		if (instance.state is InstanceState.Pending or instance.state is InstanceState.Held):
+			self.__ACCOUNT("CM VM DESTROY UNSTARTED", instance=instance)
 			self.data.removeInstance(instance)
 		elif (instance.state is InstanceState.Activating):
-			self.stateTransition(instance, InstanceState.Activating, InstanceState.Destroying)
+			self.__ACCOUNT("CM VM DESTROY STARTING", instance=instance)
+			self.__stateTransition(instance, InstanceState.Activating, InstanceState.Destroying)
 			self.data.releaseInstance(instance)
 		else:
 			# XXXstroucki: This is a problem with keeping
 			# clean state.
-			self.stateTransition(instance, None, InstanceState.Destroying)
+			self.__ACCOUNT("CM VM DESTROY", instance=instance)
+			self.__stateTransition(instance, None, InstanceState.Destroying)
 			if instance.hostId is None:
 				self.data.removeInstance(instance)
 			else:
@@ -318,8 +381,9 @@ class ClusterManagerService(object):
 	
 	def suspendVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
+		self.__stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM SUSPEND", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
 		destination = "suspend/%d_%s" % (instance.id, instance.name)
 		try:
@@ -331,14 +395,16 @@ class ClusterManagerService(object):
 	
 	def resumeVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
+		self.__stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
 		source = "suspend/%d_%s" % (instance.id, instance.name)
 		instance.hints['__resume_source'] = source
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM RESUME", instance=instance)
 		return instance
 	
 	def migrateVm(self, instanceId, targetHostId):
 		instance = self.data.acquireInstance(instanceId)
+		self.__ACCOUNT("CM VM MIGRATE", instance=instance)
 		try:
 			# FIXME: should these be acquire/release host?
 			targetHost = self.data.getHost(targetHostId)
@@ -347,7 +413,7 @@ class ClusterManagerService(object):
 		except:
 			self.data.releaseInstance(instance)
 			raise
-		self.stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
+		self.__stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
 		self.data.releaseInstance(instance)
 		try:
 			# Prepare the target
@@ -355,16 +421,16 @@ class ClusterManagerService(object):
 			self.proxy[sourceHost.name].prepSourceVm(instance.vmId)
 			self.log.info("migrateVm: Calling prepReceiveVm on target host %s" % targetHost.name)
 			cookie = self.proxy[targetHost.name].prepReceiveVm(instance, sourceHost)
-		except Exception, e:
+		except Exception:
 			self.log.exception('prepReceiveVm failed')
 			raise
 		instance = self.data.acquireInstance(instance.id)
-		self.stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)
+		self.__stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)
 		self.data.releaseInstance(instance)
 		try:
 			# Send the VM
 			self.proxy[sourceHost.name].migrateVm(instance.vmId, targetHost, cookie)
-		except Exception, e:
+		except Exception:
 			self.log.exception('migrateVm failed')
 			raise
 		try:
@@ -376,15 +442,16 @@ class ClusterManagerService(object):
 		try:
 			# Notify the target
 			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
-		except Exception, e:
+		except Exception:
 			self.log.exception('receiveVm failed')
 			raise
 		return
 	
 	def pauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Running, InstanceState.Pausing)
+		self.__stateTransition(instance, InstanceState.Running, InstanceState.Pausing)
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM PAUSE", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
 		try:
 			self.proxy[hostname].pauseVm(instance.vmId)
@@ -392,14 +459,15 @@ class ClusterManagerService(object):
 			self.log.exception('pauseVm failed on host %s with vmId %d' % (hostname, instance.vmId))
 			raise
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Pausing, InstanceState.Paused)
+		self.__stateTransition(instance, InstanceState.Pausing, InstanceState.Paused)
 		self.data.releaseInstance(instance)
 		return
 
 	def unpauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Paused, InstanceState.Unpausing)
+		self.__stateTransition(instance, InstanceState.Paused, InstanceState.Unpausing)
 		self.data.releaseInstance(instance)
+		self.__ACCOUNT("CM VM UNPAUSE", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
 		try:
 			self.proxy[hostname].unpauseVm(instance.vmId)
@@ -407,7 +475,7 @@ class ClusterManagerService(object):
 			self.log.exception('unpauseVm failed on host %s with vmId %d' % (hostname, instance.vmId))
 			raise
 		instance = self.data.acquireInstance(instanceId)
-		self.stateTransition(instance, InstanceState.Unpausing, InstanceState.Running)
+		self.__stateTransition(instance, InstanceState.Unpausing, InstanceState.Running)
 		self.data.releaseInstance(instance)
 		return
 	
@@ -442,6 +510,7 @@ class ClusterManagerService(object):
 	def vmmSpecificCall(self, instanceId, arg):
 		instance = self.data.getInstance(instanceId)
 		hostname = self.data.getHost(instance.hostId).name
+		self.__ACCOUNT("CM VM SPECIFIC CALL", instance=instance)
 		try:
 			res = self.proxy[hostname].vmmSpecificCall(instance.vmId, arg)
 		except Exception:
@@ -468,8 +537,7 @@ class ClusterManagerService(object):
 
 		if oldHost.up == False:
 			self.__upHost(oldHost)
-		self.hostLastContactTime[host.id] = time.time()
-		#self.hostLastUpdateTime[host.id] = time.time()
+		self.hostLastContactTime[host.id] = self.__now()
 		oldHost.version = host.version
 		oldHost.memory = host.memory
 		oldHost.cores = host.cores
@@ -500,8 +568,9 @@ class ClusterManagerService(object):
 			self.log.exception("Could not acquire instance")
 			raise
 
-		self.instanceLastContactTime[instanceId] = time.time()
+		self.instanceLastContactTime[instanceId] = self.__now()
 		oldInstance.decayed = False
+		self.__ACCOUNT("CM VM UPDATE", instance=oldInstance)
 
 		if (instance.state == InstanceState.Exited):
 			# determine why a VM has exited
@@ -509,7 +578,7 @@ class ClusterManagerService(object):
 			if (oldInstance.state not in [InstanceState.ShuttingDown, InstanceState.Destroying, InstanceState.Suspending]):
 				self.log.warning('Unexpected exit on %s of instance %s (vmId %d)' % (hostname, oldInstance.name, oldInstance.vmId))
 			if (oldInstance.state == InstanceState.Suspending):
-				self.stateTransition(oldInstance, InstanceState.Suspending, InstanceState.Suspended)
+				self.__stateTransition(oldInstance, InstanceState.Suspending, InstanceState.Suspended)
 				oldInstance.hostId = None
 				oldInstance.vmId = None
 				self.data.releaseInstance(oldInstance)
@@ -552,13 +621,14 @@ class ClusterManagerService(object):
 
 		self.data.releaseHost(dataHost)
 		instance = self.data.acquireInstance(instanceId)
+		self.__ACCOUNT("CM VM ACTIVATE", instance=instance)
 
 		if ('__resume_source' in instance.hints):
-			self.stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
+			self.__stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
 		else:
 			# XXXstroucki should held VMs be continually tried? Or be explicitly set back to pending?
-			#self.stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
-			self.stateTransition(instance, None, InstanceState.Activating)
+			#self.__stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
+			self.__stateTransition(instance, None, InstanceState.Activating)
 
 		instance.hostId = host.id
 		self.data.releaseInstance(instance)
@@ -568,14 +638,14 @@ class ClusterManagerService(object):
 				vmId = self.proxy[host.name].resumeVm(instance, instance.hints['__resume_source'])
 			else:
 				vmId = self.proxy[host.name].instantiateVm(instance)
-		except Exception, e:
+		except Exception:
 			instance = self.data.acquireInstance(instanceId)
 			if (instance.state is InstanceState.Destroying): # Special case for if destroyVm is called during initialization and initialization fails
 				self.data.removeInstance(instance)
 			else:
 				# XXXstroucki what can we do about pending hosts in the scheduler?
 				# put them at the end of the queue and keep trying?
-				self.stateTransition(instance, None, InstanceState.Held)
+				self.__stateTransition(instance, None, InstanceState.Held)
 				instance.hostId = None
 				self.data.releaseInstance(instance)
 			return "failure"
@@ -594,7 +664,7 @@ class ClusterManagerService(object):
 		else:
 			if ('__resume_source' not in instance.hints):
 				# XXXstroucki should we just wait for NM to update?
-				#self.stateTransition(instance, InstanceState.Activating, InstanceState.Running)
+				#self.__stateTransition(instance, InstanceState.Activating, InstanceState.Running)
 				pass
 
 		self.data.releaseInstance(instance)
@@ -606,9 +676,41 @@ class ClusterManagerService(object):
                         self.log.info("Host %s is already registered, it was updated now" % hostname)
                 else:
                         self.log.info("A host was registered - hostname: %s, version: %s, memory: %s, cores: %s" % (hostname, version, memory, cores))
+
+		try:
+			host = self.data.getHost(hostId)
+			self.__ACCOUNT("CM HOST REGISTER", host=host)
+		except:
+			self.log.warning("Failed to lookup host %s" % hostId)
+
                 return hostId
 
         def unregisterHost(self, hostId):
+		try:
+			host = self.data.getHost(hostId)
+			self.__ACCOUNT("CM HOST UNREGISTER", host=host)
+		except:
+			self.log.warning("Failed to lookup host %s" % hostId)
+			return
+
                 self.data.unregisterHost(hostId)
                 self.log.info("Host %s was unregistered" % hostId)
                 return
+
+	# service thread
+	def __monitorCluster(self):
+		while True:
+			sleepFor = min(self.expireHostTime, self.allowDecayed)
+
+			try:
+				self.__checkHosts()
+				self.__checkInstances()
+			except:
+				self.log.exception('monitorCluster iteration failed')
+			#  XXXrgass too chatty.  Remove
+			# XXXstroucki the risk is that a deadlock in obtaining
+			# data could prevent this loop from continuing.
+			#self.log.info("Sleeping for %d seconds" % sleepFor)
+			time.sleep(sleepFor)
+
+

@@ -16,11 +16,11 @@
 # under the License.    
 
 import ConfigParser
-import cPickle
+#import cPickle
 import os
-import select
+#import select
 import signal
-import struct
+#import struct
 import sys
 import threading
 import time
@@ -28,7 +28,6 @@ import traceback
 import types
 import getpass
 
-import rpyc
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
 
@@ -109,7 +108,7 @@ class failsafe(object):
 		def newFunc(*args, **kw):
 			try:
 				return cur(*args, **kw)
-			except Exception, e:
+			except:
 				self.__dict__['__current_obj__'] = self.__dict__['__failsafe_obj__']
 				return fail(*args, **kw)
 		return newFunc
@@ -197,9 +196,9 @@ def convertExceptions(oldFunc):
 	def newFunc(*args, **kw):
 		try:
 			return oldFunc(*args, **kw)
-		except TashiException, e:
+		except TashiException:
 			raise
-		except Exception, e:
+		except:
 			self = args[0]
 			if (self.convertExceptions):
 				raise TashiException(d={'errno':Errors.ConvertedException, 'msg': traceback.format_exc(10)})
@@ -264,10 +263,12 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 def createClient(config):
 	cfgHost = config.get('Client', 'clusterManagerHost')
 	cfgPort = config.get('Client', 'clusterManagerPort')
-	cfgTimeout = config.get('Client', 'clusterManagerTimeout')
+	#XXXstroucki nothing uses timeout right now
+	#cfgTimeout = config.get('Client', 'clusterManagerTimeout')
 	host = os.getenv('TASHI_CM_HOST', cfgHost)
 	port = os.getenv('TASHI_CM_PORT', cfgPort)
-	timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
+	#XXXstroucki nothing uses timeout right now
+	#timeout = float(os.getenv('TASHI_CM_TIMEOUT', cfgTimeout)) * 1000.0
 
 	authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
 	if authAndEncrypt:

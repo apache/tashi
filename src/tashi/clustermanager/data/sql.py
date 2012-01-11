@@ -17,11 +17,9 @@
 
 import logging
 import threading
-import time
-import types
 # XXXstroucki getImages needs os?
 import os
-from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration
 from tashi.clustermanager.data.datainterface import DataInterface
 from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 
@@ -45,7 +43,7 @@ class SQL(DataInterface):
 			self.password = self.config.get('SQL', 'password')
 			self.conn = MySQLdb.connect(host=host, user=user, passwd=self.password, db=db)
 		else:
-			raise ValueException, 'Unknown SQL database engine by URI: %s' % (self.uri)
+			raise TashiException, 'Unknown SQL database engine by URI: %s' % (self.uri)
 
 		self.instanceOrder = ['id', 'vmId', 'hostId', 'decayed', 'state', 'userId', 'name', 'cores', 'memory', 'disks', 'nics', 'hints']
 		self.hostOrder = ['id', 'name', 'up', 'decayed', 'state', 'memory', 'cores', 'version']
@@ -319,7 +317,7 @@ class SQL(DataInterface):
 		for r in res:
 			if r[1] == hostname:
 				id = r[0]
-				print "Host %s already registered, update will be done" % id
+				self.log.warning("Host %s already registered, update will be done" % id)
 				s = ""
 				host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 				l = self.makeHostList(host)

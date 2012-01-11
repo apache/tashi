@@ -20,7 +20,7 @@ import threading
 import os
 import ConfigParser
 
-from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import Host, Network, User, TashiException, Errors, HostState
 from tashi.clustermanager.data import DataInterface
 
 class FromConfig(DataInterface):
@@ -109,7 +109,7 @@ class FromConfig(DataInterface):
 	def releaseInstance(self, instance):
 		try:
 			if (instance.id not in self.instances): # MPR: should never be true, but good to check
-				raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (instanceId)})
+				raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (instance.id)})
 		finally:
 			self.releaseLock(instance._lock)
 	

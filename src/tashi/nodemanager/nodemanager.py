@@ -22,7 +22,6 @@ import signal
 import sys
 
 from tashi.util import instantiateImplementation, getConfig, debugConsole, signalHandler
-from tashi import ConnectionManager
 import tashi
 from tashi import boolean
 
