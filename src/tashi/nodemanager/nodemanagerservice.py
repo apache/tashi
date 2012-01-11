@@ -60,7 +60,7 @@ class NodeManagerService(object):
 		self.accountingPort = None
 		try:
 			self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
-			self.accountingPort = self.config.get('NodeManagerService', 'accountingPort')
+			self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
 		except:
 			pass
 

@@ -55,7 +55,7 @@ class ClusterManagerService(object):
 		self.accountingPort = None
 		try:
 			self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
-			self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+			self.accountingPort = self.config.getint('ClusterManagerService', 'accountingPort')
 		except:
 			pass
 
@@ -71,7 +71,6 @@ class ClusterManagerService(object):
 		try:
 			if (self.accountingHost is not None) and \
 				    (self.accountingPort is not None):
-
 				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
 		except:
 			self.log.exception("Could not init accounting")
