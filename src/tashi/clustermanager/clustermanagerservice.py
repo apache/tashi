@@ -269,6 +269,12 @@ class ClusterManagerService(object):
 		
 		# iterate through all VMs I believe are active
 		for instanceId in self.instanceLastContactTime.keys():
+			# Don't query non-running VMs. eg. if a VM
+			# is suspended, and has no host, then there's
+			# no one to ask
+			if instance.state != InstanceState.Running:
+				continue
+
 			if (self.instanceLastContactTime[instanceId] < (self.__now() - self.allowDecayed)):
 				try:
 					instance = self.data.acquireInstance(instanceId)
