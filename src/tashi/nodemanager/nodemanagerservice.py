@@ -132,9 +132,9 @@ class NodeManagerService(object):
 		except Exception, e:
 			self.log.exception('Failed to send data to the CM')
 
-		toSleep = start - time.time() + self.registerFrequency
-		if (toSleep > 0):
-			time.sleep(toSleep)
+		#toSleep = start - time.time() + self.registerFrequency
+		#if (toSleep > 0):
+			#time.sleep(toSleep)
 
         def __ACCOUNTFLUSH(self):
 		try:

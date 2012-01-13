@@ -154,7 +154,8 @@ class Qemu(VmControlInterface):
 
 		for vmId in vmIds:
 			child = controlledVMs[vmId]
-			name = child.instance.name
+			instance = child.instance
+			name = instance.name
 
 			if vmId not in pids:
 				# VM is no longer running, but is still
@@ -218,12 +219,12 @@ class Qemu(VmControlInterface):
 			else:
 				# VM is still running
 				try:
+					
 					if (child.migratingOut):
-						#self.nm.vmStateChange(vmId, None, InstanceState.MigrateTrans)
-						pass
-					else:
-						#self.nm.vmStateChange(vmId, None, InstanceState.Running)
-						pass
+						self.nm.vmStateChange(vmId, None, InstanceState.MigrateTrans)
+					elif (instance.state == InstanceState.Orphaned) or \
+						(instance.state == InstanceState.Activating):
+						self.nm.vmStateChange(vmId, None, InstanceState.Running)
 				except:
 					log.exception("vmStateChange failed for VM %s" % (name))
 						
@@ -634,6 +635,7 @@ class Qemu(VmControlInterface):
 		# XXX: Use fifo to improve performance
 		vmId = self.__stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
 		self.dfs.copyTo(tmpTarget, target)
+		os.unlink(tmpTarget)
 		return vmId
 	
 	# extern
