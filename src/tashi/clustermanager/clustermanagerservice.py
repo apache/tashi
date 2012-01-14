@@ -55,7 +55,7 @@ class ClusterManagerService(object):
 		self.accountingPort = None
 		try:
 			self.accountingHost = self.config.get('ClusterManagerService', 'accountingHost')
-			self.accountingPort = self.config.get('ClusterManagerService', 'accountingPort')
+			self.accountingPort = self.config.getint('ClusterManagerService', 'accountingPort')
 		except:
 			pass
 
@@ -71,7 +71,6 @@ class ClusterManagerService(object):
 		try:
 			if (self.accountingHost is not None) and \
 				    (self.accountingPort is not None):
-
 				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
 		except:
 			self.log.exception("Could not init accounting")
@@ -270,6 +269,14 @@ class ClusterManagerService(object):
 		
 		# iterate through all VMs I believe are active
 		for instanceId in self.instanceLastContactTime.keys():
+			# Don't query non-running VMs. eg. if a VM
+			# is suspended, and has no host, then there's
+			# no one to ask
+			if instance.state != InstanceState.Running and \
+			   instance.state != InstanceState.Activating and \
+			   instance.state != InstanceState.Orphaned:
+				continue
+
 			if (self.instanceLastContactTime[instanceId] < (self.__now() - self.allowDecayed)):
 				try:
 					instance = self.data.acquireInstance(instanceId)

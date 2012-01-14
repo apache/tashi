@@ -60,7 +60,7 @@ class NodeManagerService(object):
 		self.accountingPort = None
 		try:
 			self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
-			self.accountingPort = self.config.get('NodeManagerService', 'accountingPort')
+			self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
 		except:
 			pass
 
@@ -132,9 +132,9 @@ class NodeManagerService(object):
 		except Exception, e:
 			self.log.exception('Failed to send data to the CM')
 
-		toSleep = start - time.time() + self.registerFrequency
-		if (toSleep > 0):
-			time.sleep(toSleep)
+		#toSleep = start - time.time() + self.registerFrequency
+		#if (toSleep > 0):
+			#time.sleep(toSleep)
 
         def __ACCOUNTFLUSH(self):
 		try:
@@ -311,7 +311,7 @@ class NodeManagerService(object):
 		try:
 			instance.vmId = self.vmm.resumeVm(instance, name)
 			self.instances[instance.vmId] = instance
-			threading.Thread(target=self.resumeVmHelper, args=(instance, name)).start()
+			threading.Thread(target=self.__resumeVmHelper, args=(instance, name)).start()
 		except:
 			self.log.exception('resumeVm failed')
 			raise TashiException(d={'errno':Errors.UnableToResume,'msg':"resumeVm failed on the node manager"})

@@ -27,52 +27,67 @@ class Vfs(DfsInterface):
 		DfsInterface.__init__(self, config)
 		self.prefix = self.config.get("Vfs", "prefix")
 
-# why do these three need to be separate?	
+	def __dfsToReal(self, dfspath):
+		realpath = os.path.join(self.prefix, dfspath)
+		return realpath
+
 	def copyTo(self, localSrc, dst):
-		shutil.copy(localSrc, os.path.join(self.prefix, dst))
-# just assuming this works
+		realdest = self.__dfsToReal(dst)
+		shutil.copy(localSrc, realdest)
+		# just assuming this works
 		return None
 	
 	def copyFrom(self, src, localDst):
-		shutil.copy(os.path.join(self.prefix, src), localDst)
-# just assuming this works
+		realsrc = self.__dfsToReal(src)
+		shutil.copy(realsrc, localDst)
+		# just assuming this works
 		return None
 
 	def copy(self, src, dst):
-		shutil.copy(os.path.join(self.prefix, src),
-			    os.path.join(self.prefix, dst))
-# just assuming this works
+		realsrc = self.__dfsToReal(src)
+		realdst = self.__dfsToReal(dst)
+		shutil.copy(realsrc, realdst)
+		# just assuming this works
 		return None
 	
 	def list(self, path):
 		try:
-			return os.listdir(os.path.join(self.prefix, path))
+			realpath = self.__dfsToReal(path)
+			return os.listdir(realpath)
 		except OSError, e:
+			# XXXstroucki error 20 = ENOTDIR
 			if (e.errno == 20):
 				return [path.split('/')[-1]]
 			else:
 				raise
 	
 	def stat(self, path):
-		return os.stat(os.path.join(self.prefix, path))
+		realpath = self.__dfsToReal(path)
+		return os.stat(realpath)
 	
 	def move(self, src, dst):
-		shutil.move(os.path.join(self.prefix, src), 
-			    os.path.join(self.prefix, dst))
-# just assuming this works
+		realsrc = self.__dfsToReal(src)
+		realdst = self.__dfsToReal(dst)
+		shutil.move(realsrc, realdst)
+		# just assuming this works
 		return None
 	
 	def mkdir(self, path):
-		return os.mkdir(os.path.join(self.prefix, path))
+		realpath = self.__dfsToReal(path)
+		return os.mkdir(realpath)
 	
 	def unlink(self, path):
-		return os.unlink(os.path.join(self.prefix, path))
+		realpath = self.__dfsToReal(path)
+		return os.unlink(realpath)
 	
 	def rmdir(self, path):
-		return os.rmdir(os.path.join(self.prefix, path))
+		realpath = self.__dfsToReal(path)
+		return os.rmdir(realpath)
 	
 	def open(self, path, perm):
-		return open(os.path.join(self.prefix, path), perm)
+		realpath = self.__dfsToReal(path)
+		return open(realpath, perm)
 	
 	def getLocalHandle(self, path):
-		return os.path.join(self.prefix, path)
+		realpath = self.__dfsToReal(path)
+		return realpath

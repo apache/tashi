@@ -26,6 +26,7 @@ import socket
 import subprocess
 import sys
 import time
+import shlex
 
 #from tashi.rpycservices.rpyctypes import *
 from tashi.rpycservices.rpyctypes import InstanceState, Host
@@ -153,7 +154,8 @@ class Qemu(VmControlInterface):
 
 		for vmId in vmIds:
 			child = controlledVMs[vmId]
-			name = child.instance.name
+			instance = child.instance
+			name = instance.name
 
 			if vmId not in pids:
 				# VM is no longer running, but is still
@@ -217,9 +219,11 @@ class Qemu(VmControlInterface):
 			else:
 				# VM is still running
 				try:
+					
 					if (child.migratingOut):
 						self.nm.vmStateChange(vmId, None, InstanceState.MigrateTrans)
-					else:
+					elif (instance.state == InstanceState.Orphaned) or \
+						(instance.state == InstanceState.Activating):
 						self.nm.vmStateChange(vmId, None, InstanceState.Running)
 				except:
 					log.exception("vmStateChange failed for VM %s" % (name))
@@ -508,8 +512,9 @@ class Qemu(VmControlInterface):
 		#  Construct the qemu command
 		strCmd = "%s %s %s -clock %s %s %s -m %d -smp %d -serial null -vnc none -monitor pty" % (self.QEMU_BIN, noAcpiString, cpuString, clockString, diskString, nicString, instance.memory, instance.cores)
 		if (source):
-			strCmd = "%s -incoming %s" % (strCmd, source)
-		cmd = strCmd.split()
+			strCmd = '%s -incoming "%s"' % (strCmd, source)
+		# XXXstroucki perhaps we're doing it backwards
+		cmd = shlex.split(strCmd)
 
 		log.info("Executing command: %s" % (strCmd))
 		(pipe_r, pipe_w) = os.pipe()
@@ -587,14 +592,16 @@ class Qemu(VmControlInterface):
 				# trying to restart the migration by running
 				# the command again (when qemu is ready to
 				# listen again) is probably not helpful
+				success = False
 				res = self.__enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
 				if (res.find("migration failed") == -1):
+					success = True
 					retry = 0
 					break
 				else:
 					log.error("Migration (transiently) failed: %s\n", res)
-			if (retry == 0):
+			if (retry == 0) and (success is False):
 				log.error("Migration failed: %s\n", res)
 				child.errorBit = True
 				raise RuntimeError
@@ -628,6 +635,7 @@ class Qemu(VmControlInterface):
 		# XXX: Use fifo to improve performance
 		vmId = self.__stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
 		self.dfs.copyTo(tmpTarget, target)
+		os.unlink(tmpTarget)
 		return vmId
 	
 	# extern
