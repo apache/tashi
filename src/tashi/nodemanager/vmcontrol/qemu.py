@@ -204,7 +204,7 @@ class Qemu(VmControlInterface):
 				# remove scratch storage
 				try:
 					if self.scratchVg is not None:
-						log.info("Removing scratch for %s" % (name))
+						log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove -f %s" % self.scratchVg
     						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				except:
