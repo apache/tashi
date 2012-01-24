@@ -182,7 +182,7 @@ class Qemu(VmControlInterface):
 				try:
 					if self.scratchVg is not None:
 						scratch_name = child.instance.name
-						log.info("Removing scratch for " + scratch_name)
+						log.info("Removing any scratch for " + scratch_name)
 						cmd = "/sbin/lvremove -f %s" % self.scratchVg
     						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				except:
@@ -230,7 +230,10 @@ class Qemu(VmControlInterface):
 			else:
 				log.info("Loaded VM info for %d", vmId)
 		# XXXstroucki NM may not be available yet here.
-		self.matchSystemPids(self.controlledVMs)
+		try:
+			self.matchSystemPids(self.controlledVMs)
+		except:
+			pass
 	
 	def pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
