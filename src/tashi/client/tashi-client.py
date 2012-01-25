@@ -162,6 +162,8 @@ def getSlots(cores, memory):
 	count = 0
 
 	for h in hosts:
+		if h.up is False or h.state != HostState.Normal:
+			continue
 		countbycores = int((h.cores - h.usedCores) / cores)
 		countbymemory = int((h.memory - h.usedMemory) / memory)
 		count += min(countbycores, countbymemory)
