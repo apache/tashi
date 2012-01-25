@@ -47,7 +47,6 @@ class NodeManagerService(object):
 		self.log = logging.getLogger(__file__)
 		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
 		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
-		self.infoFile = self.config.get('NodeManagerService', 'infoFile')
 		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
 		self.registerHost = boolean(config.get('NodeManagerService', 'registerHost'))
 		try:

@@ -209,7 +209,7 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 	"""Creates many permutations of a list of locations to look for config 
 	   files and then loads them"""
 	config = ConfigParser.ConfigParser()
-	baseLocations = ['./etc/', '/usr/share/tashi/', '/etc/tashi/', os.path.expanduser('~/.tashi/')]
+	baseLocations = ['/usr/local/tashi/etc/', '/usr/share/tashi/', '/etc/tashi/', os.path.expanduser('~/.tashi/')]
 	names = ['Tashi'] + additionalNames
 	names = reduce(lambda x, y: x + [y+"Defaults", y], names, [])
 	allLocations = reduce(lambda x, y: x + reduce(lambda z, a: z + [y + a + ".cfg"], names, []), baseLocations, []) + additionalFiles
