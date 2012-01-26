@@ -205,8 +205,8 @@ class Qemu(VmControlInterface):
 				try:
 					if self.scratchVg is not None:
 						log.info("Removing any scratch for %s" % (name))
-						cmd = "/sbin/lvremove -f %s" % self.scratchVg
-    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+						cmd = "/sbin/lvremove --quiet -f %s" % self.scratchVg
+    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, close_fds=True).wait()
 				except:
 					pass
 
@@ -463,7 +463,7 @@ class Qemu(VmControlInterface):
 				scratchName = "lv%s" % instance.name
 				# XXXstroucki hold lock
 				# XXXstroucki check for capacity
-				cmd = "/sbin/lvcreate -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
+				cmd = "/sbin/lvcreate --quiet -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
 				# XXXstroucki check result
 				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
