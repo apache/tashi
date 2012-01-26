@@ -211,6 +211,7 @@ extraViews = {
 'getSlots': (getSlots, None),
 'getImages': (None, ['id', 'imageName', 'imageSize']), 
 'copyImage': (None, None), 
+'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
@@ -575,7 +576,8 @@ def main():
 				if (type(res) == types.ListType):
 					makeTable(res, keys)
 				else:
-					pprint(res)
+					makeTable([res], keys)
+					
 			except IOError:
 				pass
 			except Exception, e:
