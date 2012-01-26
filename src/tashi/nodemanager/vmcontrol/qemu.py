@@ -206,7 +206,7 @@ class Qemu(VmControlInterface):
 					if self.scratchVg is not None:
 						log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove --quiet -f %s" % self.scratchVg
-    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, close_fds=True).wait()
+    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=os.open(os.devnull, "w"), close_fds=True).wait()
 				except:
 					pass
 
