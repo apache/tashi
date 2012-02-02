@@ -277,6 +277,7 @@ class ClusterManagerService(object):
 			   instance.state != InstanceState.Orphaned:
 				continue
 
+			# XXXstroucki should lock instance here?
 			if (self.instanceLastContactTime[instanceId] < (self.__now() - self.allowDecayed)):
 				try:
 					instance = self.data.acquireInstance(instanceId)
