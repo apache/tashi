@@ -7,22 +7,45 @@ The audience for this document is someone with skills in the following areas:
    * Creating disk images for mass installation
    * Networking, bridging and bonding
 
-You must be able to properly create and maintain disk images that newly created virtual machines can boot from. This includes handling installations of hardware drivers necessary to run in the virtualized environment provided by Tashi.
+You must be able to properly create and maintain disk images that newly 
+created virtual machines can boot from. This includes handling 
+installations of hardware drivers necessary to run in the virtualized 
+environment provided by Tashi.
 
-You must be able to properly handle connections to an existing network. If you do not operate the network the virtual machines are to be connected to, you must make arrangements with your network administrators for permission to connect to their network, IP address blocks, name service, DHCP and any other services necessary. The instructions here reflect an environment commonly available within a home network, i.e. a home router providing access to name service, NAT to access the internet and a DHCP service that will hand out private addresses without the need for prior reservations.
+You must be able to properly handle connections to an existing network. 
+If you do not operate the network the virtual machines are to be 
+connected to, you must make arrangements with your network 
+administrators for permission to connect to their network, IP address 
+blocks, name service, DHCP and any other services necessary. The 
+instructions here reflect an environment commonly available within a 
+home network, i.e. a home router providing access to name service, NAT 
+to access the internet and a DHCP service that will hand out private 
+addresses without the need for prior reservations.
 
-The hardware demands for an installation of Tashi are extremely modest, but
-a Tashi cluster can grow to a large size. This installation document will first demonstrate a Tashi setup in a virtual machine on a 2007 era Macbook Pro.
+The hardware demands for an installation of Tashi are extremely modest, 
+but a Tashi cluster can grow to a large size. This installation document 
+will first demonstrate a Tashi setup in a virtual machine on a 2007 era 
+Macbook Pro.
 
-If you already have an existing set of physical machines, you can choose one now to host the cluster manager and the scheduler. You can follow the instructions on how to install Tashi on a single machine, then continue on with suggestions on how to deploy additional nodes.
+If you already have an existing set of physical machines, you can choose 
+one now to host the cluster manager and the scheduler. You can follow 
+the instructions on how to install Tashi on a single machine, then 
+continue on with suggestions on how to deploy additional nodes.
 
 ---+ Installation on a single host
 
-An installation on a single host will run the cluster manager, the primitive scheduler agent and a node manager. Install Linux on this machine, add the KVM virtualization packages and prepare the networking on the host to connect virtual machines.
+An installation on a single host will run the cluster manager, the 
+primitive scheduler agent and a node manager. Install Linux on this 
+machine, add the KVM virtualization packages and prepare the networking 
+on the host to connect virtual machines.
 
 ---++ Sample fulfillment of prerequisites
 
-For example, once you have logged into the machine as root, do the following to create the bridge your newly created virtual machines will connect to. You should be connected via console because you may lose your network connection if you aren't very careful here. Refer to your distribution's instructions on how to make this configuration permanent.
+For example, once you have logged into the machine as root, do the 
+following to create the bridge your newly created virtual machines will 
+connect to. You should be connected via console because you may lose 
+your network connection if you aren't very careful here. Refer to your 
+distribution's instructions on how to make this configuration permanent.
 
 # BEGIN SAMPLE PREPARATION
 # create a network bridge for the default network
@@ -54,11 +77,22 @@ chmod 700 /etc/qemu-ifup.0
 If you don't have RPyC version 3.1 installed, download a copy from
 http://sourceforge.net/projects/rpyc/files/main/ and install it.
 
-Prepare a virtual machine image in qcow2 format for Tashi to deploy. You can create this with practically any consumer or professional virtualization system, by converting the resulting disk image via qemu-img. Note that operating systems from Redmond only tend to install a minimal amount of hardware drivers, and deployment could fail because the necessary drivers aren't on the disk image. Search online for a virtual driver diskette providing virtio drivers for qemu, or other drivers for the virtualization layer you select. Linux and BSD VMs should be fine. For this installation, the default Tashi configuration will look for images in /tmp/images
+Prepare a virtual machine image in qcow2 format for Tashi to deploy. You 
+can create this with practically any consumer or professional 
+virtualization system, by converting the resulting disk image via 
+qemu-img. Note that operating systems from Redmond only tend to install 
+a minimal amount of hardware drivers, and deployment could fail because 
+the necessary drivers aren't on the disk image. Search online for a 
+virtual driver diskette providing virtio drivers for qemu, or other 
+drivers for the virtualization layer you select. Linux and BSD VMs 
+should be fine. For this installation, the default Tashi configuration 
+will look for images in /tmp/images
 
 ---++ Installation of Tashi code
 
-If you are reading this, you will already have obtained a distribution of the code. Go to the top level directory of Tashi and create a destination directory for the code base:
+If you are reading this, you will already have obtained a distribution 
+of the code. Go to the top level directory of Tashi and create a 
+destination directory for the code base:
 
 ls
 DISCLAIMER  doc/  etc/  LICENSE  Makefile  NOTICE  README  src/
@@ -79,7 +113,10 @@ Symlinking in zoni-cli...
 Symlinking in Accounting server...
 Done
 
-If /usr/local/tashi/src is not included in the system's default path for searching for python modules, ensure the environment variable PYTHONPATH is set before using any Tashi executables.
+If /usr/local/tashi/src is not included in the system's default path for 
+searching for python modules, ensure the environment variable PYTHONPATH 
+is set before using any Tashi executables.
+
 export PYTHONPATH=/usr/local/tashi/src
 
 Start the cluster manager and populate its databases. When defining the host,
@@ -129,7 +166,8 @@ root@grml:/usr/local/tashi/bin# ./clustermanager &
 root@grml:/usr/local/tashi/bin# 2012-01-25 07:53:43,177 [./clustermanager:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg']
 2012-01-25 07:53:43,177 [./clustermanager:INFO] Starting cluster manager
 
-Run the node manager in the background. Note that the hostname must be registered with the cluster manager, as shown above.
+Run the node manager in the background. Note that the hostname must be 
+registered with the cluster manager, as shown above.
 
 root@grml:/usr/local/tashi/bin# ./nodemanager &
 [2] 4293
@@ -148,7 +186,8 @@ Start the primitive scheduling agent:
 root@grml:/usr/local/tashi/bin# ./primitive &
 [3] 4312
 
-Verify that the cluster manager has full communication with the host. When this has happened, decayed is False.
+Verify that the cluster manager has full communication with the host. 
+When this has happened, decayed is False.
 
 root@grml:/usr/local/tashi/bin# tashi-client gethosts
  id reserved name decayed up   state  version memory cores notes
@@ -164,9 +203,12 @@ root@grml:/usr/local/tashi/bin# ./tashi-client getimages
 ---------------------------------------
  0  debian-wheezy-amd64.qcow2 1.74G
 
-Create a VM with 1 core and 128 MB of memory using our disk image in non-persistent mode:
+Create a VM with 1 core and 128 MB of memory using our disk image in 
+non-persistent mode:
 
-root@grml:/usr/local/tashi/bin# ./tashi-client createVm --cores 1 --memory 128 --name wheezy --disks debian-wheezy-amd64.qcow2
+root@grml:/usr/local/tashi/bin# ./tashi-client createVm --cores 1 
+--memory 128 --name wheezy --disks debian-wheezy-amd64.qcow2
+
  id hostId name   user state   disk                      memory cores
 ---------------------------------------------------------------------
  1  None   wheezy root Pending debian-wheezy-amd64.qcow2 128    1    
@@ -182,7 +224,8 @@ root@grml:/usr/local/tashi/bin# ./tashi-client getinstances
 ---------------------------------------------------------------------
  1  1      wheezy root Running debian-wheezy-amd64.qcow2 128    1    
 
-After the machine had a chance to boot, find out what address it got. If you have a DHCP server on your network, search the pool of addresses:
+After the machine had a chance to boot, find out what address it got. If 
+you have a DHCP server on your network, search the pool of addresses:
 
 root@grml:/usr/local/tashi/bin# ifconfig br0
 br0       Link encap:Ethernet  HWaddr 00:0c:29:62:b3:76  
@@ -195,7 +238,9 @@ br0       Link encap:Ethernet  HWaddr 00:0c:29:62:b3:76
           RX bytes:730925 (713.7 KiB)  TX bytes:226530 (221.2 KiB)
 
 Find the MAC address given to the VM
-root@grml:/usr/local/tashi/bin# ./tashi-client getmyinstances --show-nics --hide-disk
+
+root@grml:/usr/local/tashi/bin# ./tashi-client getmyinstances 
+--show-nics --hide-disk
  id hostId name   user state   memory cores nics                                                    
 ----------------------------------------------------------------------------------------------------
  1  1      wheezy root Running 128    1     [{'ip': None, 'mac': '52:54:00:90:2a:9d', 'network': 0}]
@@ -265,3 +310,8 @@ Verify the VM is no longer running:
 root@grml:/usr/local/tashi/bin# ./tashi-client getinstances
  id hostId name user state disk memory cores
 --------------------------------------------
+
+You have now completed the simplest form of a Tashi install: a single 
+machine providing hosting, scheduling and management services. For 
+additional information on what you can do, please view the documentation 
+in the doc/ directory.
