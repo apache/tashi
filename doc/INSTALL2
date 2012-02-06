@@ -6,21 +6,20 @@ installation document. However, only the node manager will have to be
 launched on these hosts. There should be only one cluster manager and 
 scheduling agent in the cluster.
 
-You can configure the cluster manager to accept registrations for new 
-hosts. If you wish to do this, set the following option:
+You must register the host's hostname with the clustermanager, as shown 
+in the main installation document.
 
-XXX
-
-Otherwise, you must register the host's hostname with the 
-clustermanager, as shown in the main installation document.
-
-You can then start the node manager manually, or have it be started from 
-the system initialization scripts.
+You can then start the node manager manually, or have it start from the 
+system initialization scripts.
 
 ---+ Deployment over multiple networks
 
 To add additional networks to the Apache Tashi cluster, they should be 
-brought to the hosts as VLAN network interfaces, attached to software bridges.
+brought to the hosts as VLAN network interfaces, attached to software 
+bridges. The new network will have to be registered with the cluster 
+manager, as detailed in the main installation document. Scheduling of 
+virtual machines is open over the cluster, so each host needs to provide 
+access to the same networks.
 
 Generally, your network switch will have to be configured to send 
 packets "tagged" with the VLAN identifiers for all networks that the 
@@ -49,6 +48,10 @@ exit 0
 Note that the entire path of a network connection must be configured to 
 use jumbo frames, if the virtual machines are to use them.
 
-Finally, the network will have to be registered, as detailed in the main 
-installation document.
+---+ Accounting server
 
+An accounting server is available in the distribution. It will log 
+events from the cluster manager and node managers, as well as obtain 
+periodic state from the cluster manager on what virtual machines are 
+running. It can be started by running "accounting" from the binaries 
+directory, and then starting the cluster services.
