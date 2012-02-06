@@ -1,0 +1,54 @@
+---+ Installation on additional hosts
+
+To add additional hosts to the Apache Tashi cluster, they should be 
+installed to satisfy the prerequisites as described in the main 
+installation document. However, only the node manager will have to be 
+launched on these hosts. There should be only one cluster manager and 
+scheduling agent in the cluster.
+
+You can configure the cluster manager to accept registrations for new 
+hosts. If you wish to do this, set the following option:
+
+XXX
+
+Otherwise, you must register the host's hostname with the 
+clustermanager, as shown in the main installation document.
+
+You can then start the node manager manually, or have it be started from 
+the system initialization scripts.
+
+---+ Deployment over multiple networks
+
+To add additional networks to the Apache Tashi cluster, they should be 
+brought to the hosts as VLAN network interfaces, attached to software bridges.
+
+Generally, your network switch will have to be configured to send 
+packets "tagged" with the VLAN identifiers for all networks that the 
+cluster is to host virtual machines on.
+
+This can be automatically done on start up. For example, a stanza from 
+/etc/network/interfaces that configures a bridge for VLAN 11, using 
+jumbo frames, will look like this:
+
+auto br11
+iface br11 inet manual
+  mtu 9000
+  bridge_ports eth0.11
+  bridge_fd 1
+  bridge_hello 1
+  up ifconfig eth0.11 mtu 9000
+
+The corresponding /etc/qemu-ifup.11 looks like this:
+
+#!/bin/sh
+
+/sbin/ifconfig $1 0.0.0.0 up mtu 9000
+/sbin/brctl addif br11 $1
+exit 0
+
+Note that the entire path of a network connection must be configured to 
+use jumbo frames, if the virtual machines are to use them.
+
+Finally, the network will have to be registered, as detailed in the main 
+installation document.
+
