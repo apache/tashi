@@ -119,8 +119,10 @@ is set before using any Tashi executables.
 
 export PYTHONPATH=/usr/local/tashi/src
 
-Start the cluster manager and populate its databases. When defining the host,
-you must provide the name the host has been given by the hostname command.
+Start the cluster manager and populate the hosts and networks databases. 
+When defining the host, you must provide the name the host has been 
+given by the hostname command. If you plan on eventually having several 
+hosts and networks, feel free to add them now.
 
 root@grml:/usr/local/tashi/bin# DEBUG=1 ./clustermanager
 2012-01-26 23:12:33,972 [./clustermanager:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg']

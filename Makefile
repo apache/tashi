@@ -27,6 +27,15 @@ default: bin src/utils/nmd
 all: bin src/utils/nmd src/tags doc/html aws
 	@echo Done
 
+package: src DISCLAIMER INSTALL LICENSE NOTICE README
+	@echo "Building package in apache-tashi.tar.gz"
+	rm -rf apache-tashi.tar.gz apache-tashi
+	mkdir apache-tashi
+	cp -rp doc etc Makefile src DISCLAIMER INSTALL LICENSE NOTICE README apache-tashi/
+	find apache-tashi -type d -name ".svn"|xargs rm -rf
+	tar zcf apache-tashi.tar.gz apache-tashi
+	rm -rf apache-tashi
+
 doc: rmdoc doc/html
 	@echo Done
 
