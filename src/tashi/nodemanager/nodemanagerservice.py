@@ -47,7 +47,6 @@ class NodeManagerService(object):
 		self.log = logging.getLogger(__file__)
 		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
 		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
-		self.infoFile = self.config.get('NodeManagerService', 'infoFile')
 		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
 		self.registerHost = boolean(config.get('NodeManagerService', 'registerHost'))
 		try:
@@ -225,9 +224,17 @@ class NodeManagerService(object):
 
 	def __getInstance(self, vmId):
 		instance = self.instances.get(vmId, None)
-		if (instance is None):
-			raise TashiException(d={'errno':Errors.NoSuchVmId,'msg':"There is no vmId %d on this host" % (vmId)})
-		return instance
+		if instance is not None:
+			return instance
+
+		# refresh self.instances if not found
+		self.__loadVmInfo()
+		instance = self.instances.get(vmId, None)
+		if instance is not None:
+			return instance
+
+
+		raise TashiException(d={'errno':Errors.NoSuchVmId,'msg':"There is no vmId %d on this host" % (vmId)})
 	
 	# remote
 	# Called from VMM to update self.instances

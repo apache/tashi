@@ -27,6 +27,15 @@ default: bin src/utils/nmd
 all: bin src/utils/nmd src/tags doc/html aws
 	@echo Done
 
+package: src DISCLAIMER INSTALL LICENSE NOTICE README
+	@echo "Building package in apache-tashi.tar.gz"
+	rm -rf apache-tashi.tar.gz apache-tashi
+	mkdir apache-tashi
+	cp -rp doc etc Makefile src DISCLAIMER INSTALL LICENSE NOTICE README apache-tashi/
+	find apache-tashi -type d -name ".svn"|xargs rm -rf
+	tar zcf apache-tashi.tar.gz apache-tashi
+	rm -rf apache-tashi
+
 doc: rmdoc doc/html
 	@echo Done
 
@@ -35,7 +44,7 @@ clean: rmnmd rmbin rmtags rmdoc rmaws
 	@echo Done
 
 version:
-	sed -i "s/version = .*/version = \"`date`\"/" src/tashi/version.py
+	sed -i "s/version = .*/version = \"`date +%Y-%m-%d`\"/" src/tashi/version.py
 
 aws: src/tashi/aws/wsdl/AmazonEC2_services_types.py src/tashi/aws/wsdl/AmazonEC2_services_server.py
 
@@ -51,21 +60,15 @@ src/tashi/aws/wsdl/2009-04-04.ec2.wsdl:
 rmaws:
 	if test -e src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; then echo Removing aws...; rm -f src/tashi/aws/wsdl/2009-04-04.ec2.wsdl; rm -f src/tashi/aws/wsdl/AmazonEC2_*.py; fi
 
-# Implicit builds
-# src/utils/nmd: src/utils/Makefile src/utils/nmd.c
-#	@echo Building nmd...
-#	(cd src/utils; make)
-#	ln -s ../src/utils/nmd ./bin/nmd
-
 src/utils/nmd: src/utils/nmd.py
-	ln -s ../src/utils/nmd.py ./bin/nmd.py
+	ln -s ../src/utils/nmd.py ./bin/nmd
 
 #rmnmd:
 #	if test -e src/utils/nmd; then echo Removing nmd...; (cd src/utils; make clean); rm -f bin/nmd; fi
 rmnmd:
-	echo Removing nmd...; rm -f bin/nmd.py
+	echo Removing nmd...; rm -f bin/nmd
 
-bin: bindir bin/clustermanager.py bin/nodemanager.py bin/tashi-client.py bin/primitive.py bin/zoni-cli.py bin/accounting.py
+bin: bindir bin/clustermanager bin/nodemanager bin/tashi-client bin/primitive bin/zoni-cli bin/accounting
 bindir:
 	if test ! -d bin; then mkdir bin; fi
 rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive rmzoni-cli rmaccounting
@@ -74,31 +77,31 @@ bin/getInstances:
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
 rmclients:
 	if test -e bin/getInstances; then (echo Removing client symlinks...; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --rmsyms; cd ..); fi
-bin/accounting.py: src/tashi/accounting/accounting.py
+bin/accounting: src/tashi/accounting/accounting.py
 	@echo Symlinking in Accounting server...
-	(cd bin; ln -s ../src/tashi/accounting/accounting.py .)
+	(cd bin; ln -s ../src/tashi/accounting/accounting.py accounting)
 rmaccounting:
-	if test -e bin/accounting.py; then echo Removing Accounting server symlink...; rm bin/accounting.py; fi
-bin/clustermanager.py: src/tashi/clustermanager/clustermanager.py
+	if test -e bin/accounting; then echo Removing Accounting server symlink...; rm bin/accounting; fi
+bin/clustermanager: src/tashi/clustermanager/clustermanager.py
 	@echo Symlinking in clustermanager...
-	(cd bin; ln -s ../src/tashi/clustermanager/clustermanager.py .)
+	(cd bin; ln -s ../src/tashi/clustermanager/clustermanager.py clustermanager)
 rmclustermanager:
-	if test -e bin/clustermanager.py; then echo Removing clustermanager symlink...; rm bin/clustermanager.py; fi
-bin/nodemanager.py: src/tashi/nodemanager/nodemanager.py
+	if test -e bin/clustermanager; then echo Removing clustermanager symlink...; rm bin/clustermanager; fi
+bin/nodemanager: src/tashi/nodemanager/nodemanager.py
 	@echo Symlinking in nodemanager...
-	(cd bin; ln -s ../src/tashi/nodemanager/nodemanager.py .)
+	(cd bin; ln -s ../src/tashi/nodemanager/nodemanager.py nodemanager)
 rmnodemanager:
-	if test -e bin/nodemanager.py; then echo Removing nodemanager symlink...; rm bin/nodemanager.py; fi
-bin/primitive.py: src/tashi/agents/primitive.py
+	if test -e bin/nodemanager; then echo Removing nodemanager symlink...; rm bin/nodemanager; fi
+bin/primitive: src/tashi/agents/primitive.py
 	@echo Symlinking in primitive...
-	(cd bin; ln -s ../src/tashi/agents/primitive.py .)
+	(cd bin; ln -s ../src/tashi/agents/primitive.py primitive)
 rmprimitive:
-	if test -e bin/primitive.py; then echo Removing primitve-agent symlink...; rm bin/primitive.py; fi
-bin/tashi-client.py:
+	if test -e bin/primitive; then echo Removing primitve-agent symlink...; rm bin/primitive; fi
+bin/tashi-client:
 	@echo Symlinking in tashi-client...
-	(cd bin; ln -s ../src/tashi/client/tashi-client.py .)
+	(cd bin; ln -s ../src/tashi/client/tashi-client.py tashi-client)
 rmtashi-client:
-	if test -e bin/tashi-client.py; then echo Removing tashi-client symlink...; rm bin/tashi-client.py; fi
+	if test -e bin/tashi-client; then echo Removing tashi-client symlink...; rm bin/tashi-client; fi
 src/tags:
 	@echo Generating tags...
 	(cd src; ctags-exuberant -R --c++-kinds=+p --fields=+iaS --extra=+q -f ./tags .)
@@ -112,14 +115,15 @@ rmdoc:
 	if test -d doc/html; then echo Removing HTML docs...; rm -rf ./doc/html; fi
 
 #  Zoni 
-bin/zoni-cli.py:
+bin/zoni-cli:
 	@echo Symlinking in zoni-cli...
-	(cd bin; ln -s ../src/zoni/client/zoni-cli.py .)
+	(cd bin; ln -s ../src/zoni/client/zoni-cli .)
+# why necessarily put this in /usr/local/bin like nothing else?
 usr/local/bin/zoni:
 	@echo Creating /usr/local/bin/zoni
 	(echo '#!/bin/bash\nPYTHONPATH=$(shell pwd)/src $(shell pwd)/bin/zoni-cli.py $$*' > /usr/local/bin/zoni; chmod 755 /usr/local/bin/zoni)
 rmzoni-cli:
-	if test -e bin/zoni-cli.py; then echo Removing zoni-cli symlink...; rm bin/zoni-cli.py; fi
+	if test -e bin/zoni-cli; then echo Removing zoni-cli symlink...; rm bin/zoni-cli; fi
 	if test -e /usr/local/bin/zoni; then echo Removing zoni...; rm /usr/local/bin/zoni; fi
 
 ## for now only print warnings having to do with bad indentation. pylint doesn't make it easy to enable only 1,2 checks

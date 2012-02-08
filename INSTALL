@@ -1,0 +1,319 @@
+Welcome to Apache Tashi!
+
+This text will show you how to get set up quickly, and then will touch 
+on how to configure additional functionality.
+
+The audience for this document is someone with skills in the following areas:
+   * Creating disk images for mass installation
+   * Networking, bridging and bonding
+
+You must be able to properly create and maintain disk images that newly 
+created virtual machines can boot from. This includes handling 
+installations of hardware drivers necessary to run in the virtualized 
+environment provided by Tashi.
+
+You must be able to properly handle connections to an existing network. 
+If you do not operate the network the virtual machines are to be 
+connected to, you must make arrangements with your network 
+administrators for permission to connect to their network, IP address 
+blocks, name service, DHCP and any other services necessary. The 
+instructions here reflect an environment commonly available within a 
+home network, i.e. a home router providing access to name service, NAT 
+to access the internet and a DHCP service that will hand out private 
+addresses without the need for prior reservations.
+
+The hardware demands for an installation of Tashi are extremely modest, 
+but a Tashi cluster can grow to a large size. This installation document 
+will first demonstrate a Tashi setup in a virtual machine on a 2007 era 
+Macbook Pro.
+
+If you already have an existing set of physical machines, you can choose 
+one now to host the cluster manager and the scheduler. You can follow 
+the instructions on how to install Tashi on a single machine, then 
+continue on with suggestions on how to deploy additional nodes.
+
+---+ Installation on a single host
+
+An installation on a single host will run the cluster manager, the 
+primitive scheduler agent and a node manager. Install Linux on this 
+machine, add the KVM virtualization packages and prepare the networking 
+on the host to connect virtual machines.
+
+---++ Sample fulfillment of prerequisites
+
+For example, once you have logged into the machine as root, do the 
+following to create the bridge your newly created virtual machines will 
+connect to. You should be connected via console because you may lose 
+your network connection if you aren't very careful here. Refer to your 
+distribution's instructions on how to make this configuration permanent.
+
+# BEGIN SAMPLE PREPARATION
+# create a network bridge for the default network
+brctl addbr br0
+
+# set the bridge's hello and forward delay to 1 second
+brctl setfd br0 1
+brctl sethello br0 1
+
+# disconnect eth0 from the network, attach it to the bridge and
+# obtain an address for the bridge
+ifdown eth0;ifconfig eth0 0.0.0.0;brctl addif br0 eth0;dhclient br0
+
+# create a script /etc/qemu-ifup.0 which will allow virtual machines
+# to be attached to the default network (0).
+
+cat /etc/qemu-ifup.0
+#!/bin/sh
+
+/sbin/ifconfig $1 0.0.0.0 up
+/sbin/brctl addif br0 $1
+exit 0
+
+# Ensure the script has execute permissions
+chmod 700 /etc/qemu-ifup.0
+
+# END SAMPLE PREPARATION
+
+If you don't have RPyC version 3.1 installed, download a copy from
+http://sourceforge.net/projects/rpyc/files/main/ and install it.
+
+Prepare a virtual machine image in qcow2 format for Tashi to deploy. You 
+can create this with practically any consumer or professional 
+virtualization system, by converting the resulting disk image via 
+qemu-img. Note that operating systems from Redmond only tend to install 
+a minimal amount of hardware drivers, and deployment could fail because 
+the necessary drivers aren't on the disk image. Search online for a 
+virtual driver diskette providing virtio drivers for qemu, or other 
+drivers for the virtualization layer you select. Linux and BSD VMs 
+should be fine. For this installation, the default Tashi configuration 
+will look for images in /tmp/images
+
+---++ Installation of Tashi code
+
+If you are reading this, you will already have obtained a distribution 
+of the code. Go to the top level directory of Tashi and create a 
+destination directory for the code base:
+
+ls
+DISCLAIMER  doc/  etc/  LICENSE  Makefile  NOTICE  README  src/
+
+mkdir /usr/local/tashi
+
+Move the Tashi code to the directory you created
+mv * /usr/local/tashi
+
+Create Tashi executables in /usr/local/tashi/bin
+cd /usr/local/tashi
+root@grml:/usr/local/tashi# make
+Symlinking in clustermanager...
+Symlinking in nodemanager...
+Symlinking in tashi-client...
+Symlinking in primitive...
+Symlinking in zoni-cli...
+Symlinking in Accounting server...
+Done
+
+If /usr/local/tashi/src is not included in the system's default path for 
+searching for python modules, ensure the environment variable PYTHONPATH 
+is set before using any Tashi executables.
+
+export PYTHONPATH=/usr/local/tashi/src
+
+Start the cluster manager and populate the hosts and networks databases. 
+When defining the host, you must provide the name the host has been 
+given by the hostname command. If you plan on eventually having several 
+hosts and networks, feel free to add them now.
+
+root@grml:/usr/local/tashi/bin# DEBUG=1 ./clustermanager
+2012-01-26 23:12:33,972 [./clustermanager:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg']
+2012-01-26 23:12:33,972 [./clustermanager:INFO] Starting cluster manager
+**********************************************************************
+Welcome to IPython. I will try to create a personal configuration directory
+where you can customize many aspects of IPython's functionality in:
+
+/root/.ipython
+Initializing from configuration: /usr/lib/python2.6/dist-packages/IPython/UserConfig
+
+Successful installation!
+
+Please read the sections 'Initial Configuration' and 'Quick Tips' in the
+IPython manual (there are both HTML and PDF versions supplied with the
+distribution) to make sure that your system environment is properly configured
+to take advantage of IPython's features.
+
+Important note: the configuration system has changed! The old system is
+still in place, but its setting may be partly overridden by the settings in 
+"~/.ipython/ipy_user_conf.py" config file. Please take a look at the file 
+if some of the new settings bother you. 
+
+
+Please press <RETURN> to start IPython.
+**********************************************************************
+
+In [1]: from tashi.rpycservices.rpyctypes import Host, HostState, Network
+
+In [2]: data.baseDataObject.hosts[1] = Host(d={'id':1,'name':'grml','state': HostState.Normal,'up':False})
+
+In [3]: data.baseDataObject.networks[1]=Network(d={'id':0,'name':'default'})
+
+In [4]: data.baseDataObject.save()
+
+In [5]: import os
+
+In [6]: os.kill(os.getpid(), 9)
+
+Run the cluster manager in the background:
+root@grml:/usr/local/tashi/bin# ./clustermanager &
+[1] 4289
+root@grml:/usr/local/tashi/bin# 2012-01-25 07:53:43,177 [./clustermanager:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg']
+2012-01-25 07:53:43,177 [./clustermanager:INFO] Starting cluster manager
+
+Run the node manager in the background. Note that the hostname must be 
+registered with the cluster manager, as shown above.
+
+root@grml:/usr/local/tashi/bin# ./nodemanager &
+[2] 4293
+root@grml:/usr/local/tashi/bin# 2012-01-25 07:53:59,348 [__main__:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg', '/usr/local/tashi/etc/NodeManager.cfg']
+2012-01-25 07:53:59,392 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.py:INFO] No VM information found in /var/tmp/VmControlQemu/
+2012-01-25 07:53:59,404 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.py:INFO] Waiting for NM initialization
+
+Verify that the node is shown as being "Up".
+
+root@grml:/usr/local/tashi/bin# ./tashi-client gethosts
+ id reserved name decayed up   state  version memory cores notes
+----------------------------------------------------------------
+ 1  []       grml True    True Normal HEAD    233    1     None
+
+Start the primitive scheduling agent:
+root@grml:/usr/local/tashi/bin# ./primitive &
+[3] 4312
+
+Verify that the cluster manager has full communication with the host. 
+When this has happened, decayed is False.
+
+root@grml:/usr/local/tashi/bin# tashi-client gethosts
+ id reserved name decayed up   state  version memory cores notes
+----------------------------------------------------------------
+ 1  []       grml False   True Normal HEAD    233    1     None 
+
+Check the presence of a disk image:
+
+root@grml:/usr/local/tashi/bin# ls /tmp/images/
+debian-wheezy-amd64.qcow2
+root@grml:/usr/local/tashi/bin# ./tashi-client getimages
+ id imageName                 imageSize
+---------------------------------------
+ 0  debian-wheezy-amd64.qcow2 1.74G
+
+Create a VM with 1 core and 128 MB of memory using our disk image in 
+non-persistent mode:
+
+root@grml:/usr/local/tashi/bin# ./tashi-client createVm --cores 1 
+--memory 128 --name wheezy --disks debian-wheezy-amd64.qcow2
+
+ id hostId name   user state   disk                      memory cores
+---------------------------------------------------------------------
+ 1  None   wheezy root Pending debian-wheezy-amd64.qcow2 128    1    
+
+2012-02-02 22:09:58,392 [./primitive:INFO] Scheduling instance wheezy (128 mem, 1 cores, 0 uid) on host grml
+2012-02-02 22:09:58,398 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.pyc:INFO] Executing command: /usr/bin/kvm   -clock dynticks -drive file=/tmp/images/debian-wheezy-amd64.qcow2,if=ide,index=0,cache=off,snapshot=on  -net nic,macaddr=52:54:00:90:2a:9d,model=virtio,vlan=0 -net tap,ifname=tashi1.0,vlan=0,script=/etc/qemu-ifup.0  -m 128 -smp 1 -serial null -vnc none -monitor pty
+2012-02-02 22:09:58,412 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.pyc:INFO] Adding vmId 5472
+
+Verify the machine is running:
+
+root@grml:/usr/local/tashi/bin# ./tashi-client getinstances
+ id hostId name   user state   disk                      memory cores
+---------------------------------------------------------------------
+ 1  1      wheezy root Running debian-wheezy-amd64.qcow2 128    1    
+
+After the machine had a chance to boot, find out what address it got. If 
+you have a DHCP server on your network, search the pool of addresses:
+
+root@grml:/usr/local/tashi/bin# ifconfig br0
+br0       Link encap:Ethernet  HWaddr 00:0c:29:62:b3:76  
+          inet addr:192.168.244.131  Bcast:192.168.244.255  Mask:255.255.255.0
+          inet6 addr: fe80::20c:29ff:fe62:b376/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:2622 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1598 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:730925 (713.7 KiB)  TX bytes:226530 (221.2 KiB)
+
+Find the MAC address given to the VM
+
+root@grml:/usr/local/tashi/bin# ./tashi-client getmyinstances 
+--show-nics --hide-disk
+ id hostId name   user state   memory cores nics                                                    
+----------------------------------------------------------------------------------------------------
+ 1  1      wheezy root Running 128    1     [{'ip': None, 'mac': '52:54:00:90:2a:9d', 'network': 0}]
+
+Look for that MAC address on the local network
+root@grml:/usr/local/tashi/bin# arp-scan -I br0 192.168.244.0/24|grep 90:2a:9d
+Interface: br0, datalink type: EN10MB (Ethernet)
+Starting arp-scan 1.6 with 256 hosts (http://www.nta-monitor.com/tools/arp-scan/)
+192.168.244.136 52:54:00:90:2a:9d       QEMU
+
+Log into the VM:
+root@grml:/usr/local/tashi/bin# ssh root@192.168.244.136
+The authenticity of host '192.168.244.136 (192.168.244.136)' can't be established.
+RSA key fingerprint is af:f2:1a:3a:2b:7c:c3:3b:6a:04:4f:37:bb:75:16:58.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '192.168.244.136' (RSA) to the list of known hosts.
+root@192.168.244.136's password: 
+Linux debian 3.1.0-1-amd64 #1 SMP Tue Jan 10 05:01:58 UTC 2012 x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Thu Jan 19 15:06:22 2012 from login.cirrus.pdl.cmu.local
+debian:~# 
+debian:~# uname -a
+Linux debian 3.1.0-1-amd64 #1 SMP Tue Jan 10 05:01:58 UTC 2012 x86_64 GNU/Linux
+debian:~# cat /proc/cpuinfo
+processor       : 0
+vendor_id       : AuthenticAMD
+cpu family      : 6
+model           : 2
+model name      : QEMU Virtual CPU version 0.14.0
+stepping        : 3
+cpu MHz         : 2193.593
+cache size      : 512 KB
+fpu             : yes
+fpu_exception   : yes
+cpuid level     : 4
+wp              : yes
+flags           : fpu pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 syscall nx lm up nopl pni cx16 popcnt hypervisor lahf_lm svm abm sse4a
+bogomips        : 4387.18
+TLB size        : 1024 4K pages
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 40 bits physical, 48 bits virtual
+power management:
+
+debian:~# perl -e 'print "My new VM!\n";'
+My new VM!
+debian:~# halt
+
+Broadcast message from root@debian (pts/0) (Wed Jan 25 02:01:43 2012):
+
+The system is going down for system halt NOW!
+debian:~# Connection to 192.168.244.136 closed by remote host.
+Connection to 192.168.244.136 closed.
+
+2012-02-02 22:18:35,662 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.pyc:INFO] Removing vmId 5472 because it is no longer running
+2012-02-02 22:18:35,662 [/usr/local/tashi/src/tashi/nodemanager/vmcontrol/qemu.pyc:INFO] Removing any scratch for wheezy
+2012-02-02 22:18:36,461 [./primitive:INFO] VM exited: wheezy
+
+Verify the VM is no longer running:
+
+root@grml:/usr/local/tashi/bin# ./tashi-client getinstances
+ id hostId name user state disk memory cores
+--------------------------------------------
+
+You have now completed the simplest form of a Tashi install: a single 
+machine providing hosting, scheduling and management services. For 
+additional information on what you can do, please view the documentation 
+in the doc/ directory.

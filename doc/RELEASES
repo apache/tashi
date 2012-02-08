@@ -1,0 +1,140 @@
+---+ Apache Tashi release policy
+
+This document is based on the draft incubator release management 
+document available at 
+http://incubator.apache.org/guides/releasemanagement.html
+
+---++ Apache RAT testing
+
+You could use Apache RAT to examine for any problems like required files 
+which are missing, or which ones don't include an Apache header.
+
+To run RAT, obtain the binary release of Apache RAT, untar it and run 
+java -jar apache-rat-0.8/apache-rat-0.8.jar <top directory>
+
+---++ Uploading artifacts
+
+---+++ Distribution
+
+The destination for an artifact is www.apache.org/dist/incubator/tashi . 
+This location is accessible at /www/www.apache.org/dist/incubator/tashi 
+on people.apache.org.
+
+---+++ Mirroring
+
+Releases must be mirrored. Checksums, KEYS, signatures are mirrored too. 
+Per the release signing guide, the mirrored copies of these files are 
+non-authoritative. In-site links must point to the originals on 
+www.apache.org.
+
+---+++ Archiving
+
+All releases must be archived for future reference. Archives are stored 
+under http://archive.apache.org/dist/incubator/tashi. This archiving 
+happens automatially for all artifacts in 
+www.apache.org/dist/incubator/tashi.
+
+Old releases should be removed from www.apache.org/dist/incubator/tashi. 
+The release will then only remain on the archive server.
+
+---+++ Permissions
+
+All files should be owned by the "incubator" group. Permissions should 
+be <user>:incubator 664, or <user>:incubator 775 respectively for 
+directories.
+
+---+++ Checksums and signatures
+
+The KEYS file should contain the public keys for code signers. The 
+private key needs to be kept safe. Code-signing keys should be linked to 
+the Apache web of trust.
+
+---+++ Modifications
+
+Uploaded artifacts must never be modified. Excluded from this policy are 
+README's, NOTES, KEYS and the like.
+
+---++ Distribution checklist
+
+   * Destination: www.apache.org/dist/incubator/tashi
+   * umask 022
+   * group owner is "incubator"
+   * Checksums and signatures match to artifact
+   * Old release archived
+   * Links to KEYS, signatures and checksums point to www.apache.org
+   * Package into .tar.gz
+
+---++ Dealing with defects
+
+Uploaded artifacts must never be modified (repeat). A new numbered 
+release should be generated. (Assume this will require a vote)
+
+Serious defects may call for a release withdrawal by archiving, 
+announcement on the mailing lists and adding a notice to the download 
+page.
+
+---++ Release checklist
+
+   * Packages:
+      * Artifacts unpack correctly?
+      * Documentation is readable?
+      * For distributed libraries:
+         * Licenses are included, along with NOTICEs?
+         * Licenses comply with incubator policy?
+         * LICENSE and NOTICE contain required sections?
+         * Crypto code satisfies export regulations?
+      * Copyright notices:
+         * Source files include license boilerplate?
+         * Source files with licenses not in LICENSE?
+         * Check policy on header file compliance?
+      * Incubator requirements:
+         * DISCLAIMER included?
+         * Check legal STATUS document?
+      * Source package:
+         * Build instructions exist and work?
+         * License headers applied correctly?
+         * Version control cruft cleaned?
+      * Keys:
+         * KEYS file contains proper signing keys?
+         * Signing key is available on public keyservers?
+      * Version control:
+         * Release was built from specific tag?
+         * Tag named "APACHE_TASHI_<version>"?
+      * Miscellaneous:
+         * Deprecations, incompatibilities documented in RELEASE_NOTES?
+
+---++ Naming
+
+The release should be named apache-tashi-<version>-incubating. <version> 
+should be a six-digit year-and-month, optionally followed by a period 
+and number in case of bug fixes applied to the base version.
+
+---++ Guidelines
+
+In case of need for additional guidance, the following mailing lists are 
+helpful:
+
+   * legal-discuss: for licensing issues
+   * infrastructure-issues: for issues pertaining to release infrastructure
+
+---++ Announcements
+
+Announce releases via apache.org address. Announcements should be plain
+text signed.
+
+---++ Release procedure
+
+Releases must be approved by Incubator PMC.
+
+A release should first be proposed to the PPMC. The proposal should include:-
+   * Link to release candidate artifact (in apache home directory)
+   * Link to tag from which the release was built
+
+Should the PPMC vote pass, call for a vote on incubator.apache.org. 
+Additionally to the above provide a link to the PPMC voting thread.
+
+Remove release candidate artifacts on conclusion of voting.
+
+---++ Invocation
+
+Oh god...

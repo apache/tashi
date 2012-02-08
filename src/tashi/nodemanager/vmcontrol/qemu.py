@@ -205,9 +205,10 @@ class Qemu(VmControlInterface):
 				try:
 					if self.scratchVg is not None:
 						log.info("Removing any scratch for %s" % (name))
-						cmd = "/sbin/lvremove -f %s" % self.scratchVg
-    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+						cmd = "/sbin/lvremove --quiet -f %s" % self.scratchVg
+    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
+					log.warning("Problem cleaning scratch volumes")
 					pass
 
 				# let the NM know
@@ -463,7 +464,7 @@ class Qemu(VmControlInterface):
 				scratchName = "lv%s" % instance.name
 				# XXXstroucki hold lock
 				# XXXstroucki check for capacity
-				cmd = "/sbin/lvcreate -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
+				cmd = "/sbin/lvcreate --quiet -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
 				# XXXstroucki check result
 				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
@@ -621,7 +622,7 @@ class Qemu(VmControlInterface):
 			self.nm.vmStateChange(vmId, None, InstanceState.Running)
 			# XXXstroucki Should make sure Running state is saved
 			# otherwise on restart it will appear as Activating
-			# until we update the state in __matchSystemPids
+			# until we update the state in __matchHostPids
 			child.instance.state = InstanceState.Running
 			self.__saveChildInfo(child)
 			return vmId
