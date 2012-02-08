@@ -43,6 +43,8 @@ def clean(args):
 	return args
 
 class client:
+	import hashlib
+
 	def __init__(self, host, port, username=None, password=None):
 		"""Client for ManagerService. If username and password are provided, rpyc.tlslite_connect will be used to connect, else rpyc.connect will be used."""
 		self.host = host
@@ -54,7 +56,20 @@ class client:
 	def createConn(self):
 		"""Creates a rpyc connection."""
 		if self.username != None and self.password != None:
-			return rpyc.tlslite_connect(host=self.host, port=self.port, username=self.username, password=self.password)
+			sock = rpyc.ssl_connect(host=self.host, port=self.port)
+			hello = sock.read()
+			print "XXXstroucki hello line %s" % (hello)
+			if hello != "tashi server sha1":
+				raise AuthenticationError("Wrong protocol version")
+			sock.write("%s|%s" % (self.username, hashlib.sha1(self.password)))
+			sock.flush()
+			result = sock.read()
+			print "XXXstroucki result line %s" % (result)
+			if result.startswith("200 "):
+				pass
+			else:
+				raise AuthenticationError("Wrong protocol version")
+			return sock
 		else:
 			return rpyc.connect(host=self.host, port=self.port)
 
@@ -76,6 +91,39 @@ class client:
 				raise res
 			return res
 		return connectWrap
+
+class UsernamePasswordAuthenticator(object):
+	import ssl
+	import hashlib
+
+	def __init__(self, userdict):
+		for username, password in userdict.iteritems():
+			self.userdict[username] = hashlib.sha1(password)
+
+	def __call__(self, sock):
+		try:
+			sock2 = ssl.wrap.socket(sock, server_side = True)
+		except: ssl.SSLError:
+			raise AuthenticationError(str(sys.exc_info()))
+
+		try:
+			sock2.write("tashi server sha1")
+			sock2.flush()
+			auth = sock2.read()
+			(username, password) = auth.split('|')
+
+			hash = self.userdict[username]			
+			if (hashlib.sha1(password) == hash):
+				pass
+			else:
+				raise AuthenticationError("Authentication failed")
+			sock2.write("200 how are you gentlemen ././")
+			sock2.flush()
+		except:
+			raise AuthenticationError(str(sys.exc_info()))
+
+		return sock2, sock2.getpeercert()
+
 
 class ManagerService(rpyc.Service):
 	"""Wrapper for rpyc service"""
