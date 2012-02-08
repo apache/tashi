@@ -15,9 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-import rpyc
 from tashi.rpycservices import rpycservices
-from tashi.rpycservices.rpyctypes import *
+#from tashi.rpycservices.rpyctypes import *
 
 class ConnectionManager(object):
 	def __init__(self, username, password, port, timeout=10000.0):
