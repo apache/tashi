@@ -19,20 +19,23 @@ import logging
 import threading
 import time
 import types
+# XXXstroucki getImages needs os?
+import os
 from tashi.rpycservices.rpyctypes import *
 from tashi.clustermanager.data.datainterface import DataInterface
-from tashi.util import stringPartition, boolean
+from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 
 class SQL(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
 		self.uri = self.config.get("SQL", "uri")
 		self.log = logging.getLogger(__name__)
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 
 		if (self.uri.startswith("sqlite://")):
 			import sqlite
 			self.dbEngine = "sqlite"
-			self.conn = sqlite.connect(self.uri[9:], autocommit=1)
+			self.conn = sqlite.connect(self.uri[9:], autocommit=1, timeout=1500)
 		elif (self.uri.startswith("mysql://")):
 			import MySQLdb
 			self.dbEngine = "mysql"
@@ -49,6 +52,7 @@ class SQL(DataInterface):
 		self.instanceLock = threading.Lock()
 		self.instanceIdLock = threading.Lock()
 		self.instanceLocks = {}
+		self.instanceBusy = {}
 		self.hostLock = threading.Lock()
 		self.hostLocks = {}
 		self.maxInstanceId = 1
@@ -63,15 +67,20 @@ class SQL(DataInterface):
 			try:
 				cur.execute(stmt)
 			except:
-				self.log.exception('Exception executing SQL statement')
+				self.log.exception('Exception executing SQL statement %s' % stmt)
 		finally:
 			self.sqlLock.release()
 		return cur
 		
 	def getNewInstanceId(self):
 		self.instanceIdLock.acquire()
-		instanceId = self.maxInstanceId
+		cur = self.executeStatement("SELECT MAX(id) FROM instances")
+		self.maxInstanceId = cur.fetchone()[0]
+		# XXXstroucki perhaps this can be handled nicer
+		if (self.maxInstanceId is None):
+			self.maxInstanceId = 0
 		self.maxInstanceId = self.maxInstanceId + 1
+		instanceId = self.maxInstanceId
 		self.instanceIdLock.release()
 		return instanceId
 	
@@ -135,6 +144,7 @@ class SQL(DataInterface):
 			instance._lock = threading.Lock()
 			self.instanceLocks[instance.id] = instance._lock
 			instance._lock.acquire()
+			self.instanceBusy[instance.id] = True
 			l = self.makeInstanceList(instance)
 			self.executeStatement("INSERT INTO instances VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		finally:
@@ -142,7 +152,13 @@ class SQL(DataInterface):
 		return instance
 	
 	def acquireInstance(self, instanceId):
-		self.instanceLock.acquire()
+		busyCheck = True
+		while busyCheck == True:
+			self.instanceLock.acquire()
+			busyCheck = self.instanceBusy.setdefault(instanceId, False)
+			if busyCheck:
+				self.instanceLock.release()
+
 		try:
 			cur = self.executeStatement("SELECT * from instances WHERE id = %d" % (instanceId))
 			l = cur.fetchone()
@@ -152,8 +168,10 @@ class SQL(DataInterface):
 			self.instanceLocks[instance.id] = self.instanceLocks.get(instance.id, threading.Lock())
 			instance._lock = self.instanceLocks[instance.id]
 			instance._lock.acquire()
+			self.instanceBusy[instance.id] = True
 		finally:
 			self.instanceLock.release()
+
 		return instance
 	
 	def releaseInstance(self, instance):
@@ -166,7 +184,11 @@ class SQL(DataInterface):
 				if (e < len(self.instanceOrder)-1):
 					s = s + ", "
 			self.executeStatement("UPDATE instances SET %s WHERE id = %d" % (s, instance.id))
+			self.instanceBusy[instance.id] = False
 			instance._lock.release()
+		except:
+			self.log.exception("Excepted while holding lock")
+			raise
 		finally:
 			self.instanceLock.release()
 	
@@ -174,8 +196,13 @@ class SQL(DataInterface):
 		self.instanceLock.acquire()
 		try:
 			self.executeStatement("DELETE FROM instances WHERE id = %d" % (instance.id))
-			instance._lock.release()
+			#XXXstroucki extraneous instance won't have a lock
+			try:
+				instance._lock.release()
+			except:
+				pass
 			del self.instanceLocks[instance.id]
+			del self.instanceBusy[instance.id]
 		finally:
 			self.instanceLock.release()
 	
@@ -258,6 +285,17 @@ class SQL(DataInterface):
 		r = cur.fetchone()
 		network = Network(d={'id':r[0], 'name':r[1]})
 		return network
+
+        def getImages(self):
+                count = 0
+                myList = []
+                for i in self.dfs.list("images"):
+                        myFile = self.dfs.getLocalHandle("images/" + i)
+                        if os.path.isfile(myFile):
+                                image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+                                myList.append(image)
+                                count += 1
+                return myList
 	
 	def getUsers(self):
 		cur = self.executeStatement("SELECT * from users")

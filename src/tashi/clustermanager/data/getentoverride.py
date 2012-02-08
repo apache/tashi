@@ -17,14 +17,17 @@
 
 import subprocess
 import time
-from tashi.rpycservices.rpyctypes import User
+import os
+from tashi.rpycservices.rpyctypes import User, LocalImages
 from tashi.clustermanager.data import DataInterface
-from tashi.util import instantiateImplementation
+from tashi.util import instantiateImplementation, humanReadable
 
 class GetentOverride(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
 		self.baseDataObject = instantiateImplementation(config.get("GetentOverride", "baseData"), config)
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
+
 		self.users = {}
 		self.lastUserUpdate = 0.0
 		self.fetchThreshold = float(config.get("GetentOverride", "fetchThreshold"))
@@ -64,6 +67,17 @@ class GetentOverride(DataInterface):
 	
 	def getNetwork(self, id):
 		return self.baseDataObject.getNetwork(id)
+
+	def getImages(self):
+		count = 0
+		myList = []
+		for i in self.dfs.list("images"):
+			myFile = self.dfs.getLocalHandle("images/" + i)
+			if os.path.isfile(myFile):
+				image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+				myList.append(image)
+				count += 1
+		return myList
 	
 	def fetchFromGetent(self):
 		now = time.time()

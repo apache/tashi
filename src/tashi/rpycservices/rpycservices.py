@@ -19,8 +19,8 @@ import rpyc
 from tashi.rpycservices.rpyctypes import *
 import cPickle
 
-clusterManagerRPCs = ['createVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'migrateVm', 'pauseVm', 'unpauseVm', 'getHosts', 'getNetworks', 'getUsers', 'getInstances', 'vmmSpecificCall', 'registerNodeManager', 'vmUpdate', 'activateVm']
-nodeManagerRPCs = ['instantiateVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'prepReceiveVm', 'prepSourceVm', 'migrateVm', 'receiveVm', 'pauseVm', 'unpauseVm', 'getVmInfo', 'listVms', 'vmmSpecificCall', 'getHostInfo']
+clusterManagerRPCs = ['createVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'migrateVm', 'pauseVm', 'unpauseVm', 'getHosts', 'getNetworks', 'getUsers', 'getInstances', 'vmmSpecificCall', 'registerNodeManager', 'vmUpdate', 'activateVm', 'registerHost', 'getImages', 'copyImage']
+nodeManagerRPCs = ['instantiateVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'prepReceiveVm', 'prepSourceVm', 'migrateVm', 'receiveVm', 'pauseVm', 'unpauseVm', 'getVmInfo', 'listVms', 'vmmSpecificCall', 'getHostInfo', 'liveCheck']
 
 def clean(args):
 	"""Cleans the object so cPickle can be used."""
@@ -43,7 +43,7 @@ def clean(args):
 
 class client:
 	def __init__(self, host, port, username=None, password=None):
-		"""Client for ManagerService. If username and password are provided, rpyc.tls_connect will be used to connect, else rpyc.connect will be used."""
+		"""Client for ManagerService. If username and password are provided, rpyc.tlslite_connect will be used to connect, else rpyc.connect will be used."""
 		self.host = host
 		self.port = int(port)
 		self.username = username
@@ -53,7 +53,7 @@ class client:
 	def createConn(self):
 		"""Creates a rpyc connection."""
 		if self.username != None and self.password != None:
-			return rpyc.tls_connect(host=self.host, port=self.port, username=self.username, password=self.password)
+			return rpyc.tlslite_connect(host=self.host, port=self.port, username=self.username, password=self.password)
 		else:
 			return rpyc.connect(host=self.host, port=self.port)
 

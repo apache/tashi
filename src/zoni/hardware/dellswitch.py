@@ -35,6 +35,7 @@ from zoni.data.resourcequerysql import *
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
 from zoni.agents.dhcpdns import DhcpDns
+from zoni.extra.util import *
 
 
 '''  Using pexpect to control switches because couldn't get snmp to work 
@@ -47,20 +48,39 @@ class HwDellSwitch(HwSwitchInterface):
 		self.verbose = False
 		self.log = logging.getLogger(os.path.basename(__file__))
 
+		try:
+			self.switchModel = host['hw_model']
+		except:
+			pass
+
 
  	def setVerbose(self, verbose):
 		self.verbose = verbose
 
 	def __login(self):
-		
-		switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
+		# ssh
+		if self.config['hardwareControl']['dellswitch']['accessmode'] == "ssh":
+			switchIp = "ssh " +  self.host['hw_userid'] + "@" + self.host['hw_name']
+		# telnet 
+		else:
+			switchIp = "telnet " +  self.host['hw_name'] 
+
+
+
 		child = pexpect.spawn(switchIp)
 
 		#  Be Verbose and print everything
 		if self.verbose:
 			child.logfile = sys.stdout
 
-		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
+		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', 'User:', 'No route to host', pexpect.EOF, pexpect.TIMEOUT])
+
+		#  Unable to connect
+		if opt == 4:
+			mesg = "ERROR:  Login to %s failed\n" % (self.host['hw_name'])
+			self.log.error(mesg)
+			exit(1)
+			
 		#XXX  Doesn't seem to do what I want:(
 		child.setecho(False)
 
@@ -69,11 +89,11 @@ class HwDellSwitch(HwSwitchInterface):
 			child.sendline("yes")
 			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
 			
-		if opt == 0:
+		if opt == 0 or opt == 3:
 			child.sendline(self.host['hw_userid'])
 			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
 			child.sendline(self.host['hw_password'])
-			i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
+			i=child.expect(['console','#', 'Name:', '>',pexpect.EOF, pexpect.TIMEOUT])
 			if i == 2:
 				mesg = "ERROR:  Login to %s failed\n" % (self.host['hw_name'])
 				self.log.error(mesg)
@@ -84,36 +104,62 @@ class HwDellSwitch(HwSwitchInterface):
 			child.sendline(self.host['hw_password'])
 			i=child.expect(['console','>', 'Name:', pexpect.EOF, pexpect.TIMEOUT])
 			#  on the 6448 dell, need to send enable, just send to all
+		
+		if opt == 1 or opt == 3:
 			child.sendline('enable')
 			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
-
 
 		return child
 
 	def __getPrsLabel(self):
 		dadate = datetime.datetime.now().strftime("%Y%m%d-%H%M-%S")
-		return "PRS_" + dadate
+		return "Zoni_" + dadate
 
+	def __genPortName(self, port):
+		if "62" in self.switchModel:
+			return "1/g%s" % str(port)
+		elif "54" in self.switchModel:
+			return "g%s" % str(port)
+		else:
+			return "g%s" % str(port)
+
+	def labelPort(self, desc=None):
+		mydesc = "%s-%s" % (self.host['location'], desc)
+		if desc == None or desc == " ":
+			mydesc = "%s" % (self.host['location'])
+		child = self.__login()
+		child.sendline('config')
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
+		child.sendline(cmd)
+		cmd = "description \"%s\"" % mydesc
+		child.sendline(cmd)
+		child.sendline('exit')
+		child.terminate()
 	
 	def enableHostPort(self):
 		child = self.__login()
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
 		cmd = "no shutdown" 
 		child.sendline(cmd)
 		child.sendline('exit')
 		child.terminate()
+		self.log.info("Host port enabled %s:%s" % (self.host['hw_name'], self.host['hw_port']))
 		
 	def disableHostPort(self):
 		child = self.__login()
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
 		cmd = "shutdown"
 		child.sendline(cmd)
 		child.sendline('exit')
 		child.terminate()
+		self.log.info("Host port disabled %s:%s" % (self.host['hw_name'], self.host['hw_port']))
 
 	def removeVlan(self, num):
 		#  Check for important vlans
@@ -125,6 +171,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline(cmd)
 		child.sendline('exit')
 		child.terminate()
+		self.log.info("Vlan %s removed from switch %s" % (num, self.host['hw_name']))
 	
 	def addVlanToTrunk(self, vlan):
 		mesg = "Adding Vlan %s to trunks on switch" % (vlan)
@@ -140,11 +187,8 @@ class HwDellSwitch(HwSwitchInterface):
 
 	def createVlansThread(self, vlan, switch,host):
 		mesg = "Creating vlan %s on switch %s" % (str(vlan),str(switch))
-		print "host is ", host
 		self.log(mesg)
-		print "create"
 		self.createVlan(vlan)
-		print "cend"
 		self.addVlanToTrunk(vlan);
 		thread.exit()
 
@@ -225,27 +269,37 @@ class HwDellSwitch(HwSwitchInterface):
 		#child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 
 		child.terminate()
-		#print "before", child.before
-		#print "after", child.after
 
-	def addNodeToVlan(self, vlan):
-		mesg = "Adding Node to vlan %s" % (str(vlan))
+	def addNodeToVlan(self, vlan, tag="untagged"):
+		if tag == "native":
+			self.setNativeVlan(vlan)
+			tag = "untagged"
+		
+		mesg = "Adding switchport (%s:%s) to vlan %s:%s" % (str(self.host['hw_name']), str(self.host['hw_port']), str(vlan), str(tag))
 		self.log.info(mesg)
 		
 		child = self.__login()
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
 		child.expect(["config-if", pexpect.EOF])
-		cmd = "switchport trunk allowed vlan add " + vlan
+		#cmd = "switchport trunk allowed vlan add " + vlan
+		cmd = "switchport mode general"
 		child.sendline(cmd)
-		child.sendline('exit')
+		cmd = "switchport general allowed vlan add %s %s" % (str(vlan), str(tag))
+		child.sendline(cmd)
 
 		NOVLAN = "VLAN was not created by user."
-		i=child.expect(['config-if',NOVLAN, pexpect.EOF, pexpect.TIMEOUT])
+		#  XXX this has problems with 62xx switches.  Need to catch the error if a vlan doesn't exist. 
+		#  Currently you can leave out the 'config-if' and it will work but will require you to wait for 
+		#  the timeout when you finally create and add the node to the vlan.  Leaving out support for 62xx switches
+		#  for now.
+		NOVLAN62 = "ERROR"
+		i=child.expect(['config-if',NOVLAN, NOVLAN62, pexpect.EOF, pexpect.TIMEOUT])
 		#  Vlan must exist in order to add a host to it.  
 		#  If it doesn't exist, try to create it
-		if i == 1:
+		if i == 1 or i == 2:
 			self.log.warning("WARNING:  Vlan %sdoesn't exist, trying to create" % (vlan))
 			#  Add a tag showing this was created by PRS
 			newvlan = vlan + ":" + self.__getPrsLabel()
@@ -257,13 +311,14 @@ class HwDellSwitch(HwSwitchInterface):
 		child.terminate()
 
 	def removeNodeFromVlan(self, vlan):
-		mesg = "Removing Node from vlan %s" % (str(vlan))
+		mesg = "Removing switchport (%s:%s) from vlan %s" % (str(self.host['hw_name']), str(self.host['hw_port']), str(vlan))
 		self.log.info(mesg)
 		child = self.__login()
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
-		cmd = "switchport trunk allowed vlan remove " + vlan
+		cmd = "switchport general allowed vlan remove " + vlan
 		child.sendline(cmd)
 		child.sendline('exit')
 		child.sendline('exit')
@@ -282,19 +337,37 @@ class HwDellSwitch(HwSwitchInterface):
 			##self.createVlan(newvlan)
 			##self.setNativeVlan(vlan)
 			
+	def setPortMode (self, mode):
+		child = self.__login()
+		child.logfile = sys.stdout
+		child.sendline('config')
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
+		child.sendline(cmd)
+		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
+		if i > 0:
+			self.log.error("setPortMode %s failed" % (cmd))
+
+		cmd = "switchport mode %s" % mode
+		child.sendline(cmd)
+		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
+		child.sendline('exit')
+		child.sendline('exit')
+		child.terminate()
 
 	def setNativeVlan(self, vlan):
 		child = self.__login()
 		child.logfile = sys.stdout
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
 		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
 		if i > 0:
 			self.log.error("setNativeVlan %s failed" % (cmd))
 
 		NOVLAN = "VLAN was not created by user."
-		cmd = "switchport trunk native vlan " + vlan
+		cmd = "switchport general pvid " + vlan
 		child.sendline(cmd)
 		i=child.expect(['config-if', NOVLAN, pexpect.EOF, pexpect.TIMEOUT])
 		#  Vlan must exist in order to add a host to it.  
@@ -311,19 +384,22 @@ class HwDellSwitch(HwSwitchInterface):
 		child.terminate()
 
 	#  Restore Native Vlan.  In Dell's case, this is vlan 1
-	def restoreNativeVlan(self):
-		child = self.__login()
-		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
-		child.sendline(cmd)
-		cmd = "switchport trunk native vlan 1"
-		child.sendline(cmd)
-		child.sendline('exit')
-		child.sendline('exit')
+	#  Removing this 
+	#def restoreNativeVlan(self):
+		#child = self.__login()
+		#child.sendline('config')
+		#portname = self.__genPortName(self.host['hw_port'])
+		#cmd = "interface ethernet %s" % str(portname)
+		#child.sendline(cmd)
+		##cmd = "switchport trunk native vlan 1"
+		#cmd = "switchport general pvid 1"
+		#child.sendline(cmd)
+		#child.sendline('exit')
+		#child.sendline('exit')
+		##child.terminate()
 		#child.terminate()
-		child.terminate()
 
-	#  Setup the switch for node allocation
+	##  Setup the switch for node allocation
 	def allocateNode(self):
 		pass
 
@@ -332,7 +408,8 @@ class HwDellSwitch(HwSwitchInterface):
 		child = self.__login()
 		child.logfile = sys.stdout
 		child.sendline('config')
-		cmd = "interface ethernet g" + str(self.host['hw_port'])
+		portname = self.__genPortName(self.host['hw_port'])
+		cmd = "interface ethernet %s" % str(portname)
 		child.sendline(cmd)
 		i=child.expect(['config-if', pexpect.EOF, pexpect.TIMEOUT])
 		if i > 0:
@@ -358,9 +435,16 @@ class HwDellSwitch(HwSwitchInterface):
 		print "NODE   - " + self.host['location']
 		print "------------------------------------\n"
 		child.logfile = sys.stdout
-		cmd = "show interface switchport ethernet g" + str(self.host['hw_port'])
+		
+		portname = self.__genPortName(self.host['hw_port'])
+
+		cmd = "show interface switchport ethernet %s" % str(portname)
 		child.sendline(cmd)
-		i = child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
+		i = child.expect(['#','--More--', pexpect.EOF, pexpect.TIMEOUT])
+		#  send a space for more
+		while i == 1:
+			child.sendline(" ")
+			i = child.expect(['#','--More--', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()
 
 	def interactiveSwitchConfig(self):
@@ -373,8 +457,26 @@ class HwDellSwitch(HwSwitchInterface):
 		#child.logfile = sys.stdout
 		child.sendline(self.host['hw_password'])
 		child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
+
+	def saveConfig(self, switch, query):
+		self.host = query.getSwitchInfo(switch)
+		child = self.__login()
+		cmd = "copy running-config startup-config"
+		child.sendline(cmd)
+		i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
+		child.sendline("y")
+		child.terminate()
+
+	def __saveConfig(self):
+		cmd = "copy running-config startup-config"
+		child.sendline(cmd)
+		i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
+		child.sendline("y")
+		child.terminate()
+
 	
 	def registerToZoni(self, user, password, host):
+		self.setVerbose(True)
 		host = string.strip(str(host))
 		#  Get hostname of the switch
 		if len(host.split(".")) == 4:
@@ -395,33 +497,12 @@ class HwDellSwitch(HwSwitchInterface):
 				self.log.critical(mesg)
 				exit()
 
-		switchIp = "ssh " + user + "@" + ip
-		child = pexpect.spawn(switchIp)
-		opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
-		#XXX  Doesn't seem to do what I want:(
-		child.setecho(False)
-
-		#  Send a yes to register authenticity of host for ssh
-		if opt == 2:
-			child.sendline("yes")
-			opt = child.expect(['Name:', 'assword:', 'Are you sure.*', pexpect.EOF, pexpect.TIMEOUT])
-			
-		if opt == 0:
-			child.sendline(user)
-			i = child.expect(['assword:', 'Connection',  pexpect.EOF, pexpect.TIMEOUT])
-			child.sendline(password)
-			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
-			if i == 2:
-				mesg = "Login to switch %s failed" % (host)
-				self.log.error(mesg)
-				exit(1)
-
-		if opt == 1:
-			child.sendline(password)
-			i=child.expect(['console',host, 'Name:', pexpect.EOF, pexpect.TIMEOUT])
-			#  on the 6448 dell, need to send enable, just send to all
-			child.sendline('enable')
-			i=child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
+		#  log into the switch
+		self.host = {}
+		self.host['hw_userid'] = user
+		self.host['hw_name'] = host
+		self.host['hw_password'] = password
+		child = self.__login()
 
 		fout = tempfile.TemporaryFile()
 		child.logfile = fout
@@ -429,10 +510,11 @@ class HwDellSwitch(HwSwitchInterface):
 		cmd = "show system"
 		child.sendline(cmd)
 		val = host + "#"
-		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+		tval = host + ">"
+		i = child.expect([val, tval, '\n\r\n\r', "--More--",  pexpect.EOF, pexpect.TIMEOUT])
 		cmd = "show version"
 		child.sendline(cmd)
-		i = child.expect([val, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
+		i = child.expect([val, tval, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
 
 		fout.seek(0)
 		a={}
@@ -441,10 +523,11 @@ class HwDellSwitch(HwSwitchInterface):
 				datime = time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
 				val = "Registered by Zoni on : " + datime
 				a['hw_notes'] = val + "; " + string.strip(i.split(':', 1)[1])
-			if "System MAC" in i:
-				a['hw_mac'] = string.strip(i.split(':', 1)[1])
-			if "SW version" in i:
-				a['hw_version_sw'] = string.strip(i.split('   ')[1].split()[0])
+			if "MAC" in i:
+				a['hw_mac'] = normalizeMac(string.strip(i.split(":", 1)[1]))
+			#  moving this capture to snmp 
+			#if "SW version" in i:
+				#a['hw_version_sw'] = string.strip(i.split('   ')[1].split()[0])
 			if "HW version" in i:
 				a['hw_version_fw'] = string.strip(i.split('   ')[1].split()[0])
 				
@@ -468,11 +551,18 @@ class HwDellSwitch(HwSwitchInterface):
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_model'] = str(varBinds[0][1])
+
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,3,0")
 		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_make'] = str(varBinds[0][1])
+
+		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,4,0")
+		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		cmdgen.CommunityData('my-agent', user, 0), \
+		cmdgen.UdpTransportTarget((host, 161)), oid)
+		a['hw_version_sw'] = str(varBinds[0][1])
 
 		#  Register in dns
 		if self.config['dnsEnabled']:

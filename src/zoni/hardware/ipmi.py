@@ -20,6 +20,9 @@
 
 import sys
 import os 
+import subprocess
+import logging
+import string
 
 from systemmanagementinterface import SystemManagementInterface
 
@@ -29,77 +32,91 @@ from systemmanagementinterface import SystemManagementInterface
 		#self.proto = proto
 
 class Ipmi(SystemManagementInterface):
-	def __init__(self, host, user, password):
-		self.host = host + "-ipmi"
-		self.password = password
-		self.user = user
+	def __init__(self, config, nodeName, hostInfo):
+		#  should send data obj instead of hostInfo
+		self.config = config
+		self.nodeName = nodeName + "-ipmi"
+		self.password = hostInfo['ipmi_password']
+		self.user = hostInfo['ipmi_user']
 		self.powerStatus = None
 		self.verbose = False
-		self.ipmicmd = "ipmitool -I lanplus -U" + self.user + " -H" + self.host + \
-						" -P " + self.password  + " "
+		self.log = logging.getLogger(__name__)
+		self.ipmicmd = "ipmitool -I lanplus -U %s -H %s -P %s " % (self.user, self.nodeName, self.password)
+		print self.ipmicmd
 		
 
 	def setVerbose(self, verbose):
 		self.verbose = verbose
 
-	def getPowerStatus(self):
+	def __executeCmd(self, cmd):
+		a = subprocess.Popen(args=cmd.split(), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+		out=  a.stdout.readline()
+		err =  a.stderr.readline()
+		if self.verbose:
+			print "out is ", out
+			print "err is ", err
+		if err:
+			self.log.info("%s %s" % (self.nodeName, err))
+			return -1
+			
+		self.log.info("%s %s" % (self.nodeName, out))
+		return 1
+
+
+	def __setPowerStatus(self):
 		if self.verbose:
 			print self.ipmicmd
 		cmd = self.ipmicmd + "chassis power status"
-		a = os.popen(cmd)
-		output = a.read()
-
-		print "%s\n%s" % (self.host, output)
+		a = subprocess.Popen(args=cmd.split(), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+		output = a.stdout.readline()
+		myerr = a.stderr.readline()
+	
 		if "off" in output:
 			self.powerStatus = 0
 		if "on" in output:
 			self.powerStatus = 1
-		if "Unable" in output:
-			print "unable to get the status"
-			self.powerStatus = 0
-	
+		if "Unable" in myerr:
+			self.powerStatus = -1
+
 		return output
-		#return a.read()
-		#for line in a.readlines():
-			#print line 	
 
 	def isPowered(self):
 		if self.powerStatus == None:
-			self.getPowerStatus()
-		if self.powerStatus:
-			return 1;
-		if not self.powerStatus:
-			return 0;
+			self.__setPowerStatus()
+		self.log.info("Hardware get power status : %s", self.powerStatus)
+		return self.powerStatus
+
+	def getPowerStatus(self):
+		#self.log.info("getPowerStatus :%s" % self.nodeName)
+		return self.isPowered()
 	
 
 	def powerOn(self):
+		self.log.info("Hardware power on : %s", self.nodeName)
 		cmd = self.ipmicmd + "chassis power on"
-		a = os.popen(cmd)
-		output = a.read()
-		print "output is ", output
+		return self.__executeCmd(cmd)
 
 	def powerOff(self):
+		self.log.info("Hardware power off : %s", self.nodeName)
 		cmd = self.ipmicmd + "chassis power off"
-		a = os.popen(cmd)
-		output = a.read()
-		print "output is ", output
+		return self.__executeCmd(cmd)
+
+	def powerOffSoft(self):
+		self.log.info("Hardware power off (soft): %s", self.nodeName)
+		cmd = self.ipmicmd + "chassis power soft"
+		return self.__executeCmd(cmd)
 
 	def powerCycle(self):
+		self.log.info("Hardware power cycle : %s", self.nodeName)
 		cmd = self.ipmicmd + "chassis power cycle"
-		a = os.popen(cmd)
-		output = a.read()
-		print "output is ", output
+		return self.__executeCmd(cmd)
 		
 	def powerReset(self):
+		self.log.info("Hardware power reset : %s", self.nodeName)
 		cmd = self.ipmicmd + "chassis power reset"
-		a = os.popen(cmd)
-		output = a.read()
-		print "output is ", output
+		return self.__executeCmd(cmd)
 		
 	def activateConsole(self):
+		self.log.info("Hardware sol activate : %s", self.nodeName)
 		cmd = self.ipmicmd + "sol activate"
-		a = os.popen(cmd)
-		output = a.read()
-		print "output is ", output
-		
-#ipmitool -I lanplus -E -H r2r1c3b0-ipmi -U root chassis power status
+		return self.__executeCmd(cmd)

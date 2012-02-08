@@ -143,6 +143,40 @@ class Network(object):
 	def __ne__(self, other):
 		return not (self == other)
 
+class LocalImages(object):
+	def __init__(self, d=None):
+		self.id = None
+		self.userId = None
+		self.imageName = None
+		self.imageSize = None
+		self.isPublic = None
+		self.explicitUserIds = None
+		if isinstance(d, dict):
+			if 'id' in d:
+				self.id = d['id']
+			if 'userId' in d:
+				self.userId = d['userId']
+			if 'imageName' in d:
+				self.imageName = d['imageName']
+			if 'imageSize' in d:
+				self.imageSize = d['imageSize']
+			if 'isPublic' in d:
+				self.isPublic = d['isPublic']
+			if 'explicitUserIds' in d:
+				self.explicitUserIds = d['explicitUserIds']
+
+	def __str__(self): 
+		return str(self.__dict__)
+
+	def __repr__(self): 
+		return repr(self.__dict__)
+
+	def __eq__(self, other):
+		return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+	def __ne__(self, other):
+		return not (self == other)
+
 class User(object):
 	def __init__(self, d=None):
 		self.id = None

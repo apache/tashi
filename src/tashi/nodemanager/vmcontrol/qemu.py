@@ -27,6 +27,9 @@ import subprocess
 import sys
 import time
 
+# for scratch space support
+from os import system
+
 from tashi.rpycservices.rpyctypes import *
 from tashi.util import broken, logged, scrubString, boolean
 from tashi import version, stringPartition
@@ -102,6 +105,8 @@ class Qemu(VmControlInterface):
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
+		self.scratchVg = self.config.get("Qemu", "scratchVg")
+		# XXXstroucki revise
 		self.scratchDir = self.config.get("Qemu", "scratchDir")
 		if len(self.scratchDir) == 0:
 			self.scratchDir = "/tmp"
@@ -118,7 +123,7 @@ class Qemu(VmControlInterface):
 	class anonClass:
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
-	
+
 	def getSystemPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
@@ -130,15 +135,25 @@ class Qemu(VmControlInterface):
 			except Exception:
 				pass
 		return pids
-	
+
+	def getInstances(self):
+		"""Will return a dict of instances by vmId to the caller"""
+		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
+
 	def matchSystemPids(self, controlledVMs):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
+		if self.nm is None:
+			#XXXstroucki log may not be there yet either
+			#self.log.info("NM hook not yet available")
+			return
+
 		vmIds = controlledVMs.keys()
 		pids = self.getSystemPids()
 		for vmId in vmIds:
+			child = controlledVMs[vmId]
+
 			if vmId not in pids:
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
-				child = controlledVMs[vmId]
 				del controlledVMs[vmId]
 				try:
 					del self.stats[vmId]
@@ -163,10 +178,29 @@ class Qemu(VmControlInterface):
 					for i in child.monitorHistory:
 						f.write(i)
 					f.close()
+				#XXXstroucki remove scratch storage
+				try:
+					if self.scratchVg is not None:
+						scratch_name = child.instance.name
+						log.info("Removing any scratch for " + scratch_name)
+						cmd = "/sbin/lvremove -f %s" % self.scratchVg
+    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				except:
+					pass
+
 				try:
 					if (not child.migratingOut):
 						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
 				except Exception, e:
+					log.exception("vmStateChange failed")
+			else:
+				try:
+					if (child.migratingOut):
+						self.nm.vmStateChange(vmId, None, InstanceState.MigrateTrans)
+					else:
+						self.nm.vmStateChange(vmId, None, InstanceState.Running)
+				except:
+					#XXXstroucki nm is initialised at different time
 					log.exception("vmStateChange failed")
 						
 	
@@ -185,13 +219,21 @@ class Qemu(VmControlInterface):
 				self.vncPortLock.release()
 				child.monitorFd = os.open(child.ptyFile, os.O_RDWR | os.O_NOCTTY)
 				child.monitor = os.fdopen(child.monitorFd)
+
+				#XXXstroucki ensure instance has vmId
+				child.instance.vmId = vmId
+				
 				self.controlledVMs[child.pid] = child
 				log.info("Adding vmId %d" % (child.pid))
 			except Exception, e:
 				log.exception("Failed to load VM info for %d", vmId)
 			else:
 				log.info("Loaded VM info for %d", vmId)
-		self.matchSystemPids(self.controlledVMs)
+		# XXXstroucki NM may not be available yet here.
+		try:
+			self.matchSystemPids(self.controlledVMs)
+		except:
+			pass
 	
 	def pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
@@ -262,7 +304,8 @@ class Qemu(VmControlInterface):
 		res = self.consumeAvailable(child)
 		os.write(child.monitorFd, command + "\n")
 		if (expectPrompt):
-			self.consumeUntil(child, command)
+			# XXXstroucki: receiving a vm can take a long time
+			self.consumeUntil(child, command, timeout=timeout)
 			res = self.consumeUntil(child, "(qemu) ", timeout=timeout)
 		return res
 
@@ -300,13 +343,8 @@ class Qemu(VmControlInterface):
 		cmd = "head -n 1 /proc/meminfo"		
 		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
 		if (memoryStr[2] == "kB"):
-			host.memory = int(memoryStr[1])/1024
-		elif (memoryStr[2] == "mB"):
-			host.memory = int(memoryStr[1])
-		elif (memoryStr[2] == "gB"):
-			host.memory = int(memoryStr[1])*1024
-		elif (memoryStr[2] == " B"):
-			host.memory = int(memoryStr[1])/(1024*1024)
+			# XXXstroucki should have parameter for reserved mem
+			host.memory = (int(memoryStr[1])/1024) - 512
 		else:
 			log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0
@@ -351,6 +389,8 @@ class Qemu(VmControlInterface):
 				snapshot = "on"
 				migrate = "on"
 
+			thisDiskList.append("cache=off")
+
 			thisDiskList.append("snapshot=%s" % snapshot)
 
 			if (self.useMigrateArgument):
@@ -358,9 +398,50 @@ class Qemu(VmControlInterface):
 
 			diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
 
+		# scratch disk (should be integrated better)
+		scratchSize = instance.hints.get("scratchSpace", "0")
+		scratchSize = int(scratchSize)
+		scratch_file = None
 
+		try:
+			if scratchSize > 0:
+				if self.scratchVg is None:
+					raise Exception, "No scratch volume group defined"
+				# create scratch disk
+				# XXXstroucki: needs to be cleaned somewhere
+				# XXXstroucki: clean user provided instance name
+				scratch_name = "lv" + instance.name
+				# XXXstroucki hold lock
+				# XXXstroucki check for capacity
+				cmd = "/sbin/lvcreate -n" + scratch_name + " -L" + str(scratchSize) + "G " + self.scratchVg
+				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				index += 1
+
+				thisDiskList = [ "file=/dev/%s/%s" % (self.scratchVg, scratch_name) ]
+				thisDiskList.append("if=%s" % diskInterface)
+				thisDiskList.append("index=%d" % index)
+				thisDiskList.append("cache=off")
+				
+				if (True or disk.persistent):
+					snapshot = "off"
+					migrate = "off"
+				else:
+					snapshot = "on"
+					migrate = "on"
+
+				thisDiskList.append("snapshot=%s" % snapshot)
+
+				if (self.useMigrateArgument):
+					thisDiskList.append("migrate=%s" % migrate)
+
+				diskString = diskString + "-drive " + ",".join(thisDiskList) + " "
+
+		except:
+			print 'caught exception'
+			raise 'exception'
+	
 		#  Nic hints
-		nicModel = instance.hints.get("nicModel", "e1000")
+		nicModel = instance.hints.get("nicModel", "virtio")
 		nicString = ""
 		for i in range(0, len(instance.nics)):
 			nic = instance.nics[i]
@@ -404,6 +485,7 @@ class Qemu(VmControlInterface):
 		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = True, OSchild = True)
 		child.ptyFile = None
 		child.vncPort = -1
+		child.instance.vmId = child.pid
 		self.saveChildInfo(child)
 		self.controlledVMs[child.pid] = child
 		log.info("Adding vmId %d" % (child.pid))
@@ -427,7 +509,8 @@ class Qemu(VmControlInterface):
 		child.monitor = os.fdopen(child.monitorFd)
 		self.saveChildInfo(child)
 		if (issueContinue):
-			self.enterCommand(child, "c")
+			# XXXstroucki: receiving a vm can take a long time
+			self.enterCommand(child, "c", timeout=None)
 	
 	def stopVm(self, vmId, target, stopFirst):
 		"""Universal function to stop a VM -- used by suspendVM, migrateVM """
@@ -437,7 +520,7 @@ class Qemu(VmControlInterface):
 		if (target):
 			retry = self.migrationRetries
 			while (retry > 0):
-				res = self.enterCommand(child, "migrate %s" % (target), timeout=self.migrateTimeout)
+				res = self.enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
 				if (res.find("migration failed") == -1):
 					retry = -1
@@ -459,7 +542,6 @@ class Qemu(VmControlInterface):
 		return vmId
 	
 	def suspendVm(self, vmId, target):
-		child = self.getChildFromPid(vmId)
 		tmpTarget = "/tmp/tashi_qemu_suspend_%d_%d" % (os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
 		vmId = self.stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
@@ -678,6 +760,7 @@ class Qemu(VmControlInterface):
 										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
 					self.stats[vmId]['cpuLoad'] = cpuLoad
 					self.stats[vmId]['rss'] = rss
+					self.stats[vmId]['vsize'] = vsize
 					self.stats[vmId]['recvMBs'] = sendMBs
 					self.stats[vmId]['sendMBs'] = recvMBs
 			except:

@@ -111,11 +111,31 @@ class ldap(UserManagementInterface):
 
 class files(UserManagementInterface):
 	def __init__(self):
-		raise NotImplementedError
+		pass
 
 
-	def getUserId(self):
-		raise NotImplementedError
+	def getUserId(self, userName=None):
+		if userName == None:
+			return os.getuid()
+		cmd = "cat /etc/passwd "
+		a = os.popen(cmd)
+		for line in a.readlines():
+			if userName in line :
+				return line.split(":")[2]
+		return 0
+
+
+	def getUserName(self, userId=None):
+		if userId == None:
+			return os.getenv('USERNAME')
+		cmd = "cat /etc/passwd "
+		a = os.popen(cmd)
+		for line in a.readlines():
+			if str(userId) in line :
+				return line.split(":")[0]
+
+		return 0
+
 
 	def getGroupId(self):
-		raise NotImplementedError
+		pass
