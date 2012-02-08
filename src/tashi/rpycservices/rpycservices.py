@@ -17,6 +17,10 @@
 
 import rpyc
 from tashi.rpycservices.rpyctypes import Instance, Host, User
+import ssl
+import hashlib
+import sys
+
 import cPickle
 
 clusterManagerRPCs = ['createVm', 'shutdownVm', 'destroyVm', 'suspendVm', 'resumeVm', 'migrateVm', 'pauseVm', 'unpauseVm', 'getHosts', 'getNetworks', 'getUsers', 'getInstances', 'vmmSpecificCall', 'registerNodeManager', 'vmUpdate', 'activateVm', 'registerHost', 'getImages', 'copyImage']
@@ -43,10 +47,8 @@ def clean(args):
 	return args
 
 class client:
-	import hashlib
-
 	def __init__(self, host, port, username=None, password=None):
-		"""Client for ManagerService. If username and password are provided, rpyc.tlslite_connect will be used to connect, else rpyc.connect will be used."""
+		"""Client for ManagerService. If username and password are provided, rpyc.ssl_connect will be used to connect, else rpyc.connect will be used."""
 		self.host = host
 		self.port = int(port)
 		self.username = username
@@ -61,7 +63,7 @@ class client:
 			print "XXXstroucki hello line %s" % (hello)
 			if hello != "tashi server sha1":
 				raise AuthenticationError("Wrong protocol version")
-			sock.write("%s|%s" % (self.username, hashlib.sha1(self.password)))
+			sock.write("%s|%s" % (self.username, hashlib.sha1(self.password).hexdigest()))
 			sock.flush()
 			result = sock.read()
 			print "XXXstroucki result line %s" % (result)
@@ -92,18 +94,22 @@ class client:
 			return res
 		return connectWrap
 
-class UsernamePasswordAuthenticator(object):
-	import ssl
-	import hashlib
+class AuthenticationError(Exception):
+	pass
 
-	def __init__(self, userdict):
+class UsernamePasswordAuthenticator(object):
+	def __init__(self, config, userdict):
+		self.userdict = {}
+		self.certfile = config.get("Security", "certFile")
+		if self.certfile is None:
+			raise AuthenticationError("SSL cert file must be defined")
 		for username, password in userdict.iteritems():
-			self.userdict[username] = hashlib.sha1(password)
+			self.userdict[username] = hashlib.sha1(password).hexdigest()
 
 	def __call__(self, sock):
 		try:
-			sock2 = ssl.wrap.socket(sock, server_side = True)
-		except: ssl.SSLError:
+			sock2 = ssl.wrap_socket(sock, certfile=self.certfile, server_side = True)
+		except ssl.SSLError:
 			raise AuthenticationError(str(sys.exc_info()))
 
 		try:
@@ -113,7 +119,7 @@ class UsernamePasswordAuthenticator(object):
 			(username, password) = auth.split('|')
 
 			hash = self.userdict[username]			
-			if (hashlib.sha1(password) == hash):
+			if (hashlib.sha1(password).hexdigest() == hash):
 				pass
 			else:
 				raise AuthenticationError("Authentication failed")

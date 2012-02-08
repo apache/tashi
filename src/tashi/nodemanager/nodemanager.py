@@ -27,7 +27,6 @@ from tashi import boolean
 
 from tashi.rpycservices import rpycservices
 from rpyc.utils.server import ThreadedServer
-from tashi.rpycservices import UsernamePasswordAuthenticator
 
 @signalHandler(signal.SIGTERM)
 def handleSIGTERM(signalNumber, stackFrame):
@@ -50,7 +49,7 @@ def main():
 	if boolean(config.get("Security", "authAndEncrypt")):
 		users = {}
 		users[config.get('AllowedUsers', 'clusterManagerUser')] = config.get('AllowedUsers', 'clusterManagerPassword')
-		authenticator = UsernamePasswordAuthenticator(users)
+		authenticator = rpycservices.UsernamePasswordAuthenticator(config, users)
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)
