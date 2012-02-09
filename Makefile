@@ -33,6 +33,7 @@ package: src DISCLAIMER INSTALL LICENSE NOTICE README
 	mkdir apache-tashi
 	cp -rp doc etc Makefile src DISCLAIMER INSTALL LICENSE NOTICE README apache-tashi/
 	find apache-tashi -type d -name ".svn"|xargs rm -rf
+	chgrp -R incubator apache-tashi
 	tar zcf apache-tashi.tar.gz apache-tashi
 	rm -rf apache-tashi
 
