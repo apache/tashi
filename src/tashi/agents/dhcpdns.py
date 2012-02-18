@@ -28,8 +28,7 @@ from tashi import boolean
 class DhcpDns(InstanceHook):
 	def __init__(self, config, client, post=False):
 		InstanceHook.__init__(self, config, client, post)
-		self.dnsKeyName = self.config.get('DhcpDns', 'dnsKeyName')
-		self.dnsSecretKey = self.config.get('DhcpDns', 'dnsSecretKey')
+		self.dnsKeyFile = self.config.get('DhcpDns', 'dnsKeyFile')
 		self.dnsServer = self.config.get('DhcpDns', 'dnsServer')
 		self.dnsDomain = self.config.get('DhcpDns', 'dnsDomain')
 		self.dnsExpire = int(self.config.get('DhcpDns', 'dnsExpire'))
@@ -114,7 +113,6 @@ class DhcpDns(InstanceHook):
 		except:
 			pass
 		cmd = "omshell"
-# XXXpipe: open omshell session
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dhcpServer))
 		if (self.dhcpSecretKey != ""):
@@ -132,7 +130,6 @@ class DhcpDns(InstanceHook):
 
 	def removeDhcp(self, name, ipaddr=None):
 		cmd = "omshell"
-# XXXpipe: open omshell session
 		(stdin, stdout) = os.popen2(cmd)
 		stdin.write("server %s\n" % (self.dhcpServer))
 		if (self.dhcpSecretKey != ""):
@@ -154,12 +151,14 @@ class DhcpDns(InstanceHook):
 			self.removeDns(name)
 		except:
 			pass
-		cmd = "nsupdate"
+		if (self.dnsKeyFile != ""):
+			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
+		else:
+			cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
-			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
 			stdin.write("update add %s.%s %d A %s\n" % (name, self.dnsDomain, self.dnsExpire, ip))
 			stdin.write("\n")
 			if (self.reverseDns):
@@ -180,12 +179,14 @@ class DhcpDns(InstanceHook):
 				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
 	
 	def removeDns(self, name):
-		cmd = "nsupdate"
+		if (self.dnsKeyFile != ""):
+			cmd = "nsupdate -k %s" % (self.dnsKeyFile)
+		else:
+			cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
-			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
 			if (self.reverseDns):
 				ip = socket.gethostbyname(name)
 				ipSegments = map(int, ip.split("."))
