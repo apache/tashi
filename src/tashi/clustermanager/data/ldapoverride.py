@@ -33,6 +33,7 @@ class LdapOverride(DataInterface):
 		self.nameKey = config.get("LdapOverride", "nameKey")
 		self.idKey = config.get("LdapOverride", "idKey")
 		self.ldapCommand = config.get("LdapOverride", "ldapCommand")
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 	
 	def registerInstance(self, instance):
 		return self.baseDataObject.registerInstance(instance)
