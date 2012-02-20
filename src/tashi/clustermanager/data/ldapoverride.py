@@ -20,9 +20,9 @@ import time
 #XXXstroucki getImages requires os?
 import os
 from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration
+from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 from tashi.rpycservices.rpyctypes import User
 from tashi.clustermanager.data import DataInterface
-from tashi.util import instantiateImplementation
 
 class LdapOverride(DataInterface):
 	def __init__(self, config):
