@@ -19,6 +19,7 @@ import subprocess
 import time
 #XXXstroucki getImages requires os?
 import os
+from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration
 from tashi.rpycservices.rpyctypes import User
 from tashi.clustermanager.data import DataInterface
 from tashi.util import instantiateImplementation
