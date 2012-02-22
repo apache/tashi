@@ -45,6 +45,9 @@ class DataInterface(object):
 	
 	def getHost(self, id):
 		raise NotImplementedError
+
+	def getImages(self):
+		raise NotImplementedError
 	
 	def getInstances(self):
 		raise NotImplementedError
