@@ -53,7 +53,8 @@ class Pickled(FromConfig):
 	
 	def save(self):
 		filename = self.file
-		tempfile = ".%s" % filename
+		# XXXstroucki could be better
+		tempfile = "%s.new" % filename
 
 		file = open(tempfile, "w")
 		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
