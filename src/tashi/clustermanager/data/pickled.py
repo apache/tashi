@@ -52,9 +52,13 @@ class Pickled(FromConfig):
 		return ch
 	
 	def save(self):
-		file = open(self.file, "w")
+		filename = self.file
+		tempfile = ".%s" % filename
+
+		file = open(tempfile, "w")
 		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
 		file.close()
+		os.rename(tempfile, filename)
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
