@@ -173,7 +173,7 @@ def getSlots(cores, memory):
 	print "with %d" % (cores),
 	print (lambda:"cores", lambda:"core")[cores == 1](),
 	print "and %d MB memory could be created." % (memory)
-	
+
 def createMany(instance, count):
 	# will create instances from 0 to count-1
 	l = len(str(count - 1))
@@ -216,10 +216,12 @@ extraViews = {
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
 'getInstances': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
-'getMyInstances': (getMyInstances, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores'])
+'getMyInstances': (getMyInstances, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 }
 
 # Used to specify what args are excepted for a function, what to use to convert the string to a value, what to use as a default value if it's missing, and whether the argument was required or not
+# XXXstroucki add checkHId for host id checking?
+
 argLists = {
 'createVm': [('userId', int, getUser, False), ('name', str, lambda: requiredArg('name'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False)],
 'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
@@ -241,6 +243,7 @@ argLists = {
 'getMyInstances': [],
 'getVmLayout': [],
 'vmmSpecificCall': [('instance', checkIid, lambda: requiredArg('instance'), True), ('arg', str, lambda: requiredArg('arg'), True)],
+'cmAdmin': [('arg', str, lambda: requiredArg('arg'), True), ('instance', checkIid, lambda: {}, False), ('state', str, lambda: {}, False), ('hostname', str, lambda: {}, False), ('host', str, lambda: {}, False), ('netid', str, lambda: {}, False), ('netname', str, lambda: {}, False), ('userid', str, lambda: {}, False), ('username', str, lambda: {}, False)],
 'unregisterHost': [('hostId', int, lambda: requiredArg('hostId'), True)],
 }
 
@@ -257,6 +260,7 @@ convertArgs = {
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
 'vmmSpecificCall': '[instance, arg]',
+'cmAdmin': '{"arg":arg, "instance":instance, "state":state, "hostname":hostname, "host":host, "netid":netid, "netname":netname, "userid":userid, "username":username}'
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
@@ -282,6 +286,7 @@ description = {
 'getMyInstances': 'Utility function that only lists VMs owned by the current user',
 'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
 'vmmSpecificCall': 'Direct access to VM manager specific functionality',
+'cmAdmin': 'Direct access to CM specific functionality',
 'unregisterHost' : 'Unregisters host. Registration happens when starting node manager',
 'getImages' : 'Gets a list of available VM images',
 'copyImage' : 'Copies a VM image',
@@ -309,6 +314,7 @@ examples = {
 'getImages': [''],
 'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
 'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc'],
+'cmAdmin': ['(see hints)'],
 'unregisterHost' : ['--hostId 2'],
 }
 
