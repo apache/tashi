@@ -1,1 +1,2 @@
-allow command line creation of hosts and networks
+allow command line creation of hosts and networks (and users possibly)
+allow command line deletion of hosts and networks (and users possibly)

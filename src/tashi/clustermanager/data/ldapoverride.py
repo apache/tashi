@@ -17,9 +17,12 @@
 
 import subprocess
 import time
+#XXXstroucki getImages requires os?
+import os
+from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration
+from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
 from tashi.rpycservices.rpyctypes import User
 from tashi.clustermanager.data import DataInterface
-from tashi.util import instantiateImplementation
 
 class LdapOverride(DataInterface):
 	def __init__(self, config):
@@ -31,6 +34,7 @@ class LdapOverride(DataInterface):
 		self.nameKey = config.get("LdapOverride", "nameKey")
 		self.idKey = config.get("LdapOverride", "idKey")
 		self.ldapCommand = config.get("LdapOverride", "ldapCommand")
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 	
 	def registerInstance(self, instance):
 		return self.baseDataObject.registerInstance(instance)
@@ -67,6 +71,17 @@ class LdapOverride(DataInterface):
 	
 	def getNetwork(self, id):
 		return self.baseDataObject.getNetwork(id)
+
+        def getImages(self):
+                count = 0
+                myList = []
+                for i in self.dfs.list("images"):
+                        myFile = self.dfs.getLocalHandle("images/" + i)
+                        if os.path.isfile(myFile):
+                                image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+                                myList.append(image)
+                                count += 1
+                return myList
 
 	def fetchFromLdap(self):
 		now = time.time()
