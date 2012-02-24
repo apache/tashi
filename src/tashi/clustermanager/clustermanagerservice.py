@@ -280,7 +280,7 @@ class ClusterManagerService(object):
 					if instance.state != InstanceState.Running and \
 					   instance.state != InstanceState.Activating and \
 					   instance.state != InstanceState.Orphaned:
-						self.data.releaseInstance(instanceId)
+						self.data.releaseInstance(instance)
 						continue
 				except:
 					continue
