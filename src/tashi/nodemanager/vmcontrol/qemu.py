@@ -132,10 +132,11 @@ class Qemu(VmControlInterface):
 	def __getHostPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
+		real_bin = os.readlink(self.QEMU_BIN)
 		for f in os.listdir("/proc"):
 			try:
 				bin = os.readlink("/proc/%s/exe" % (f))
-				if (bin.find(self.QEMU_BIN) != -1):
+				if (bin.find(real_bin) != -1):
 					pids.append(int(f))
 			except Exception:
 				pass
