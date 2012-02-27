@@ -33,7 +33,7 @@ package: src DISCLAIMER INSTALL LICENSE NOTICE README
 	mkdir apache-tashi
 	cp -rp doc etc Makefile src DISCLAIMER INSTALL LICENSE NOTICE README apache-tashi/
 	find apache-tashi -type d -name ".svn"|xargs rm -rf
-	chgrp -R incubator apache-tashi
+	-chgrp -R incubator apache-tashi
 	tar zcf apache-tashi.tar.gz apache-tashi
 	rm -rf apache-tashi
 
@@ -118,7 +118,7 @@ rmdoc:
 #  Zoni 
 bin/zoni-cli:
 	@echo Symlinking in zoni-cli...
-	(cd bin; ln -s ../src/zoni/client/zoni-cli .)
+	(cd bin; ln -s ../src/zoni/client/zoni-cli.py zoni-client)
 # why necessarily put this in /usr/local/bin like nothing else?
 usr/local/bin/zoni:
 	@echo Creating /usr/local/bin/zoni
