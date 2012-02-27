@@ -575,6 +575,8 @@ def main():
 			try:
 				if (type(res) == types.ListType):
 					makeTable(res, keys)
+				elif (type(res) == types.StringType):
+					print res
 				else:
 					makeTable([res], keys)
 					
