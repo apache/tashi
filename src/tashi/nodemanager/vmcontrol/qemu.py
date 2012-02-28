@@ -504,8 +504,14 @@ class Qemu(VmControlInterface):
 		nicModel = self.__stripSpace(nicModel)
 
 		nicString = ""
+		nicNetworks = {}
 		for i in range(0, len(instance.nics)):
+			# Don't allow more than one interface per vlan
 			nic = instance.nics[i]
+			if nicNetworks.has_key(nic.network):
+				continue
+			nicNetworks[nic.network] = True
+
 			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=%s%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, self.ifPrefix, instance.id, i, nic.network, nic.network)
 
 		#  ACPI
