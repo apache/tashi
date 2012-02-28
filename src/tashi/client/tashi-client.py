@@ -563,12 +563,18 @@ def main():
 		
 		f = getattr(client, function, None)
 
-		if (f is None):
-			f = extraViews[function][0]
-		if (function in convertArgs):
-			fargs = eval(convertArgs[function], globals(), vals)
-		else:
-			fargs = []
+		try:
+			if (f is None):
+				f = extraViews[function][0]
+			if (function in convertArgs):
+				fargs = eval(convertArgs[function], globals(), vals)
+			else:
+				fargs = []
+		except NameError, e:
+			print e
+			print "Please run tashi-client --examples for syntax information"
+			sys.exit(-1)
+
 		res = f(*fargs)
 		if (res != None):
 			keys = extraViews.get(function, (None, None))[1]
