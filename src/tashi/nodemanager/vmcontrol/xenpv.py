@@ -346,6 +346,8 @@ extra='xencons=tty'
 				instance.disks[i].local = newdisk
 
 
+		# XXXstroucki if ever supporting multiple nics,
+		# ensure more than one isn't put on the same network.
 		fn = self.createXenConfig(name, 
 					  instance.disks[0].local, 
 					  instance.nics[0].mac, 
