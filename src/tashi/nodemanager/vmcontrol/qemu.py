@@ -132,7 +132,10 @@ class Qemu(VmControlInterface):
 	def __getHostPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
-		real_bin = os.readlink(self.QEMU_BIN)
+		real_bin = self.QEMU_BIN
+		while os.path.islink(real_bin):
+			real_bin = os.readlink(self.QEMU_BIN)
+
 		for f in os.listdir("/proc"):
 			try:
 				bin = os.readlink("/proc/%s/exe" % (f))
@@ -504,11 +507,11 @@ class Qemu(VmControlInterface):
 		nicNetworks = {}
 		for i in range(0, len(instance.nics)):
 			# Don't allow more than one interface per vlan
+			nic = instance.nics[i]
 			if nicNetworks.has_key(nic.network):
 				continue
 			nicNetworks[nic.network] = True
 
-			nic = instance.nics[i]
 			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=%s%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, self.ifPrefix, instance.id, i, nic.network, nic.network)
 
 		#  ACPI
