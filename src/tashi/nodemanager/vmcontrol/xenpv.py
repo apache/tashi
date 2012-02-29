@@ -168,7 +168,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		vmType = hints.get('vmtype', self.defaultVmType)
 		print 'starting vm with type: ', vmType
 
-                disk0 = 'tap:%s' % self.disktype
+		disk0 = 'tap:%s' % self.disktype
 		diskU = 'xvda1'
 
 		try:
@@ -313,10 +313,10 @@ extra='xencons=tty'
 	@synchronizedmethod
 	def instantiateVm(self, instance):
 
-                try:
-                   disktype = self.config.get('XenPV', 'defaultDiskType')
-                except:
-                   disktype = 'vhd'
+		try:
+			disktype = self.config.get('XenPV', 'defaultDiskType')
+		except:
+			disktype = 'vhd'
 
 		# FIXME: this is NOT the right way to get out hostId
 		self.hostId = instance.hostId
@@ -346,6 +346,8 @@ extra='xencons=tty'
 				instance.disks[i].local = newdisk
 
 
+		# XXXstroucki if ever supporting multiple nics,
+		# ensure more than one isn't put on the same network.
 		fn = self.createXenConfig(name, 
 					  instance.disks[0].local, 
 					  instance.nics[0].mac, 

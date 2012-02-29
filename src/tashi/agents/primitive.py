@@ -43,7 +43,7 @@ class Primitive(object):
 					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
-	        self.hosts = {}
+		self.hosts = {}
 		self.load = {}
 		self.instances = {}
 		self.muffle = {}
@@ -62,9 +62,9 @@ class Primitive(object):
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
 			#if (h.up == True and h.state == HostState.Normal):
-				hosts[ctr] = h
-				ctr = ctr + 1
-				load[h.id] = []
+			hosts[ctr] = h
+			ctr = ctr + 1
+			load[h.id] = []
 			
 		load[None] = []
 		_instances = self.cm.getInstances()
@@ -199,7 +199,7 @@ class Primitive(object):
 							if myDisk == i.disks[0].uri and i.disks[0].persistent == True:
 								count += 1
 						if count > 1:
-								minMaxHost = None
+							minMaxHost = None
 
 			if (minMaxHost):
 				# found a host

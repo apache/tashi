@@ -28,8 +28,8 @@ class VmControlInterface(object):
 		self.dfs = dfs
 		self.nm = nm
 
-        def getInstances(self):
-                """Will return a dict of instances by vmId to the caller"""
+	def getInstances(self):
+		"""Will return a dict of instances by vmId to the caller"""
 		raise NotImplementedError
 	
 	def instantiateVm(self, instance):

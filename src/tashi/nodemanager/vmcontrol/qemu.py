@@ -132,10 +132,14 @@ class Qemu(VmControlInterface):
 	def __getHostPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
+		real_bin = self.QEMU_BIN
+		while os.path.islink(real_bin):
+			real_bin = os.readlink(self.QEMU_BIN)
+
 		for f in os.listdir("/proc"):
 			try:
 				bin = os.readlink("/proc/%s/exe" % (f))
-				if (bin.find(self.QEMU_BIN) != -1):
+				if (bin.find(real_bin) != -1):
 					pids.append(int(f))
 			except Exception:
 				pass
@@ -206,7 +210,7 @@ class Qemu(VmControlInterface):
 					if self.scratchVg is not None:
 						log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove --quiet -f %s" % self.scratchVg
-    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
+						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
 					log.warning("Problem cleaning scratch volumes")
 					pass
@@ -500,8 +504,14 @@ class Qemu(VmControlInterface):
 		nicModel = self.__stripSpace(nicModel)
 
 		nicString = ""
+		nicNetworks = {}
 		for i in range(0, len(instance.nics)):
+			# Don't allow more than one interface per vlan
 			nic = instance.nics[i]
+			if nicNetworks.has_key(nic.network):
+				continue
+			nicNetworks[nic.network] = True
+
 			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=%s%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, self.ifPrefix, instance.id, i, nic.network, nic.network)
 
 		#  ACPI
