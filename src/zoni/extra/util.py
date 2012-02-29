@@ -19,6 +19,7 @@
 #
 
 import os
+import sys
 import string
 import ConfigParser
 import time
@@ -218,19 +219,25 @@ def createKey(name):
 	return val
 	
 
-
+def __getShellFn():
+	if sys.version_info < (2, 6, 1):
+		from IPython.Shell import IPShellEmbed
+		return IPShellEmbed()
+	else:
+		import IPython
+		return IPython.embed()
 
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
 		try :
 			import atexit
-			from IPython.Shell import IPShellEmbed
+			shellfn = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
 				(stdin, stdout) = os.popen2("reset")
 				stdout.read()
-			dbgshell = IPShellEmbed()
+			dbgshell = shellfn()
 			atexit.register(resetConsole)
 			dbgshell(local_ns=globalDict, global_ns=globalDict)
 		except Exception:

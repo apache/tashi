@@ -5,15 +5,15 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
-# under the License.    
+# under the License.
 
 import logging
 import socket
@@ -28,10 +28,10 @@ import tashi
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
-	   
-	   Perhaps in the future I can hide the dfs from the 
+
+	   Perhaps in the future I can hide the dfs from the
 	   VmControlInterface and do all dfs operations here?"""
-	
+
 	def __init__(self, config, vmm):
 		self.config = config
 		self.vmm = vmm
@@ -83,18 +83,18 @@ class NodeManagerService(object):
 		# start service threads
 		threading.Thread(target=self.__registerWithClusterManager).start()
 		threading.Thread(target=self.__statsThread).start()
-	
+
 	def __initAccounting(self):
-                self.accountBuffer = []
-                self.accountLines = 0
-                self.accountingClient = None
-                try:
-                        if (self.accountingHost is not None) and \
-                                    (self.accountingPort is not None):
-                                self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
-                except:
-                        self.log.exception("Could not init accounting")
-			
+		self.accountBuffer = []
+		self.accountLines = 0
+		self.accountingClient = None
+		try:
+			if (self.accountingHost is not None) and \
+						(self.accountingPort is not None):
+				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+		except:
+			self.log.exception("Could not init accounting")
+
 	def __loadVmInfo(self):
 		try:
 			self.instances = self.vmm.getInstances()
@@ -135,7 +135,7 @@ class NodeManagerService(object):
 		#if (toSleep > 0):
 			#time.sleep(toSleep)
 
-        def __ACCOUNTFLUSH(self):
+	def __ACCOUNTFLUSH(self):
 		try:
 			if (self.accountingClient is not None):
 				self.accountingClient.record(self.accountBuffer)
@@ -145,33 +145,33 @@ class NodeManagerService(object):
 			self.log.exception("Failed to flush accounting data")
 
 
-        def __ACCOUNT(self, text, instance=None, host=None):
-                now = time.time()
-                instanceText = None
-                hostText = None
+	def __ACCOUNT(self, text, instance=None, host=None):
+		now = time.time()
+		instanceText = None
+		hostText = None
 
-                if instance is not None:
+		if instance is not None:
 			try:
-                        	instanceText = 'Instance(%s)' % (instance)
+				instanceText = 'Instance(%s)' % (instance)
 			except:
 				self.log.exception("Invalid instance data")
 
-                if host is not None:
+		if host is not None:
 			try:
-                        	hostText = "Host(%s)" % (host)
+				hostText = "Host(%s)" % (host)
 			except:
 				self.log.exception("Invalid host data")
 
-                secondary = ','.join(filter(None, (hostText, instanceText)))
+		secondary = ','.join(filter(None, (hostText, instanceText)))
 
-                line = "%s|%s|%s" % (now, text, secondary)
+		line = "%s|%s|%s" % (now, text, secondary)
 
-                self.accountBuffer.append(line)
-                self.accountLines += 1
+		self.accountBuffer.append(line)
+		self.accountLines += 1
 
 		# XXXstroucki think about force flush every so often
-                if (self.accountLines > 0):
-                        self.__ACCOUNTFLUSH()
+		if (self.accountLines > 0):
+			self.__ACCOUNTFLUSH()
 
 
 	# service thread function
@@ -213,14 +213,14 @@ class NodeManagerService(object):
 				self.log.exception('statsThread threw an exception')
 			time.sleep(self.statsInterval)
 
-        def __registerHost(self):
-                hostname = socket.gethostname()
+	def __registerHost(self):
+		hostname = socket.gethostname()
 		# populate some defaults
 		# XXXstroucki: I think it's better if the nodemanager fills these in properly when registering with the clustermanager
 		memory = 0
 		cores = 0
 		version = "empty"
-                #self.cm.registerHost(hostname, memory, cores, version)
+		#self.cm.registerHost(hostname, memory, cores, version)
 
 	def __getInstance(self, vmId):
 		instance = self.instances.get(vmId, None)
@@ -235,7 +235,7 @@ class NodeManagerService(object):
 
 
 		raise TashiException(d={'errno':Errors.NoSuchVmId,'msg':"There is no vmId %d on this host" % (vmId)})
-	
+
 	# remote
 	# Called from VMM to update self.instances
 	# but only changes are Exited, MigrateTrans and Running
@@ -252,11 +252,11 @@ class NodeManagerService(object):
 			# make a note of mismatch, but go on.
 			# the VMM should know best
 			self.log.warning('VM state was %s, call indicated %s' % (vmStates[instance.state], vmStates[old]))
-                        
+
 		instance.state = cur
 
 		self.__ACCOUNT("NM VM STATE CHANGE", instance=instance)
-			      
+
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
 		# send the state change up to the CM
@@ -278,8 +278,8 @@ class NodeManagerService(object):
 	def createInstance(self, instance):
 		vmId = instance.vmId
 		self.instances[vmId] = instance
-		
-	
+
+
 	# remote
 	def instantiateVm(self, instance):
 		self.__ACCOUNT("NM VM INSTANTIATE", instance=instance)
@@ -291,7 +291,7 @@ class NodeManagerService(object):
 			return vmId
 		except:
 			self.log.exception("Failed to start instance")
-	
+
 	# remote
 	def suspendVm(self, vmId, destination):
 		instance = self.__getInstance(vmId)
@@ -300,7 +300,7 @@ class NodeManagerService(object):
 		instance.state = InstanceState.Suspending
 		self.instances[vmId] = instance
 		threading.Thread(target=self.vmm.suspendVm, args=(vmId, destination)).start()
-	
+
 	# called by resumeVm as thread
 	def __resumeVmHelper(self, instance, name):
 		self.vmm.resumeVmHelper(instance, name)
@@ -323,7 +323,7 @@ class NodeManagerService(object):
 			self.log.exception('resumeVm failed')
 			raise TashiException(d={'errno':Errors.UnableToResume,'msg':"resumeVm failed on the node manager"})
 		return instance.vmId
-	
+
 	# remote
 	def prepReceiveVm(self, instance, source):
 		self.__ACCOUNT("NM VM MIGRATE RECEIVE PREP")
@@ -353,7 +353,7 @@ class NodeManagerService(object):
 		self.instances[vmId] = instance
 		threading.Thread(target=self.__migrateVmHelper, args=(instance, target, transportCookie)).start()
 		return
-	
+
 	# called by receiveVm as thread
 	# XXXstroucki migrate in?
 	def __receiveVmHelper(self, instance, transportCookie):
@@ -429,4 +429,3 @@ class NodeManagerService(object):
 	# remote
 	def liveCheck(self):
 		return "alive"
-	

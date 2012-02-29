@@ -327,11 +327,11 @@ def main():
 	if (options.nodeName):
 		cmdargs["sys_id"] = options.nodeName
 
-	if 	(options.numCores or options.clockSpeed or options.numMemory or options.numProcs or options.cpuFlags) and not options.showResources:
-			usage = "MISSING OPTION: When specifying hardware parameters, you need the -s or --showResources switch"
-			print usage
-			parser.print_help()	
-			exit()
+	if (options.numCores or options.clockSpeed or options.numMemory or options.numProcs or options.cpuFlags) and not options.showResources:
+		usage = "MISSING OPTION: When specifying hardware parameters, you need the -s or --showResources switch"
+		print usage
+		parser.print_help()	
+		exit()
 
 	if options.getResources:
 		print "ALL resources"

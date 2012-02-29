@@ -54,7 +54,7 @@ class HwDellSwitch(HwSwitchInterface):
 			pass
 
 
- 	def setVerbose(self, verbose):
+	def setVerbose(self, verbose):
 		self.verbose = verbose
 
 	def __login(self):
