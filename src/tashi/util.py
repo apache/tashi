@@ -27,6 +27,7 @@ import time
 import traceback
 import types
 import getpass
+import functools
 
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
@@ -268,6 +269,64 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 			ns = ns + c
 	return ns
 
+class Connection:
+	def __init__(self, host, port, authAndEncrypt=False, credentials=None):
+		self.host = host
+		self.port = port
+		self.credentials = credentials
+		self.authAndEncrypt = authAndEncrypt
+		self.connection = None
+
+	def __connect(self):
+		# create new connection
+
+		username = None
+		password = None
+
+		if credentials is not None:
+			username = self.credentials[0]
+			password = self.credentials[1]
+
+		if authAndEncrypt:
+			if username is None:
+				username = raw_input("Enter Username:")
+
+			if password is None:
+				password = raw_input("Enter Password:")
+
+			if self.credentials != (username, password):
+				self.credentials = (username, password)
+
+			client = rpycservices.client(self.host, self.port, username=username, password=password)
+		else:
+			client = rpycservices.client(self.host, self.port)
+
+		self.connection = client
+
+
+	def __do(self, name, *args, **kwargs):
+		if self.connection is None:
+			self.__connect()
+
+		remotefn = getattr(self.connection, name, None)
+
+		try:
+			if callable(remotefn):
+				remotefn(args, kwargs)
+
+			else:
+				raise TashiException
+
+		except:
+			self.connection = None
+			raise TashiException
+
+		# ENDING
+
+	def __getattr__(self, name):
+		return functools.partial(self.__do, name)
+
+
 def createClient(config):
 	cfgHost = config.get('Client', 'clusterManagerHost')
 	cfgPort = config.get('Client', 'clusterManagerPort')
@@ -281,14 +340,12 @@ def createClient(config):
 	authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
 	if authAndEncrypt:
 		username = config.get('AccessClusterManager', 'username')
-		if username == '':
-			username = raw_input('Enter Username:')
 		password = config.get('AccessClusterManager', 'password')
-		if password == '':
-			password = getpass.getpass('Enter Password:')
-		client = rpycservices.client(host, port, username=username, password=password)
+		client = Connection(host, port, authAndEncrypt, (username, password)
+
 	else:
-		client = rpycservices.client(host, port)
+		client = Connection(host, port)
+
 	return client
 
 def enumToStringDict(cls):
