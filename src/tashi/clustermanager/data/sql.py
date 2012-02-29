@@ -217,6 +217,10 @@ class SQL(DataInterface):
 			self.instanceLock.release()
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
+
 		host = self.getHost(hostId)
 		self.hostLock.acquire()
 		self.hostLocks[host.id] = self.hostLocks.get(host.id, threading.Lock())

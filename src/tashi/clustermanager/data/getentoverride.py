@@ -57,6 +57,10 @@ class GetentOverride(DataInterface):
 		return self.baseDataObject.removeInstance(instance)
 	
 	def acquireHost(self, hostId):
+	if type(hostId) is not int:
+                        self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+                        raise TypeError
+
 		return self.baseDataObject.acquireHost(hostId)
 	
 	def releaseHost(self, host):

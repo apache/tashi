@@ -134,6 +134,10 @@ class FromConfig(DataInterface):
 			self.releaseLock(self.instanceLock)
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+                        self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+                        raise TypeError
+
 		self.hostLock.acquire()
 		host = self.hosts.get(hostId, None)
 		if (host is None):
