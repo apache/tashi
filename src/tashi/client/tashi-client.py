@@ -570,7 +570,14 @@ def main():
 			if (arg.startswith("--")):
 				if (arg[2:] in possibleArgs):
 					(parg, conv, default, required) = possibleArgs[arg[2:]]
-					val = conv(args.pop(0))
+					try:
+						val = None
+						lookahead = args[0]
+						if not lookahead.startswith("--"):
+							val = conv(args.pop(0))
+					except:
+						pass
+
 					if (val == None):
 						val = default()
 
