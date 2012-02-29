@@ -276,6 +276,10 @@ class Connection:
 		self.credentials = credentials
 		self.authAndEncrypt = authAndEncrypt
 		self.connection = None
+		# XXXstroucki some thing may still depend on this (client)
+		self.username = None
+		if credentials is not None:
+			self.username = credentials[0]
 
 	def __connect(self):
 		# create new connection
