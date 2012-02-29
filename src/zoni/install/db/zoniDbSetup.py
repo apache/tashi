@@ -27,8 +27,8 @@ try:
 	import optparse
 	import getpass
 except ImportError, e:
-        print "Module not installed : %s" % e
-        exit()
+	print "Module not installed : %s" % e
+	exit()
 
 
 a = os.path.join("../")
@@ -406,7 +406,7 @@ def execQuery(conn, query):
 
 def entryExists(conn, table, col, checkVal):
 	query = "select * from " + table + " where " + col + " = '" + checkVal + "'"
- 	r = execQuery(conn, query)
+	r = execQuery(conn, query)
 	res = r.fetchall()
 	if len(res) > 0:
 		return (1, res)
@@ -415,5 +415,5 @@ def entryExists(conn, table, col, checkVal):
 
 
 if __name__ == "__main__":
-    main()
+	main()
 

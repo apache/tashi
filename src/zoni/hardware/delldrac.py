@@ -147,7 +147,7 @@ class dellDrac(SystemManagementInterface):
 		for val in fout.readlines():
 			if "OK" in val:
 				code = 1
- 			if "CURRENTLY POWER-OFF" in val:
+			if "CURRENTLY POWER-OFF" in val:
 				self.log.info("Hardware already power off : %s", self.hostname)
 				code = 1
 		if code < 1:
@@ -171,7 +171,7 @@ class dellDrac(SystemManagementInterface):
 		for val in fout.readlines():
 			if "OK" in val:
 				code = 1
- 			if "CURRENTLY POWER-OFF" in val:
+			if "CURRENTLY POWER-OFF" in val:
 				self.log.info("Hardware already power off : %s", self.hostname)
 				code = 1
 		if code < 1:
