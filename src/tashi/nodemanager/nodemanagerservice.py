@@ -112,6 +112,8 @@ class NodeManagerService(object):
 			notifyCM = []
 			try:
 				while (len(self.notifyCM) > 0):
+					# XXXstroucki ValueError: need more than 1 value to unpack
+					# observed here. How?
 					value = self.notifyCM.pop(0)
 					(instanceId, newInst, old, success) = value
 					try:
