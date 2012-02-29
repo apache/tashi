@@ -283,11 +283,11 @@ class Connection:
 		username = None
 		password = None
 
-		if credentials is not None:
+		if self.credentials is not None:
 			username = self.credentials[0]
 			password = self.credentials[1]
 
-		if authAndEncrypt:
+		if self.authAndEncrypt:
 			if username is None:
 				username = raw_input("Enter Username:")
 
@@ -312,7 +312,7 @@ class Connection:
 
 		try:
 			if callable(remotefn):
-				remotefn(args, kwargs)
+				returns = remotefn(*args, **kwargs)
 
 			else:
 				raise TashiException
@@ -321,7 +321,7 @@ class Connection:
 			self.connection = None
 			raise TashiException
 
-		# ENDING
+		return returns
 
 	def __getattr__(self, name):
 		return functools.partial(self.__do, name)
@@ -341,7 +341,7 @@ def createClient(config):
 	if authAndEncrypt:
 		username = config.get('AccessClusterManager', 'username')
 		password = config.get('AccessClusterManager', 'password')
-		client = Connection(host, port, authAndEncrypt, (username, password)
+		client = Connection(host, port, authAndEncrypt, (username, password))
 
 	else:
 		client = Connection(host, port)
