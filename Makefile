@@ -128,11 +128,11 @@ rmzoni-cli:
 	if test -e /usr/local/bin/zoni; then echo Removing zoni...; rm /usr/local/bin/zoni; fi
 
 ## for now only print warnings having to do with bad indentation. pylint doesn't make it easy to enable only 1,2 checks
-disabled_warnings=$(shell pylint --list-msgs|grep :W0| awk -F: '{ORS=","; if ($$2 != "W0311" && $$2 != "W0312"){ print $$2}}')
+disabled_warnings=$(shell pylint --list-msgs|grep :W0| awk -F: '{ORS=","; if ($$2 != "W0311" && $$2 != "W0312"){ print $$2}}')",F0401"
 pysrc=$(shell find . \! -path '*gen-py*' \! -path '*services*' \! -path '*messagingthrift*' \! -name '__init__.py' -name "*.py")
 tidy: $(addprefix tidyfile/,$(pysrc))
-	@echo Insuring .py files are nice and tidy!
+	@echo Ensured .py files are nice and tidy!
 
 tidyfile/%: %
 	@echo Checking tidy for $*
-	pylint --report=no --disable-msg-cat=R,C,E --disable-msg=$(disabled_warnings) --indent-string="\t" $* 2> /dev/null; 
+	pylint --report=no --disable=R,C,E --disable=$(disabled_warnings) --indent-string="\t" $* 2> /dev/null; 
