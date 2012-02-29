@@ -166,7 +166,7 @@ def getSlots(cores, memory):
 			continue
 		countbycores = int((h.cores - h.usedCores) / cores)
 		countbymemory = int((h.memory - h.usedMemory) / memory)
-		count += min(countbycores, countbymemory)
+		count += max(0, min(countbycores, countbymemory))
 
 	print "%d" % (count),
 	print (lambda:"instances", lambda:"instance")[count == 1](),
@@ -186,12 +186,26 @@ def createMany(instance, count):
 		instances.append(client.createVm(instance))
 	return instances
 
+def shutdownMany(basename):
+	return __shutdownOrDestroyMany("shutdown", basename)
+
 def destroyMany(basename):
+	return __shutdownOrDestroyMany("destroy", basename)
+
+def __shutdownOrDestroyMany(method, basename):
 	instances = client.getInstances()
 	count = 0
 	for i in instances:
 		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
-			client.destroyVm(i.id)
+			if method == "shutdown":
+				client.shutdownVm(i.id)
+
+			elif method == "destroy":
+				client.destroyVm(i.id)
+
+			else:
+				raise ValueError("Unknown method")
+
 			count = count + 1
 	if (count == 0):
 		raise ValueError("That is an unused basename")
@@ -213,6 +227,7 @@ extraViews = {
 'copyImage': (None, None), 
 'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
+'shutdownMany': (shutdownMany, None),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
 'getInstances': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
@@ -225,6 +240,7 @@ argLists = {
 'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
 'shutdownVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'destroyVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
+'shutdownMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'destroyMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'suspendVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'resumeVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
@@ -250,6 +266,7 @@ convertArgs = {
 'createMany': '[Instance(d={"userId":userId,"name":basename,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), count]',
 'shutdownVm': '[instance]',
 'destroyVm': '[instance]',
+'shutdownMany': '[basename]',
 'destroyMany': '[basename]',
 'suspendVm': '[instance]',
 'resumeVm': '[instance]',
@@ -268,6 +285,7 @@ description = {
 'createMany': 'Utility function that creates many VMs with the same set of parameters',
 'shutdownVm': 'Attempts to shutdown a VM nicely',
 'destroyVm': 'Immediately destroys a VM -- it is the same as unplugging a physical machine and should be used for non-persistent VMs or when all else fails',
+'shutdownMany': 'Attempts to gracefully shut down a group of VMs created with createMany',
 'destroyMany': 'Destroys a group of VMs created with createMany',
 'suspendVm': 'Suspends a running VM to disk',
 'resumeVm': 'Resumes a suspended VM from disk',
@@ -293,6 +311,7 @@ examples = {
 'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance foobar'],
 'destroyVm': ['--instance 12345', '--instance foobar'],
+'shutdownMany': ['--basename foobar'],
 'destroyMany': ['--basename foobar'],
 'suspendVm': ['--instance 12345', '--instance foobar'],
 'resumeVm': ['--instance 12345', '--instance foobar'],
@@ -563,18 +582,26 @@ def main():
 		
 		f = getattr(client, function, None)
 
-		if (f is None):
-			f = extraViews[function][0]
-		if (function in convertArgs):
-			fargs = eval(convertArgs[function], globals(), vals)
-		else:
-			fargs = []
+		try:
+			if (f is None):
+				f = extraViews[function][0]
+			if (function in convertArgs):
+				fargs = eval(convertArgs[function], globals(), vals)
+			else:
+				fargs = []
+		except NameError, e:
+			print e
+			print "Please run tashi-client --examples for syntax information"
+			sys.exit(-1)
+
 		res = f(*fargs)
 		if (res != None):
 			keys = extraViews.get(function, (None, None))[1]
 			try:
 				if (type(res) == types.ListType):
 					makeTable(res, keys)
+				elif (type(res) == types.StringType):
+					print res
 				else:
 					makeTable([res], keys)
 					

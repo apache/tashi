@@ -284,16 +284,17 @@ class SQL(DataInterface):
 		network = Network(d={'id':r[0], 'name':r[1]})
 		return network
 
-        def getImages(self):
-                count = 0
-                myList = []
-                for i in self.dfs.list("images"):
-                        myFile = self.dfs.getLocalHandle("images/" + i)
-                        if os.path.isfile(myFile):
-                                image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
-                                myList.append(image)
-                                count += 1
-                return myList
+	def getImages(self):
+		count = 0
+		myList = []
+		for i in self.dfs.list("images"):
+			myFile = self.dfs.getLocalHandle("images/" + i)
+			if os.path.isfile(myFile):
+				image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+				myList.append(image)
+				count += 1
+
+		return myList
 	
 	def getUsers(self):
 		cur = self.executeStatement("SELECT * from users")

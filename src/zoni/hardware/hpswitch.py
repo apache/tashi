@@ -74,10 +74,10 @@ class HwHPSwitch(HwSwitchInterface):
 		child.sendline(cmd)
 		opt = child.expect(["Confirm(.*)", "No save(.*)", pexpect.EOF, pexpect.TIMEOUT])
 		if opt == 0:
-				print "saving to flash"
-				child.sendline("y\n")
+			print "saving to flash"
+			child.sendline("y\n")
 		if opt == 1:
-				print "no save needed"
+			print "no save needed"
 		child.sendline('exit')
 		child.terminate()
 

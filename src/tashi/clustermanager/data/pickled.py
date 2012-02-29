@@ -39,22 +39,27 @@ class Pickled(FromConfig):
 	
 	def cleanInstances(self):
 		ci = {}
-		for i in self.instances.itervalues():
+		for ignore, i in self.instances.items():
 			i2 = Instance(d=i.__dict__)
 			ci[i2.id] = i2
 		return ci
 	
 	def cleanHosts(self):
 		ch = {}
-		for h in self.hosts.itervalues():
+		for ignore, h in self.hosts.items():
 			h2 = Host(d=h.__dict__)
 			ch[h2.id] = h2
 		return ch
 	
 	def save(self):
-		file = open(self.file, "w")
+		filename = self.file
+		# XXXstroucki could be better
+		tempfile = "%s.new" % filename
+
+		file = open(tempfile, "w")
 		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
 		file.close()
+		os.rename(tempfile, filename)
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
@@ -67,11 +72,11 @@ class Pickled(FromConfig):
 		self.instances = instances
 		self.networks = networks
 		self.users = users
-		for i in self.instances.itervalues():
+		for ignore, i in self.instances.items():
 			if (i.id >= self.maxInstanceId):
 				self.maxInstanceId = i.id + 1
 			i._lock = threading.Lock()
 			self.lockNames[i._lock] = "i%d" % (i.id)
-		for h in self.hosts.itervalues():
+		for ignore, h in self.hosts.items():
 			h._lock = threading.Lock()
 			self.lockNames[h._lock] = "h%d" % (h.id)
