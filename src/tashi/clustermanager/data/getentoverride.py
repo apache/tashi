@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+import logging
 import subprocess
 import time
 import os
@@ -25,6 +26,7 @@ from tashi.util import instantiateImplementation, humanReadable
 class GetentOverride(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
+		self.log = logging.getLogger(__name__)
 		self.baseDataObject = instantiateImplementation(config.get("GetentOverride", "baseData"), config)
 		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 
@@ -57,7 +59,7 @@ class GetentOverride(DataInterface):
 		return self.baseDataObject.removeInstance(instance)
 	
 	def acquireHost(self, hostId):
-	if type(hostId) is not int:
+		if type(hostId) is not int:
                         self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
                         raise TypeError
 

@@ -16,16 +16,18 @@
 # under the License.    
 
 from __future__ import with_statement
+import logging
 import threading
 import os
 import ConfigParser
 
-from tashi.rpycservices.rpyctypes import Host, Network, User, TashiException, Errors, HostState
+from tashi.rpycservices.rpyctypes import Host, Network, User, TashiException, Errors, HostState, Instance
 from tashi.clustermanager.data import DataInterface
 
 class FromConfig(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
+		self.log = logging.getLogger(__name__)
 		self.hosts = {}
 		self.instances = {}
 		self.networks = {}
@@ -150,7 +152,7 @@ class FromConfig(DataInterface):
 
 	
 	def releaseHost(self, host):
-		if type(host) is not Instance:
+		if type(host) is not Host:
                         self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
                         raise TypeError
 
