@@ -575,10 +575,11 @@ def main():
 						val = None
 						lookahead = args[0]
 						if not lookahead.startswith("--"):
-							val = conv(args.pop(0))
+							val = (args.pop(0)
 					except:
 						pass
 
+					val = conv(val)
 					if (val == None):
 						val = default()
 
