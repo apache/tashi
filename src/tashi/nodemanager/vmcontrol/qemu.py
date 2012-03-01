@@ -867,10 +867,14 @@ class Qemu(VmControlInterface):
 		myTicks = userTicks + sysTicks
 		vsize = (int(ws[22]))/1024.0/1024.0
 		rss = (int(ws[23])*4096)/1024.0/1024.0
-		cpuSeconds = myTicks/ticksPerSecond
-		lastCpuSeconds = cpuStats.get(vmId, cpuSeconds)
-		cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
-		cpuStats[vmId] = cpuSeconds
+		cpuSeconds = myTicks/self.ticksPerSecond
+		# XXXstroucki be more exact here?
+		last = time.time() - self.statsInterval
+		lastCpuSeconds = self.cpuStats.get(vmId, cpuSeconds)
+		if lastCpuSeconds is None:
+			lastCpuSeconds = cpuSeconds
+		cpuLoad = (cpuSeconds - lastCpuSeconds)/(time.time() - last)
+		self.cpuStats[vmId] = cpuSeconds
 		try:
 			child = self.controlledVMs[vmId]
 		except:
@@ -880,7 +884,7 @@ class Qemu(VmControlInterface):
 		(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
 		for i in range(0, len(child.instance.nics)):
 			netDev = "%s%d.%d" % (self.ifPrefix, child.instance.id, i)
-			(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+			(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = self.netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
 			(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
 		self.stats[vmId] = self.stats.get(vmId, {})
 		child = self.controlledVMs.get(vmId, None)
@@ -902,9 +906,9 @@ class Qemu(VmControlInterface):
 
 	# thread
 	def statsThread(self):
-		ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
-		netStats = {}
-		cpuStats = {}
+		self.ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
+		self.netStats = {}
+		self.cpuStats = {}
 		# XXXstroucki be more exact here?
 		last = time.time() - self.statsInterval
 		while True:
@@ -920,7 +924,7 @@ class Qemu(VmControlInterface):
 						ws = ld.split()
 						recvBytes = float(ws[0])
 						sendBytes = float(ws[8])
-						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = netStats.get(dev, (0.0, 0.0, recvBytes, sendBytes))
+						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = self.netStats.get(dev, (0.0, 0.0, recvBytes, sendBytes))
 						if (recvBytes < lastRecvBytes):
 							# We seem to have overflowed
 							# XXXstroucki How likely is this to happen?
@@ -936,7 +940,7 @@ class Qemu(VmControlInterface):
 								lastSendBytes = lastSendBytes - 2**32
 						recvMBs = (recvBytes-lastRecvBytes)/(now-last)/1024.0/1024.0
 						sendMBs = (sendBytes-lastSendBytes)/(now-last)/1024.0/1024.0
-						netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
+						self.netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
 
 
 				for vmId in self.controlledVMs:
