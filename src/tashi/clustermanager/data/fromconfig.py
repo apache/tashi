@@ -78,6 +78,10 @@ class FromConfig(DataInterface):
 		return instanceId
 	
 	def registerInstance(self, instance):
+		if type(instance) is not Instance:
+                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+                        raise TypeError
+
 		self.acquireLock(self.instanceLock)
 		try:
 			if (instance.id is not None and instance.id not in self.instances):
@@ -107,6 +111,10 @@ class FromConfig(DataInterface):
 		return instance
 	
 	def releaseInstance(self, instance):
+		if type(instance) is not Instance:
+                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+                        raise TypeError
+
 		try:
 			if (instance.id not in self.instances): # MPR: should never be true, but good to check
 				raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (instance.id)})
@@ -114,6 +122,10 @@ class FromConfig(DataInterface):
 			self.releaseLock(instance._lock)
 	
 	def removeInstance(self, instance):
+		if type(instance) is not Instance:
+                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+                        raise TypeError
+
 		self.acquireLock(self.instanceLock)
 		try:
 			del self.instances[instance.id]
@@ -122,6 +134,10 @@ class FromConfig(DataInterface):
 			self.releaseLock(self.instanceLock)
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+                        self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+                        raise TypeError
+
 		self.hostLock.acquire()
 		host = self.hosts.get(hostId, None)
 		if (host is None):
@@ -134,6 +150,10 @@ class FromConfig(DataInterface):
 
 	
 	def releaseHost(self, host):
+		if type(host) is not Instance:
+                        self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+                        raise TypeError
+
 		try:
 			if (host.id not in self.hosts): # MPR: should never be true, but good to check
 				raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (host.id)})
