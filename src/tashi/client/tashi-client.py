@@ -532,6 +532,7 @@ def main():
 	"""Main function for the client program"""
 	global INDENT, exitCode, client
 	exitCode = 0
+	exception = None
 	INDENT = (os.getenv("INDENT", 4))
 	if (len(sys.argv) < 2):
 		usage()
@@ -576,31 +577,47 @@ def main():
 			if (arg.startswith("--")):
 				if (arg[2:] in possibleArgs):
 					(parg, conv, default, required) = possibleArgs[arg[2:]]
-					val = conv(args.pop(0))
+					try:
+						val = None
+						lookahead = args[0]
+						if not lookahead.startswith("--"):
+							val = args.pop(0)
+					except:
+						pass
+
+					val = conv(val)
 					if (val == None):
 						val = default()
 
 					vals[parg] = val
 					continue
+			# somewhat lame, but i don't want to rewrite the fn at this time
+			exception = ValueError("Unknown argument %s" % (arg)) 
 
-			raise ValueError("Unknown argument %s" % (arg)) 
+		f = None
+		try:
+			f = extraViews[function][0]
+		except:
+			pass
 
-		
-		f = getattr(client, function, None)
+		if (f is None):
+			f = getattr(client, function, None)
 
 		try:
-			if (f is None):
-				f = extraViews[function][0]
+			if exception is not None:
+				raise exception
+
 			if (function in convertArgs):
 				fargs = eval(convertArgs[function], globals(), vals)
 			else:
 				fargs = []
-		except NameError, e:
-			print e
+
+			res = f(*fargs)
+		except Exception, e:
+			print "Failed in calling %s: %s" % (function, e)
 			print "Please run tashi-client --examples for syntax information"
 			sys.exit(-1)
 
-		res = f(*fargs)
 		if (res != None):
 			keys = extraViews.get(function, (None, None))[1]
 			try:
