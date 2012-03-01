@@ -36,8 +36,8 @@ class GetentOverride(DataInterface):
 	
 	def registerInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		return self.baseDataObject.registerInstance(instance)
 	
@@ -46,29 +46,29 @@ class GetentOverride(DataInterface):
 	
 	def releaseInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		return self.baseDataObject.releaseInstance(instance)
 	
 	def removeInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		return self.baseDataObject.removeInstance(instance)
 	
 	def acquireHost(self, hostId):
 		if type(hostId) is not int:
-                        self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
-                        raise TypeError
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
 
 		return self.baseDataObject.acquireHost(hostId)
 	
 	def releaseHost(self, host):
 		if type(host) is not Instance:
-                        self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+			raise TypeError
 
 		return self.baseDataObject.releaseHost(host)
 	

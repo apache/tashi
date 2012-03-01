@@ -81,8 +81,8 @@ class FromConfig(DataInterface):
 	
 	def registerInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		self.acquireLock(self.instanceLock)
 		try:
@@ -114,8 +114,8 @@ class FromConfig(DataInterface):
 	
 	def releaseInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		try:
 			if (instance.id not in self.instances): # MPR: should never be true, but good to check
@@ -125,8 +125,8 @@ class FromConfig(DataInterface):
 	
 	def removeInstance(self, instance):
 		if type(instance) is not Instance:
-                        self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
 
 		self.acquireLock(self.instanceLock)
 		try:
@@ -137,8 +137,8 @@ class FromConfig(DataInterface):
 	
 	def acquireHost(self, hostId):
 		if type(hostId) is not int:
-                        self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
-                        raise TypeError
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
 
 		self.hostLock.acquire()
 		host = self.hosts.get(hostId, None)
@@ -153,8 +153,8 @@ class FromConfig(DataInterface):
 	
 	def releaseHost(self, host):
 		if type(host) is not Host:
-                        self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
-                        raise TypeError
+			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+			raise TypeError
 
 		try:
 			if (host.id not in self.hosts): # MPR: should never be true, but good to check
