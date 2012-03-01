@@ -130,6 +130,10 @@ class SQL(DataInterface):
 		return h
 	
 	def registerInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			if (instance.id is not None and instance.id not in self.getInstances()):
@@ -173,6 +177,10 @@ class SQL(DataInterface):
 		return instance
 	
 	def releaseInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			l = self.makeInstanceList(instance)
@@ -191,6 +199,10 @@ class SQL(DataInterface):
 			self.instanceLock.release()
 	
 	def removeInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			self.executeStatement("DELETE FROM instances WHERE id = %d" % (instance.id))
@@ -205,6 +217,10 @@ class SQL(DataInterface):
 			self.instanceLock.release()
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
+
 		host = self.getHost(hostId)
 		self.hostLock.acquire()
 		self.hostLocks[host.id] = self.hostLocks.get(host.id, threading.Lock())
@@ -214,6 +230,10 @@ class SQL(DataInterface):
 		return host
 	
 	def releaseHost(self, host):
+		if type(host) is not Host:
+			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+			raise TypeError
+
 		l = self.makeHostList(host)
 		s = ""
 		for e in range(0, len(self.hostOrder)):
