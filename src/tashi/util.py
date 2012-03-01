@@ -319,11 +319,11 @@ class Connection:
 				returns = remotefn(*args, **kwargs)
 
 			else:
-				raise TashiException
+				raise TashiException({'msg':'%s not callable' % name})
 
 		except:
 			self.connection = None
-			raise TashiException
+			raise
 
 		return returns
 
