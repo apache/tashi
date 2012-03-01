@@ -852,6 +852,54 @@ class Qemu(VmControlInterface):
 	def listVms(self):
 		return self.controlledVMs.keys()
 
+	def __processVmStats(self, vmId):
+		try:
+			f = open("/proc/%d/stat" % (vmId))
+			procData = f.read()
+			f.close()
+		except:
+			log.warning("Unable to get data for instance %d" % vmId)
+			return
+
+		ws = procData.strip().split()
+		userTicks = float(ws[13])
+		sysTicks = float(ws[14])
+		myTicks = userTicks + sysTicks
+		vsize = (int(ws[22]))/1024.0/1024.0
+		rss = (int(ws[23])*4096)/1024.0/1024.0
+		cpuSeconds = myTicks/ticksPerSecond
+		lastCpuSeconds = cpuStats.get(vmId, cpuSeconds)
+		cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
+		cpuStats[vmId] = cpuSeconds
+		try:
+			child = self.controlledVMs[vmId]
+		except:
+			log.warning("Unable to obtain information on instance %d" % vmId)
+			return
+
+		(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
+		for i in range(0, len(child.instance.nics)):
+			netDev = "%s%d.%d" % (self.ifPrefix, child.instance.id, i)
+			(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+			(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
+		self.stats[vmId] = self.stats.get(vmId, {})
+		child = self.controlledVMs.get(vmId, None)
+		if (child):
+			res = self.__enterCommand(child, "info blockstats")
+			for l in res.split("\n"):
+				(device, sep, data) = stringPartition(l, ": ")
+				if (data != ""):
+					for field in data.split(" "):
+						(label, sep, val) = stringPartition(field, "=")
+						if (val != ""):
+							self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
+							self.stats[vmId]['%s_%s' % (device, label)] = int(val)
+		self.stats[vmId]['cpuLoad'] = cpuLoad
+		self.stats[vmId]['rss'] = rss
+		self.stats[vmId]['vsize'] = vsize
+		self.stats[vmId]['recvMBs'] = sendMBs
+		self.stats[vmId]['sendMBs'] = recvMBs
+
 	# thread
 	def statsThread(self):
 		ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
@@ -889,43 +937,11 @@ class Qemu(VmControlInterface):
 						recvMBs = (recvBytes-lastRecvBytes)/(now-last)/1024.0/1024.0
 						sendMBs = (sendBytes-lastSendBytes)/(now-last)/1024.0/1024.0
 						netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
+
+
 				for vmId in self.controlledVMs:
-					f = open("/proc/%d/stat" % (vmId))
-					procData = f.read()
-					f.close()
-					ws = procData.strip().split()
-					userTicks = float(ws[13])
-					sysTicks = float(ws[14])
-					myTicks = userTicks + sysTicks
-					vsize = (int(ws[22]))/1024.0/1024.0
-					rss = (int(ws[23])*4096)/1024.0/1024.0
-					cpuSeconds = myTicks/ticksPerSecond
-					lastCpuSeconds = cpuStats.get(vmId, cpuSeconds)
-					cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
-					cpuStats[vmId] = cpuSeconds
-					child = self.controlledVMs[vmId]
-					(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
-					for i in range(0, len(child.instance.nics)):
-						netDev = "%s%d.%d" % (self.ifPrefix, child.instance.id, i)
-						(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
-						(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
-					self.stats[vmId] = self.stats.get(vmId, {})
-					child = self.controlledVMs.get(vmId, None)
-					if (child):
-						res = self.__enterCommand(child, "info blockstats")
-						for l in res.split("\n"):
-							(device, sep, data) = stringPartition(l, ": ")
-							if (data != ""):
-								for field in data.split(" "):
-									(label, sep, val) = stringPartition(field, "=")
-									if (val != ""):
-										self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
-										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
-					self.stats[vmId]['cpuLoad'] = cpuLoad
-					self.stats[vmId]['rss'] = rss
-					self.stats[vmId]['vsize'] = vsize
-					self.stats[vmId]['recvMBs'] = sendMBs
-					self.stats[vmId]['sendMBs'] = recvMBs
+					self.__processVmStats(vmId)
+
 			except:
 				log.exception("statsThread threw an exception")
 			last = now

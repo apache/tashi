@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+import logging
 import cPickle
 import os
 import threading
@@ -24,6 +25,7 @@ from tashi.clustermanager.data import FromConfig, DataInterface
 class Pickled(FromConfig):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
+		self.log = logging.getLogger(__name__)
 		self.file = self.config.get("Pickled", "file")
 		self.locks = {}
 		self.lockNames = {}

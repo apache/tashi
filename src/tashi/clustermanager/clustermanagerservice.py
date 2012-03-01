@@ -36,7 +36,7 @@ class ClusterManagerService(object):
 		else:
 			self.username = None
 			self.password = None
-		self.proxy = ConnectionManager(self.username, self.password, int(self.config.get('ClusterManager', 'nodeManagerPort')))
+		self.proxy = ConnectionManager(self.username, self.password, int(self.config.get('ClusterManager', 'nodeManagerPort')), authAndEncrypt=self.authAndEncrypt)
 		self.dfs = dfs
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class ClusterManagerService(object):
 		try:
 			if (self.accountingHost is not None) and \
 				    (self.accountingPort is not None):
-				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+				self.accountingClient = ConnectionManager(self.username, self.password, self.accountingPort)[self.accountingHost]
 		except:
 			self.log.exception("Could not init accounting")
 
