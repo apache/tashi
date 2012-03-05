@@ -240,8 +240,8 @@ def debugConsole(globalDict):
 			dbgshell = shellfn()
 			atexit.register(resetConsole)
 			dbgshell()
-		except Exception, e:
-			CONSOLE_TEXT="%s >>> " % (str(e))
+		except Exception:
+			CONSOLE_TEXT=">>> "
 			input = " " 
 			while (input != ""):
 				sys.stdout.write(CONSOLE_TEXT)
