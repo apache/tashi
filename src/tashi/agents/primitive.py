@@ -41,7 +41,7 @@ class Primitive(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
+					self.hooks.append(instantiateImplementation(value, config, self.cm, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
 		self.hosts = {}
