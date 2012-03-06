@@ -149,14 +149,6 @@ class reference(object):
 	def __delattr__(self, name):
 		return delattr(self.__dict__['__real_obj__'], name)
 
-def isolatedRPC(client, method, *args, **kw):
-	"""Opens and closes a thrift transport for a single RPC call"""
-	if (not client._iprot.trans.isOpen()):
-		client._iprot.trans.open()
-	res = getattr(client, method)(*args, **kw)
-	client._iprot.trans.close()
-	return res
-
 def signalHandler(signalNumber):
 	"""Used to denote a particular function as the signal handler for a 
 	   specific signal"""
@@ -193,7 +185,7 @@ def instantiateImplementation(className, *args):
 
 def convertExceptions(oldFunc):
 	"""This converts any exception type into a TashiException so that 
-	   it can be passed over a Thrift RPC"""
+	   it can be passed over an RPC"""
 	def newFunc(*args, **kw):
 		try:
 			return oldFunc(*args, **kw)

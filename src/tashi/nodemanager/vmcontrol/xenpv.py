@@ -28,7 +28,7 @@ from vmcontrolinterface import VmControlInterface
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, TashiException
 from tashi.rpycservices.rpyctypes import Instance, Host
 from tashi import boolean, convertExceptions, ConnectionManager, version
-from tashi.util import isolatedRPC, broken
+from tashi.util import broken
 
 import tashi.parallel
 from tashi.parallel import synchronized, synchronizedmethod
