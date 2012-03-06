@@ -17,11 +17,12 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+import os
 import sys
-import signal
+import time
 import logging.config
 
-from tashi.util import signalHandler, boolean, instantiateImplementation, getConfig, debugConsole
+from tashi.util import boolean, instantiateImplementation, getConfig, debugConsole
 import tashi
 
 from tashi.rpycservices import rpycservices
@@ -54,19 +55,11 @@ def startClusterManager(config):
 	t.service._type = 'ClusterManagerService'
 
 	debugConsole(globals())
-	
-	try:
-		t.start()
-	except KeyboardInterrupt:
-		handleSIGTERM(signal.SIGTERM, None)
 
-@signalHandler(signal.SIGTERM)
-def handleSIGTERM(signalNumber, stackFrame):
-	global log
+	t.start()
+	# shouldn't exit by itself
+	return
 
-	log.info('Exiting cluster manager after receiving a SIGINT signal')
-	sys.exit(0)
-	
 def main():
 	global log
 	
@@ -80,7 +73,32 @@ def main():
 	
 	# bind the database
 	log.info('Starting cluster manager')
-	startClusterManager(config)
+
+	# handle keyboard interrupts (http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/)
+	child = os.fork()
+
+	if child == 0:
+		startClusterManager(config)
+		# shouldn't exit by itself
+		sys.exit(0)
+
+	else:
+		# main
+		try:
+			os.waitpid(child, 0)
+		except KeyboardInterrupt:
+			log.info("Exiting cluster manager after receiving a SIGINT signal")
+			os._exit(0)
+		except Exception:
+			log.exception("Abnormal termination of cluster manager")
+			os._exit(-1)
+
+		log.info("Exiting cluster manager after service thread exited")
+		os._exit(-1)
+
+	return
+
+
 
 if __name__ == "__main__":
 	main()

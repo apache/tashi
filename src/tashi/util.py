@@ -211,27 +211,27 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 		raise Exception("No config file could be found: %s" % (str(allLocations)))
 	return (config, configFiles)
 
-def __getShellFn():
+def __getShellFn(globalDict):
 	if sys.version_info < (2, 6, 1):
 		from IPython.Shell import IPShellEmbed
-		return IPShellEmbed()
+		return IPShellEmbed(user_ns=globalDict)
 	else:
 		import IPython
-		return IPython.embed()
+		return IPython.embed(user_ns=globalDict)
 
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
 		try :
 			import atexit
-			shellfn = __getShellFn()
+			shellfn = __getShellFn(globalDict)
 			def resetConsole():
 # XXXpipe: make input window sane
 				(stdin, stdout) = os.popen2("reset")
 				stdout.read()
 			dbgshell = shellfn()
 			atexit.register(resetConsole)
-			dbgshell(local_ns=globalDict, global_ns=globalDict)
+			dbgshell()
 		except Exception:
 			CONSOLE_TEXT=">>> "
 			input = " " 
