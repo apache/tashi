@@ -19,6 +19,7 @@
 
 import time
 import logging.config
+import sys
 
 from tashi.rpycservices.rpyctypes import Errors, HostState, InstanceState, TashiException
 
@@ -26,9 +27,9 @@ from tashi.util import getConfig, createClient, instantiateImplementation, boole
 import tashi
 
 class Primitive(object):
-	def __init__(self, config, cmclient):
+	def __init__(self, config):
 		self.config = config
-		self.cm = cmclient
+		self.cm = createClient(config)
 		self.hooks = []
 		self.log = logging.getLogger(__file__)
 		self.scheduleDelay = float(self.config.get("Primitive", "scheduleDelay"))
@@ -40,10 +41,10 @@ class Primitive(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
+					self.hooks.append(instantiateImplementation(value, config, self.cm, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
-	        self.hosts = {}
+		self.hosts = {}
 		self.load = {}
 		self.instances = {}
 		self.muffle = {}
@@ -62,9 +63,9 @@ class Primitive(object):
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
 			#if (h.up == True and h.state == HostState.Normal):
-				hosts[ctr] = h
-				ctr = ctr + 1
-				load[h.id] = []
+			hosts[ctr] = h
+			ctr = ctr + 1
+			load[h.id] = []
 			
 		load[None] = []
 		_instances = self.cm.getInstances()
@@ -199,7 +200,7 @@ class Primitive(object):
 							if myDisk == i.disks[0].uri and i.disks[0].persistent == True:
 								count += 1
 						if count > 1:
-								minMaxHost = None
+							minMaxHost = None
 
 			if (minMaxHost):
 				# found a host
@@ -250,7 +251,7 @@ class Primitive(object):
 				for i in oldInstances:
 					# XXXstroucki what about paused and saved VMs?
 					# XXXstroucki: do we need to look at Held VMs here?
-					if (i not in self.instances and (oldInstances[i].state == InstanceState.Running or oldInstances[i].state == InstanceState.Destroying)):
+					if (i not in self.instances and (oldInstances[i].state == InstanceState.Running or oldInstances[i].state == InstanceState.Destroying or oldInstances[i].state == InstanceState.ShuttingDown)):
 						self.log.info("VM exited: %s" % (oldInstances[i].name))
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
@@ -283,10 +284,17 @@ def main():
 	(config, configFiles) = getConfig(["Agent"])
 	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
-	cmclient = createClient(config)
 	logging.config.fileConfig(configFiles)
-	agent = Primitive(config, cmclient)
-	agent.start()
+	agent = Primitive(config)
+
+	try:
+		agent.start()
+	except KeyboardInterrupt:
+		pass
+
+	log = logging.getLogger(__file__)
+	log.info("Primitive exiting")
+	sys.exit(0)
 
 if __name__ == "__main__":
 	main()

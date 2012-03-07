@@ -27,6 +27,7 @@ import time
 import traceback
 import types
 import getpass
+import functools
 
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
@@ -148,14 +149,6 @@ class reference(object):
 	def __delattr__(self, name):
 		return delattr(self.__dict__['__real_obj__'], name)
 
-def isolatedRPC(client, method, *args, **kw):
-	"""Opens and closes a thrift transport for a single RPC call"""
-	if (not client._iprot.trans.isOpen()):
-		client._iprot.trans.open()
-	res = getattr(client, method)(*args, **kw)
-	client._iprot.trans.close()
-	return res
-
 def signalHandler(signalNumber):
 	"""Used to denote a particular function as the signal handler for a 
 	   specific signal"""
@@ -192,7 +185,7 @@ def instantiateImplementation(className, *args):
 
 def convertExceptions(oldFunc):
 	"""This converts any exception type into a TashiException so that 
-	   it can be passed over a Thrift RPC"""
+	   it can be passed over an RPC"""
 	def newFunc(*args, **kw):
 		try:
 			return oldFunc(*args, **kw)
@@ -218,20 +211,32 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 		raise Exception("No config file could be found: %s" % (str(allLocations)))
 	return (config, configFiles)
 
+def __getShellFn():
+	try:
+		from IPython.Shell import IPShellEmbed
+		return (1, IPShellEmbed)
+	except ImportError:
+		import IPython
+		return (2, IPython.embed)
+
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
 		try :
 			import atexit
-			from IPython.Shell import IPShellEmbed
+			(calltype, shellfn) = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
 				(stdin, stdout) = os.popen2("reset")
 				stdout.read()
-			dbgshell = IPShellEmbed()
 			atexit.register(resetConsole)
-			dbgshell(local_ns=globalDict, global_ns=globalDict)
-		except Exception:
+			if calltype == 1:
+				dbgshell=shellfn(user_ns=globalDict)
+				dbgshell()
+			elif calltype == 2:
+				dbgshell=shellfn
+				dbgshell(user_ns=globalDict)
+		except Exception, e:
 			CONSOLE_TEXT=">>> "
 			input = " " 
 			while (input != ""):
@@ -241,6 +246,10 @@ def debugConsole(globalDict):
 					exec(input) in globalDict
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
+
+		import os
+		os._exit(0)
+
 	if (os.getenv("DEBUG", "0") == "1"):
 		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
 
@@ -260,6 +269,68 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 			ns = ns + c
 	return ns
 
+class Connection:
+	def __init__(self, host, port, authAndEncrypt=False, credentials=None):
+		self.host = host
+		self.port = port
+		self.credentials = credentials
+		self.authAndEncrypt = authAndEncrypt
+		self.connection = None
+		# XXXstroucki some thing may still depend on this (client)
+		self.username = None
+		if credentials is not None:
+			self.username = credentials[0]
+
+	def __connect(self):
+		# create new connection
+
+		username = None
+		password = None
+
+		if self.credentials is not None:
+			username = self.credentials[0]
+			password = self.credentials[1]
+
+		if self.authAndEncrypt:
+			if username is None:
+				username = raw_input("Enter Username:")
+
+			if password is None:
+				password = raw_input("Enter Password:")
+
+			if self.credentials != (username, password):
+				self.credentials = (username, password)
+
+			client = rpycservices.client(self.host, self.port, username=username, password=password)
+		else:
+			client = rpycservices.client(self.host, self.port)
+
+		self.connection = client
+
+
+	def __do(self, name, *args, **kwargs):
+		if self.connection is None:
+			self.__connect()
+
+		remotefn = getattr(self.connection, name, None)
+
+		try:
+			if callable(remotefn):
+				returns = remotefn(*args, **kwargs)
+
+			else:
+				raise TashiException({'msg':'%s not callable' % name})
+
+		except:
+			self.connection = None
+			raise
+
+		return returns
+
+	def __getattr__(self, name):
+		return functools.partial(self.__do, name)
+
+
 def createClient(config):
 	cfgHost = config.get('Client', 'clusterManagerHost')
 	cfgPort = config.get('Client', 'clusterManagerPort')
@@ -273,14 +344,12 @@ def createClient(config):
 	authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
 	if authAndEncrypt:
 		username = config.get('AccessClusterManager', 'username')
-		if username == '':
-			username = raw_input('Enter Username:')
 		password = config.get('AccessClusterManager', 'password')
-		if password == '':
-			password = getpass.getpass('Enter Password:')
-		client = rpycservices.client(host, port, username=username, password=password)
+		client = Connection(host, port, authAndEncrypt, (username, password))
+
 	else:
-		client = rpycservices.client(host, port)
+		client = Connection(host, port)
+
 	return client
 
 def enumToStringDict(cls):

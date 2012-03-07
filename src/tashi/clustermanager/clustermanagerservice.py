@@ -19,7 +19,7 @@ import logging
 import threading
 import time
 
-from tashi.rpycservices import rpycservices             
+from tashi.rpycservices import rpycservices	     
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
 from tashi import boolean, ConnectionManager, vmStates, version, scrubString
 
@@ -36,7 +36,7 @@ class ClusterManagerService(object):
 		else:
 			self.username = None
 			self.password = None
-		self.proxy = ConnectionManager(self.username, self.password, int(self.config.get('ClusterManager', 'nodeManagerPort')))
+		self.proxy = ConnectionManager(self.username, self.password, int(self.config.get('ClusterManager', 'nodeManagerPort')), authAndEncrypt=self.authAndEncrypt)
 		self.dfs = dfs
 		self.convertExceptions = boolean(config.get('ClusterManagerService', 'convertExceptions'))
 		self.log = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class ClusterManagerService(object):
 		try:
 			if (self.accountingHost is not None) and \
 				    (self.accountingPort is not None):
-				self.accountingClient=rpycservices.client(self.accountingHost, self.accountingPort)
+				self.accountingClient = ConnectionManager(self.username, self.password, self.accountingPort)[self.accountingHost]
 		except:
 			self.log.exception("Could not init accounting")
 
@@ -126,7 +126,7 @@ class ClusterManagerService(object):
 			except:
 				self.log.exception("Invalid host data")
 
-                secondary = ','.join(filter(None, (hostText, instanceText)))
+		secondary = ','.join(filter(None, (hostText, instanceText)))
 
 		line = "%s|%s|%s" % (now, text, secondary)
 
@@ -679,12 +679,12 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return "success"
 
-        def registerHost(self, hostname, memory, cores, version):
-                hostId, alreadyRegistered = self.data.registerHost(hostname, memory, cores, version)
-                if alreadyRegistered:
-                        self.log.info("Host %s is already registered, it was updated now" % hostname)
-                else:
-                        self.log.info("A host was registered - hostname: %s, version: %s, memory: %s, cores: %s" % (hostname, version, memory, cores))
+	def registerHost(self, hostname, memory, cores, version):
+		hostId, alreadyRegistered = self.data.registerHost(hostname, memory, cores, version)
+		if alreadyRegistered:
+			self.log.info("Host %s is already registered, it was updated now" % hostname)
+		else:
+			self.log.info("A host was registered - hostname: %s, version: %s, memory: %s, cores: %s" % (hostname, version, memory, cores))
 
 		try:
 			host = self.data.getHost(hostId)
@@ -692,9 +692,9 @@ class ClusterManagerService(object):
 		except:
 			self.log.warning("Failed to lookup host %s" % hostId)
 
-                return hostId
+		return hostId
 
-        def unregisterHost(self, hostId):
+	def unregisterHost(self, hostId):
 		try:
 			host = self.data.getHost(hostId)
 			self.__ACCOUNT("CM HOST UNREGISTER", host=host)
@@ -702,9 +702,9 @@ class ClusterManagerService(object):
 			self.log.warning("Failed to lookup host %s" % hostId)
 			return
 
-                self.data.unregisterHost(hostId)
-                self.log.info("Host %s was unregistered" % hostId)
-                return
+		self.data.unregisterHost(hostId)
+		self.log.info("Host %s was unregistered" % hostId)
+		return
 
 	# service thread
 	def __monitorCluster(self):
