@@ -212,10 +212,10 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 	return (config, configFiles)
 
 def __getShellFn(globalDict):
-	if sys.version_info < (2, 6, 1):
+	try:
 		from IPython.Shell import IPShellEmbed
 		return IPShellEmbed(user_ns=globalDict)
-	else:
+	except ImportError:
 		import IPython
 		return IPython.embed(user_ns=globalDict)
 

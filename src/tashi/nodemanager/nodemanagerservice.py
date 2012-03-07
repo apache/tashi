@@ -76,6 +76,8 @@ class NodeManagerService(object):
 
 		self.__registerHost()
 
+		# XXXstroucki: should make an effort to retry
+		# otherwise vmm will wait forever
 		self.id = self.cm.registerNodeManager(self.host, self.instances.values())
 
 		# XXXstroucki cut cross check for NM/VMM state
