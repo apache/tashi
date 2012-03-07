@@ -211,28 +211,32 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 		raise Exception("No config file could be found: %s" % (str(allLocations)))
 	return (config, configFiles)
 
-def __getShellFn(globalDict):
-	if sys.version_info < (2, 6, 1):
+def __getShellFn():
+	try:
 		from IPython.Shell import IPShellEmbed
-		return IPShellEmbed(user_ns=globalDict)
-	else:
+		return (1, IPShellEmbed)
+	except ImportError:
 		import IPython
-		return IPython.embed(user_ns=globalDict)
+		return (2, IPython.embed)
 
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
 		try :
 			import atexit
-			shellfn = __getShellFn(globalDict)
+			(calltype, shellfn) = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
 				(stdin, stdout) = os.popen2("reset")
 				stdout.read()
-			dbgshell = shellfn()
 			atexit.register(resetConsole)
-			dbgshell()
-		except Exception:
+			if calltype == 1:
+				dbgshell=shellfn(user_ns=globalDict)
+				dbgshell()
+			elif calltype == 2:
+				dbgshell=shellfn
+				dbgshell(user_ns=globalDict)
+		except Exception, e:
 			CONSOLE_TEXT=">>> "
 			input = " " 
 			while (input != ""):
@@ -242,6 +246,10 @@ def debugConsole(globalDict):
 					exec(input) in globalDict
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
+
+		import os
+		os._exit(0)
+
 	if (os.getenv("DEBUG", "0") == "1"):
 		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
 

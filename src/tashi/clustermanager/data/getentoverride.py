@@ -19,7 +19,7 @@ import logging
 import subprocess
 import time
 import os
-from tashi.rpycservices.rpyctypes import User, LocalImages
+from tashi.rpycservices.rpyctypes import User, LocalImages, Instance, Host
 from tashi.clustermanager.data import DataInterface
 from tashi.util import instantiateImplementation, humanReadable
 
@@ -66,7 +66,7 @@ class GetentOverride(DataInterface):
 		return self.baseDataObject.acquireHost(hostId)
 	
 	def releaseHost(self, host):
-		if type(host) is not Instance:
+		if type(host) is not Host:
 			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
 			raise TypeError
 
