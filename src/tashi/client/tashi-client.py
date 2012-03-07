@@ -166,7 +166,7 @@ def getSlots(cores, memory):
 			continue
 		countbycores = int((h.cores - h.usedCores) / cores)
 		countbymemory = int((h.memory - h.usedMemory) / memory)
-		count += min(countbycores, countbymemory)
+		count += max(0, min(countbycores, countbymemory))
 
 	print "%d" % (count),
 	print (lambda:"instances", lambda:"instance")[count == 1](),
@@ -211,6 +211,7 @@ extraViews = {
 'getSlots': (getSlots, None),
 'getImages': (None, ['id', 'imageName', 'imageSize']), 
 'copyImage': (None, None), 
+'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
@@ -574,8 +575,11 @@ def main():
 			try:
 				if (type(res) == types.ListType):
 					makeTable(res, keys)
+				elif (type(res) == types.StringType):
+					print res
 				else:
-					pprint(res)
+					makeTable([res], keys)
+					
 			except IOError:
 				pass
 			except Exception, e:

@@ -17,16 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from socket import gethostname
-import os
-import socket
-import sys
-import threading
 import time
-import random
 import logging.config
 
-from tashi.rpycservices.rpyctypes import *
+from tashi.rpycservices.rpyctypes import Errors, HostState, InstanceState, TashiException
+
 from tashi.util import getConfig, createClient, instantiateImplementation, boolean
 import tashi
 
@@ -274,10 +269,10 @@ class Primitive(object):
 					# end for unassigned vms
 
 
-			except TashiException, e:
+			except TashiException:
 				self.log.exception("Tashi exception")
 
-			except Exception, e:
+			except Exception:
 				self.log.warning("Scheduler iteration failed")
 
 

@@ -1,5 +1,3 @@
-#! /bin/sh
-
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,12 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-./bin/addUser "User(d={'username':'mryan3'})"
-./bin/addPersistentImage "PersistentImage(d={'userId':1,'name':'i386-ubuntu.qcow'})"
-./bin/addInstanceConfiguration "InstanceConfiguration(d={'name':'i386-512','memory':512,'cores':1})"
-./bin/addHardDiskConfiguration "HardDiskConfiguration(d={'index':0,'persistentImageId':1,'persistent':False,'instanceConfigurationId':1})"
-./bin/addNetworkInterfaceConfiguration "NetworkInterfaceConfiguration(d={'index':0,'instanceConfigurationId':1})"
-./bin/addHost "Host(d={'hostname':'blade043'})"
-./bin/addHost "Host(d={'hostname':'blade044'})"
-./bin/addHost "Host(d={'hostname':'blade045'})"
-./bin/addHost "Host(d={'hostname':'blade074'})"
+from accountingservice import AccountingService
