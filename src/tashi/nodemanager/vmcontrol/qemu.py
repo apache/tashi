@@ -196,7 +196,7 @@ class Qemu(VmControlInterface):
 					try:
 						os.waitpid(vmId, 0)
 					except:
-						log.exception("waitpid failed for vmId" % (vmId))
+						log.exception("waitpid failed for vmId %s" % (vmId))
 				# recover the child's stderr and monitor
 				# output if possible
 				if (child.errorBit):
