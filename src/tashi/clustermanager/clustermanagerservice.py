@@ -271,7 +271,12 @@ class ClusterManagerService(object):
 		for instanceId in self.instanceLastContactTime.keys():
 
 			# XXXstroucki should lock instance here?
-			if (self.instanceLastContactTime[instanceId] < (self.__now() - self.allowDecayed)):
+			try:
+				lastContactTime = self.instanceLastContactTime[instanceId]
+			except KeyError:
+				continue
+
+			if (lastContactTime < (self.__now() - self.allowDecayed)):
 				try:
 					instance = self.data.acquireInstance(instanceId)
 					# Don't query non-running VMs. eg. if a VM
@@ -382,7 +387,7 @@ class ClusterManagerService(object):
 						self.proxy[hostname].destroyVm(instance.vmId)
 						self.data.releaseInstance(instance)
 				except:
-					self.log.exception('destroyVm failed on host %s vmId %s' % (hostname, str(instance.vmId)))
+					self.log.warning('destroyVm failed on host %s vmId %s' % (hostname, str(instance.vmId)))
 					self.data.removeInstance(instance)
 
 
