@@ -134,7 +134,7 @@ class Qemu(VmControlInterface):
 		pids = []
 		real_bin = self.QEMU_BIN
 		while os.path.islink(real_bin):
-			real_bin = os.readlink(self.QEMU_BIN)
+			real_bin = os.readlink(real_bin)
 
 		for f in os.listdir("/proc"):
 			try:
