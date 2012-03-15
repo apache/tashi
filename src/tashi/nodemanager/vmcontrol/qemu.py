@@ -130,10 +130,8 @@ class Qemu(VmControlInterface):
 			self.__dict__.update(attrs)
 
 	def __dereferenceLink(self, spec):
-		while os.path.islink(spec):
-			spec = os.readlink(spec)
-
-		return spec
+		newspec = os.path.realpath(spec)
+		return newspec
 
 
 	def __getHostPids(self):
