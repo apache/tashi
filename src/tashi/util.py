@@ -222,6 +222,7 @@ def __getShellFn():
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
+		import os
 		try :
 			import atexit
 			(calltype, shellfn) = __getShellFn()
@@ -247,7 +248,6 @@ def debugConsole(globalDict):
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
 
-		import os
 		os._exit(0)
 
 	if (os.getenv("DEBUG", "0") == "1"):
