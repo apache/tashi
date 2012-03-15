@@ -129,12 +129,17 @@ class Qemu(VmControlInterface):
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
 
+	def __dereferenceLink(self, spec):
+		while os.path.islink(spec):
+			spec = os.readlink(spec)
+
+		return spec
+
+
 	def __getHostPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
-		real_bin = self.QEMU_BIN
-		while os.path.islink(real_bin):
-			real_bin = os.readlink(real_bin)
+		real_bin = self.__dereferenceLink(self.QEMU_BIN)
 
 		for f in os.listdir("/proc"):
 			try:
@@ -430,6 +435,7 @@ class Qemu(VmControlInterface):
 			disk = instance.disks[index]
 			uri = scrubString(disk.uri)
 			imageLocal = self.dfs.getLocalHandle("images/" + uri)
+			imageLocal = self.__dereferenceLink(imageLocal)
 			thisDiskList = [ "file=%s" % imageLocal ]
 			thisDiskList.append("if=%s" % diskInterface)
 			thisDiskList.append("index=%d" % index)
