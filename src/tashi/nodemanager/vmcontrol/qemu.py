@@ -321,12 +321,12 @@ class Qemu(VmControlInterface):
 				#print "[NEE]: %s" % (needle)
 				(rlist, wlist, xlist) = select.select([monitorFd], [], [], timeout)
 				if (len(rlist) == 0):
-					log.error("Timeout getting results from monitor for vmId %d" % (child.pid))
+					log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise RuntimeError
 				c = os.read(monitorFd, 1)
 				if (c == ""):
-					log.error("Early termination on monitor for vmId %d" % (child.pid))
+					log.error("Early termination on monitor FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise RuntimeError
 				buf = buf + c
@@ -649,7 +649,8 @@ class Qemu(VmControlInterface):
 	
 	# extern
 	def resumeVmHelper(self, instance, source):
-		child = self.__getChildFromPid(instance.vmId)
+		vmId = instance.vmId
+		child = self.__getChildFromPid(vmId)
 		try:
 			self.__getPtyInfo(child, True)
 		except RuntimeError:
@@ -658,8 +659,13 @@ class Qemu(VmControlInterface):
 			raise
 		status = "paused"
 		while ("running" not in status):
-			status = self.__enterCommand(child, "info status")
-			time.sleep(1)
+			try:
+				status = self.__enterCommand(child, "info status")
+			except RuntimeError:
+				pass
+			time.sleep(60)
+
+		self.nm.vmStateChange(vmId, None, InstanceState.Running)
 		child.instance.state = InstanceState.Running
 		self.__saveChildInfo(child)
 	
