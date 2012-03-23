@@ -308,6 +308,8 @@ class NodeManagerService(object):
 	# called by resumeVm as thread
 	def __resumeVmHelper(self, instance, name):
 		self.vmm.resumeVmHelper(instance, name)
+		# XXXstroucki should the VMM be responsible for setting
+		# state? It should know better.
 		instance.state = InstanceState.Running
 		newInstance = Instance(d={'id':instance.id,'state':instance.state})
 		success = lambda: None

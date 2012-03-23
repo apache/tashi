@@ -353,7 +353,7 @@ class ClusterManagerService(object):
 	
 	def shutdownVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Running, InstanceState.ShuttingDown)
+		self.__stateTransition(instance, None, InstanceState.ShuttingDown)
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM SHUTDOWN", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
@@ -371,7 +371,7 @@ class ClusterManagerService(object):
 			self.data.removeInstance(instance)
 		elif (instance.state is InstanceState.Activating):
 			self.__ACCOUNT("CM VM DESTROY STARTING", instance=instance)
-			self.__stateTransition(instance, InstanceState.Activating, InstanceState.Destroying)
+			self.__stateTransition(instance, None, InstanceState.Destroying)
 			self.data.releaseInstance(instance)
 		else:
 			# XXXstroucki: This is a problem with keeping
@@ -395,7 +395,12 @@ class ClusterManagerService(object):
 	
 	def suspendVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
+		try:
+			self.__stateTransition(instance, InstanceState.Running, InstanceState.Suspending)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM SUSPEND", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
@@ -409,7 +414,12 @@ class ClusterManagerService(object):
 	
 	def resumeVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
+		try:
+			self.__stateTransition(instance, InstanceState.Suspended, InstanceState.Pending)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		source = "suspend/%d_%s" % (instance.id, instance.name)
 		instance.hints['__resume_source'] = source
 		self.data.releaseInstance(instance)
@@ -427,7 +437,13 @@ class ClusterManagerService(object):
 		except:
 			self.data.releaseInstance(instance)
 			raise
-		self.__stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
+
+		try:
+			self.__stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		try:
 			# Prepare the target
@@ -439,7 +455,12 @@ class ClusterManagerService(object):
 			self.log.exception('prepReceiveVm failed')
 			raise
 		instance = self.data.acquireInstance(instance.id)
-		self.__stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)
+		try:
+			self.__stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		try:
 			# Send the VM
@@ -463,7 +484,12 @@ class ClusterManagerService(object):
 	
 	def pauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Running, InstanceState.Pausing)
+		try:
+			self.__stateTransition(instance, InstanceState.Running, InstanceState.Pausing)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM PAUSE", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
@@ -473,13 +499,23 @@ class ClusterManagerService(object):
 			self.log.exception('pauseVm failed on host %s with vmId %d' % (hostname, instance.vmId))
 			raise
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Pausing, InstanceState.Paused)
+		try:
+			self.__stateTransition(instance, InstanceState.Pausing, InstanceState.Paused)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		return
 
 	def unpauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Paused, InstanceState.Unpausing)
+		try:
+			self.__stateTransition(instance, InstanceState.Paused, InstanceState.Unpausing)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM UNPAUSE", instance=instance)
 		hostname = self.data.getHost(instance.hostId).name
@@ -489,7 +525,12 @@ class ClusterManagerService(object):
 			self.log.exception('unpauseVm failed on host %s with vmId %d' % (hostname, instance.vmId))
 			raise
 		instance = self.data.acquireInstance(instanceId)
-		self.__stateTransition(instance, InstanceState.Unpausing, InstanceState.Running)
+		try:
+			self.__stateTransition(instance, InstanceState.Unpausing, InstanceState.Running)
+		except TashiException:
+			self.data.releaseInstance(instance)
+			raise
+
 		self.data.releaseInstance(instance)
 		return
 	
@@ -638,7 +679,7 @@ class ClusterManagerService(object):
 		self.__ACCOUNT("CM VM ACTIVATE", instance=instance)
 
 		if ('__resume_source' in instance.hints):
-			self.__stateTransition(instance, InstanceState.Pending, InstanceState.Resuming)
+			self.__stateTransition(instance, None, InstanceState.Resuming)
 		else:
 			# XXXstroucki should held VMs be continually tried? Or be explicitly set back to pending?
 			#self.__stateTransition(instance, InstanceState.Pending, InstanceState.Activating)
