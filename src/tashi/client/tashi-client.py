@@ -80,7 +80,7 @@ def getDefaultNetwork():
 	fetchNetworks()
 	networkId = 1
 	for network in networks:
-		if (networks[network].name == "default"):
+		if (getattr(networks[network], "default", False) is True):
 			networkId = network
 	return networkId
 

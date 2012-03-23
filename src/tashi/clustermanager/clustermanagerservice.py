@@ -49,6 +49,13 @@ class ClusterManagerService(object):
 		self.allowMismatchedVersions = boolean(self.config.get('ClusterManagerService', 'allowMismatchedVersions'))
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
+
+		self.defaultNetwork = 0
+		try:
+			self.defaultNetwork = int(self.config.get('ClusterManagerService', 'defaultNetwork'))
+		except:
+			pass
+
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
 
 		self.accountingHost = None
@@ -538,7 +545,12 @@ class ClusterManagerService(object):
 		return self.data.getHosts().values()
 	
 	def getNetworks(self):
-		return self.data.getNetworks().values()
+		networks = self.data.getNetworks()
+		if self.defaultNetwork in networks:
+			setattr(networks[self.defaultNetwork], "default", True)
+
+		return networks.values()
+
 	
 	def getUsers(self):
 		return self.data.getUsers().values()
