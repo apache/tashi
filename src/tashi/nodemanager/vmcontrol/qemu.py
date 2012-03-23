@@ -108,11 +108,19 @@ class Qemu(VmControlInterface):
 		self.consolePortLock = threading.Lock()
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
-		self.scratchVg = self.config.get("Qemu", "scratchVg")
-		# XXXstroucki revise
-		self.scratchDir = self.config.get("Qemu", "scratchDir")
-		if len(self.scratchDir) == 0:
-			self.scratchDir = "/tmp"
+
+		self.suspendHandler = self.__config("Qemu", "suspendHandler")
+		self.resumeHandler = self.__config("Qemu", "resumeHandler")
+
+		if self.suspendHandler is None:
+			self.suspendHandler = "gzip"
+
+		if self.resumeHandler is None:
+			self.resumeHandler = "zcat"
+
+		self.scratchVg = self.__config("Qemu", "scratchVg")
+
+		self.scratchDir = self.__config("Qemu", "scratchDir", default = "/tmp")
 
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -128,6 +136,19 @@ class Qemu(VmControlInterface):
 	class anonClass:
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
+
+	def __config(self, section, option, default = None):
+		# soft version of self.config.get. returns default value
+		# if not found in configuration
+		import ConfigParser
+
+		value = default
+		try:
+			value = self.config.get(section, option)
+		except ConfigParser.NoOptionError:
+			pass
+
+		return value
 
 	def __dereferenceLink(self, spec):
 		newspec = os.path.realpath(spec)
@@ -607,10 +628,15 @@ class Qemu(VmControlInterface):
 				# trying to restart the migration by running
 				# the command again (when qemu is ready to
 				# listen again) is probably not helpful
+				# XXXstroucki: failures observed:
+				# "migration failed"
+				# "Block format 'qcow' used by device '' does not support feature 'live migration'
 				success = False
+				# see if migration can be speeded up
+				res = self.__enterCommand(child, "migrate_set_speed 1g", timeout=self.migrateTimeout)
 				res = self.__enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
-				if (res.find("migration failed") == -1):
+				if (res.find("Block migration completed") != -1):
 					success = True
 					retry = 0
 					break
@@ -646,11 +672,17 @@ class Qemu(VmControlInterface):
 	
 	# extern
 	def suspendVm(self, vmId, target):
-		tmpTarget = "/%s/tashi_qemu_suspend_%d_%d" % (self.scratchDir, os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
-		vmId = self.__stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
-		self.dfs.copyTo(tmpTarget, target)
-		os.unlink(tmpTarget)
+		# XXXstroucki: we could create a fifo on the local fs,
+		# then start a thread to copy it to dfs. But if we're
+		# reading from dfs directly on resume, why not write
+		# directly here?
+
+		#tmpTarget = "/%s/tashi_qemu_suspend_%d_%d" % (self.scratchDir, os.getpid(), vmId)
+		fn = self.dfs.getLocalHandle("%s" % target)
+		vmId = self.__stopVm(vmId, "\"exec:%s > %s\"" % (self.suspendHandler, fn), True)
+		#self.dfs.copyTo(tmpTarget, target)
+		#os.unlink(tmpTarget)
 		return vmId
 	
 	# extern
@@ -678,7 +710,7 @@ class Qemu(VmControlInterface):
 	# extern
 	def resumeVm(self, instance, source):
 		fn = self.dfs.getLocalHandle("%s" % (source))
-		(vmId, cmd) = self.__startVm(instance, "exec:zcat %s" % (fn))
+		(vmId, cmd) = self.__startVm(instance, "exec:%s < %s" % (self.resumeHandler, fn))
 		child = self.__getChildFromPid(vmId)
 		child.cmd = cmd
 		return vmId
