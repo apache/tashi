@@ -82,6 +82,13 @@ def getDefaultNetwork():
 	for network in networks:
 		if (getattr(networks[network], "default", False) is True):
 			networkId = network
+			break
+
+		# Naming the network "default" is deprecated, and
+		# this functionality will be removed soon
+		if (networks[network].name == "default"):
+			networkId = network
+			break
 	return networkId
 
 def randomNetwork():
