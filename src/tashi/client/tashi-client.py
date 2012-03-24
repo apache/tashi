@@ -78,7 +78,7 @@ def randomMac():
 
 def getDefaultNetwork():
 	fetchNetworks()
-	networkId = 1
+	networkId = 0
 	for network in networks:
 		if (getattr(networks[network], "default", False) is True):
 			networkId = network
