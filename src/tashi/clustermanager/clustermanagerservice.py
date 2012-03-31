@@ -546,8 +546,9 @@ class ClusterManagerService(object):
 	
 	def getNetworks(self):
 		networks = self.data.getNetworks()
-		if self.defaultNetwork in networks:
-			setattr(networks[self.defaultNetwork], "default", True)
+		for network in networks:
+			if self.defaultNetwork == networks[network].id:
+				setattr(networks[network], "default", True)
 
 		return networks.values()
 

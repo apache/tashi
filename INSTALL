@@ -153,9 +153,9 @@ Please press <RETURN> to start IPython.
 
 In [1]: from tashi.rpycservices.rpyctypes import Host, HostState, Network
 
-In [2]: data.baseDataObject.hosts[1] = Host(d={'id':1,'name':'grml','state': HostState.Normal,'up':False})
+In [2]: data.baseDataObject.hosts[0] = Host(d={'id':0,'name':'grml','state': HostState.Normal,'up':False})
 
-In [3]: data.baseDataObject.networks[1]=Network(d={'id':0,'name':'default'})
+In [3]: data.baseDataObject.networks[0]=Network(d={'id':0,'name':'My Network'})
 
 In [4]: data.baseDataObject.save()
 
