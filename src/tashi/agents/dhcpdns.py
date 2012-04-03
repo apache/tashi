@@ -55,15 +55,21 @@ class DhcpDns(InstanceHook):
 		self.ipMax = {}
 		self.currentIP = {}
 		self.usedIPs = {}
-		for k in self.ipRange:
-			ipRange = self.ipRange[k]
+
+		self.initIPs()
+
+	def initIPs(self):
+		self.usedIPs = {}
+		for network in self.ipRange:
+			ipRange = self.ipRange[network]
 			(min, max) = ipRange.split("-")	
 			min = min.strip()
 			max = max.strip()
 			ipNum = self.strToIp(min)
-			self.ipMin[k] = self.strToIp(min)
-			self.ipMax[k] = self.strToIp(max)
-			self.currentIP[k] = self.ipMin[k]
+			self.ipMin[network] = self.strToIp(min)
+			self.ipMax[network] = self.strToIp(max)
+			self.currentIP[network] = self.ipMin[network]
+
 		instances = self.client.getInstances()
 		for i in instances:
 			for nic in i.nics:
@@ -93,6 +99,9 @@ class DhcpDns(InstanceHook):
 		wrapToMinAlready = False
 		if (requestedIP <= self.ipMax[network] and requestedIP >= self.ipMin[network] and (requestedIP not in self.usedIPs)):
 			allocatedIP = requestedIP
+
+		# nic.ip will be updated later in preCreate if chosen
+		# ip not available
 		while (allocatedIP == None):
 			if (self.currentIP[network] > self.ipMax[network] and wrapToMinAlready):
 				raise UserWarning("No available IP addresses for network %d" % (network))
@@ -242,6 +251,9 @@ class DhcpDns(InstanceHook):
 			ip = nic.ip
 			try:
 				ipNum = self.strToIp(ip)
+				# XXXstroucki: if this fails with KeyError,
+				# we must have double-assigned the same IP
+				# address. How does this happen?
 				del self.usedIPs[ipNum]
 			except Exception, e:
 				self.log.exception("Failed to remove host %s, ip %s from pool of usedIPs" % (instance.name, ip))
@@ -254,6 +266,10 @@ class DhcpDns(InstanceHook):
 			except Exception, e:
 				self.log.exception("Failed to remove host %s from DHCP" % (instance.name))
 		try:
+			# XXXstroucki: this can fail if the resolver can't
+			# resolve the dns server name (line 190). Perhaps
+			# the hostname should be then pushed onto a list
+			# to try again next time.
 			self.removeDns(instance.name)
 		except Exception, e:
 			self.log.exception("Failed to remove host %s from DNS" % (instance.name))
