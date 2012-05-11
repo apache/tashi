@@ -54,6 +54,7 @@ class Pickled(FromConfig):
 		return ch
 	
 	def save(self):
+		# XXXstroucki lock here to serialize saves
 		filename = self.file
 		# XXXstroucki could be better
 		tempfile = "%s.new" % filename
@@ -61,7 +62,13 @@ class Pickled(FromConfig):
 		file = open(tempfile, "w")
 		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
 		file.close()
-		os.rename(tempfile, filename)
+		try:
+			os.rename(tempfile, filename)
+		except OSError:
+			# XXXstroucki: regular save will take place
+			# soon enough, ignore this until locking is
+			# in place.
+			pass
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
