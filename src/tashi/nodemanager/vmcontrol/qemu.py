@@ -109,14 +109,8 @@ class Qemu(VmControlInterface):
 		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
 		self.stats = {}
 
-		self.suspendHandler = self.__config("Qemu", "suspendHandler")
-		self.resumeHandler = self.__config("Qemu", "resumeHandler")
-
-		if self.suspendHandler is None:
-			self.suspendHandler = "gzip"
-
-		if self.resumeHandler is None:
-			self.resumeHandler = "zcat"
+		self.suspendHandler = self.__config("Qemu", "suspendHandler", default = "gzip")
+		self.resumeHandler = self.__config("Qemu", "resumeHandler", default = "zcat")
 
 		self.scratchVg = self.__config("Qemu", "scratchVg")
 
