@@ -93,6 +93,8 @@ class DhcpDns(InstanceHook):
 		return "%d.%d.%d.%d" % ((ip>>24)&0xff, (ip>>16)&0xff, (ip>>8)&0xff, ip&0xff)
 	
 	def allocateIP(self, nic):
+		# XXXstroucki: if the network is not defined having an ip
+		# range, this will throw a KeyError. Should be logged.
 		network = nic.network
 		allocatedIP = None
 		requestedIP = self.strToIp(nic.ip)
