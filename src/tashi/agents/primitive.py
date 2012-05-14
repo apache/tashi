@@ -207,7 +207,10 @@ class Primitive(object):
 				if (not inst.hints.get("__resume_source", None)):
 					# only run preCreate hooks if newly starting
 					for hook in self.hooks:
-						hook.preCreate(inst)
+						try:
+							hook.preCreate(inst)
+						except:
+							self.log.warning("Failed to run preCreate hook")
 				self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
 				rv = "fail"
 				try:
