@@ -653,6 +653,8 @@ class Qemu(VmControlInterface):
 
 	# extern	
 	def instantiateVm(self, instance):
+		# XXXstroucki: check capacity before instantiating
+
 		try:
 			(vmId, cmd) = self.__startVm(instance, None)
 			child = self.__getChildFromPid(vmId)

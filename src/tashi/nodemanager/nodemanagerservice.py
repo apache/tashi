@@ -286,6 +286,8 @@ class NodeManagerService(object):
 
 	# remote
 	def instantiateVm(self, instance):
+		# XXXstroucki: check my capacity before instantiating
+
 		self.__ACCOUNT("NM VM INSTANTIATE", instance=instance)
 		try:
 			vmId = self.vmm.instantiateVm(instance)

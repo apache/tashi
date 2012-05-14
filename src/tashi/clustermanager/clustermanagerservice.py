@@ -675,6 +675,9 @@ class ClusterManagerService(object):
 		return "success"
 	
 	def activateVm(self, instanceId, host):
+		# XXXstroucki: check my idea of the host's capacity before
+		# trying.
+
 		dataHost = self.data.acquireHost(host.id)
 
 		if (dataHost.name != host.name):

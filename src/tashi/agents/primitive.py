@@ -76,8 +76,9 @@ class Primitive(object):
 		# XXXstroucki put held machines behind pending ones
 		heldInstances = []
 		for i in instances.itervalues():
+			# Nonrunning VMs will have hostId of None, but
+			# so will Suspended VMs.
 			if (i.hostId or i.state == InstanceState.Pending):
-				# Nonrunning VMs will have hostId of None
 				load[i.hostId] = load[i.hostId] + [i.id]
 			elif (i.hostId is None and i.state == InstanceState.Held):
 				heldInstances = heldInstances + [i.id]
@@ -245,8 +246,21 @@ class Primitive(object):
 	def start(self):
 		oldInstances = {}
 
+		# XXXstroucki: scheduling races have been observed, where
+		# a vm is scheduled on a host that had not updated its
+		# capacity with the clustermanager, leading to overloaded
+		# hosts. I think the place to insure against this happening
+		# is in the nodemanager. This scheduler will keep an
+		# internal state of cluster loading, but that is best
+		# effort and will be refreshed from CM once the buffer
+		# of vms to be scheduled is exhausted.
+
 		while True:
 			try:
+				# XXXstroucki: to get a list of vms to be
+				# scheduled, it asks the CM for a full
+				# cluster state, and will look at those
+				# without a host.
 				self.__getState()
 				
 				# Check for VMs that have exited and call
