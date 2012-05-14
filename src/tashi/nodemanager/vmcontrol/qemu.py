@@ -862,6 +862,11 @@ class Qemu(VmControlInterface):
 		threading.Thread(target=controlConsole, args=(child,consolePort)).start()
 		return "Control console listening on %s:%d" % (hostname, consolePort)
 
+	def __specificReset(self, vmId):
+		child = self.__getChildFromPid(vmId)
+		self.__enterCommand(child, "system_reset")
+		return "Sent reset signal to instance"
+
 	# extern
 	def vmmSpecificCall(self, vmId, arg):
 		arg = arg.lower()
@@ -880,12 +885,16 @@ class Qemu(VmControlInterface):
 		elif (arg == "startconsole"):
 			return self.__specificStartConsole(vmId)
 
+		elif (arg == "reset"):
+			return self.__specificReset(vmId)
+
 		elif (arg == "list"):
 			commands = [
 				"startVnc",
 				"stopVnc",
 				"changeCdrom:<image.iso>",
 				"startConsole",
+				"reset",
 				]
 			return "\n".join(commands)
 				
