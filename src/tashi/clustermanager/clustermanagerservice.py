@@ -638,7 +638,10 @@ class ClusterManagerService(object):
 
 		self.instanceLastContactTime[instanceId] = self.__now()
 		oldInstance.decayed = False
-		self.__ACCOUNT("CM VM UPDATE", instance=oldInstance)
+
+		displayInstance = oldInstance
+		self.__stateTransition(displayInstance, None, instance.state)
+		self.__ACCOUNT("CM VM UPDATE", instance=displayInstance)
 
 		if (instance.state == InstanceState.Exited):
 			# determine why a VM has exited
