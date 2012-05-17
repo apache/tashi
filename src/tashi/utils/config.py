@@ -54,3 +54,6 @@ class Config:
 			pass
 
 		return value
+
+	def items(self, *args, **kwargs):
+		return self.config.items(*args, **kwargs)

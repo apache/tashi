@@ -28,7 +28,9 @@ from rpyc.utils.server import ThreadedServer
 #from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
 #from tashi.rpycservices.rpyctypes import *
-from tashi.util import getConfig, createClient, instantiateImplementation, boolean, debugConsole
+from tashi.util import createClient, instantiateImplementation, boolean, debugConsole
+from tashi.utils.config import Config
+
 import tashi
 
 class Accounting(object):
@@ -69,7 +71,8 @@ class Accounting(object):
 		sys.exit(0)
 
 def main():
-	(config, configFiles) = getConfig(["Accounting"])
+	config = Config(["Accounting"])
+	configFiles = config.getFiles()
 	publisher = instantiateImplementation(config.get("Accounting", "publisher"), config)
 	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)

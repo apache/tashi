@@ -23,7 +23,8 @@ import sys
 
 from tashi.rpycservices.rpyctypes import Errors, HostState, InstanceState, TashiException
 
-from tashi.util import getConfig, createClient, instantiateImplementation, boolean
+from tashi.util import createClient, instantiateImplementation, boolean
+from tashi.utils.config import Config
 import tashi
 
 class Primitive(object):
@@ -298,7 +299,9 @@ class Primitive(object):
 			time.sleep(self.scheduleDelay)
 
 def main():
-	(config, configFiles) = getConfig(["Agent"])
+	config = Config(["Agent"])
+	configFiles = config.getFiles()
+
 	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)
