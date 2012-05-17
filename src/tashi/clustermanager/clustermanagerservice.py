@@ -50,11 +50,7 @@ class ClusterManagerService(object):
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
 
-		self.defaultNetwork = 0
-		try:
-			self.defaultNetwork = int(self.config.get('ClusterManagerService', 'defaultNetwork'))
-		except:
-			pass
+		self.defaultNetwork = self.config.getint('ClusterManagerService', 'defaultNetwork', 0)
 
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
 
