@@ -17,6 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+# XXXstroucki: this apparently originated from a copy of the primitive
+# scheduler code sometime in 2010. It aims to keep a pool of tashi servers
+# available, and other servers shut down. Could this be better suited for
+# a hook function of the scheduler?
+
 from socket import gethostname
 import os
 import socket

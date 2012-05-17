@@ -65,6 +65,9 @@ class client:
 		if name not in clusterManagerRPCs and name not in nodeManagerRPCs and name not in accountingRPCs:
 			return None
 		def connectWrap(*args):
+			# XXXstroucki: why not talk directly, instead
+			# of using rpyc? We're already using pickle to move
+			# args.
 			args = cPickle.dumps(clean(args))
 			try:
 				res = getattr(self.conn.root, name)(args)
