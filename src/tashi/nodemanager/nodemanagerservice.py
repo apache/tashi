@@ -33,35 +33,32 @@ class NodeManagerService(object):
 	   VmControlInterface and do all dfs operations here?"""
 
 	def __init__(self, config, vmm):
+		# XXXstroucki: vmm will wait for this constructor to complete
 		self.config = config
 		self.vmm = vmm
-		self.cmHost = config.get("NodeManagerService", "clusterManagerHost")
-		self.cmPort = int(config.get("NodeManagerService", "clusterManagerPort"))
-		self.authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+		self.cmHost = self.config.get("NodeManagerService", "clusterManagerHost")
+		self.cmPort = int(self.config.get("NodeManagerService", "clusterManagerPort"))
+		self.authAndEncrypt = boolean(self.config.get('Security', 'authAndEncrypt'))
 		if self.authAndEncrypt:
-			self.username = config.get('AccessClusterManager', 'username')
-			self.password = config.get('AccessClusterManager', 'password')
+			self.username = self.config.get('AccessClusterManager', 'username')
+			self.password = self.config.get('AccessClusterManager', 'password')
 		else:
 			self.username = None
 			self.password = None
 		self.log = logging.getLogger(__file__)
-		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
-		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
-		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
-		self.registerHost = boolean(config.get('NodeManagerService', 'registerHost'))
+		self.convertExceptions = boolean(self.config.get('NodeManagerService', 'convertExceptions'))
+		self.registerFrequency = float(self.config.get('NodeManagerService', 'registerFrequency'))
+		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval', default = 0))
+		self.registerHost = boolean(self.config.get('NodeManagerService', 'registerHost'))
 		try:
 			self.cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		except:
 			self.log.exception("Could not connect to CM")
+			# XXXstroucki: raise?
 			return
 
-		self.accountingHost = None
-		self.accountingPort = None
-		try:
-			self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
-			self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
-		except:
-			pass
+		self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
+		self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
 
 		self.notifyCM = []
 
@@ -77,10 +74,8 @@ class NodeManagerService(object):
 		self.__registerHost()
 
 		# XXXstroucki: should make an effort to retry
-		# otherwise vmm will wait forever
+		# This can time out now with an exception
 		self.id = self.cm.registerNodeManager(self.host, self.instances.values())
-
-		# XXXstroucki cut cross check for NM/VMM state
 
 		# start service threads
 		threading.Thread(target=self.__registerWithClusterManager).start()
@@ -180,14 +175,20 @@ class NodeManagerService(object):
 
 	# service thread function
 	def __registerWithClusterManager(self):
+		happy = False
 		while True:
 			#self.__ACCOUNT("TESTING")
 			start = time.time()
 			try:
 				instances = self.instances.values()
 				self.id = self.cm.registerNodeManager(self.host, instances)
+				if not happy:
+					happy = True
+					self.log.info("Registered with the CM")
+
 			except Exception:
 				self.log.exception('Failed to register with the CM')
+				happy = False
 
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):

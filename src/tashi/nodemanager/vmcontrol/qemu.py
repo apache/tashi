@@ -87,17 +87,19 @@ class Qemu(VmControlInterface):
 	
 	def __init__(self, config, dfs, nm):
 		VmControlInterface.__init__(self, config, dfs, nm)
-		self.QEMU_BIN = self.config.get("Qemu", "qemuBin")
-		self.INFO_DIR = self.config.get("Qemu", "infoDir")
-		self.POLL_DELAY = float(self.config.get("Qemu", "pollDelay"))
-		self.migrationRetries = int(self.config.get("Qemu", "migrationRetries"))
-		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout"))
-		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout"))
-		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument"))
-		self.statsInterval = float(self.config.get("Qemu", "statsInterval"))
-		# XXXstroucki amount of reserved memory could be configurable
-		self.reservedMem = 512
-		# XXXstroucki perhaps make this configurable
+		self.QEMU_BIN = self.config.get("Qemu", "qemuBin", default = "/usr/bin/kvm")
+		self.INFO_DIR = self.config.get("Qemu", "infoDir", default = "/var/tmp/VmControlQemu/")
+		self.POLL_DELAY = float(self.config.get("Qemu", "pollDelay", default = 1))
+		self.migrationRetries = int(self.config.get("Qemu", "migrationRetries", default = 10))
+		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout", default = 60))
+		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout", default = 300))
+		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument", default = False))
+		self.statsInterval = float(self.config.get("Qemu", "statsInterval", default = 0))
+		reservedMem = self.config.get("Qemu", "reservedMem", default = 512)
+		reservedMem = int(reservedMem)
+
+		self.reservedMem = reservedMem
+
 		self.ifPrefix = "tashi"
 		self.controlledVMs = {}
 		self.usedPorts = []
@@ -106,15 +108,20 @@ class Qemu(VmControlInterface):
 		self.vncPortLock = threading.Lock()
 		self.consolePort = 10000
 		self.consolePortLock = threading.Lock()
-		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
+		maxParallelMigrations = self.config.get("Qemu", "maxParallelMigrations")
+		maxParallelMigrations = int(maxParallelMigrations)
+		if maxParallelMigrations < 1:
+			maxParallelMigrations = 1
+
+		self.migrationSemaphore = threading.Semaphore(maxParallelMigrations)
 		self.stats = {}
 
-		self.suspendHandler = self.__config("Qemu", "suspendHandler", default = "gzip")
-		self.resumeHandler = self.__config("Qemu", "resumeHandler", default = "zcat")
+		self.suspendHandler = self.config.get("Qemu", "suspendHandler", default = "gzip")
+		self.resumeHandler = self.config.get("Qemu", "resumeHandler", default = "zcat")
 
-		self.scratchVg = self.__config("Qemu", "scratchVg")
+		self.scratchVg = self.config.get("Qemu", "scratchVg")
 
-		self.scratchDir = self.__config("Qemu", "scratchDir", default = "/tmp")
+		self.scratchDir = self.config.get("Qemu", "scratchDir", default = "/tmp")
 
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -130,19 +137,6 @@ class Qemu(VmControlInterface):
 	class anonClass:
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
-
-	def __config(self, section, option, default = None):
-		# soft version of self.config.get. returns default value
-		# if not found in configuration
-		import ConfigParser
-
-		value = default
-		try:
-			value = self.config.get(section, option)
-		except ConfigParser.NoOptionError:
-			pass
-
-		return value
 
 	def __dereferenceLink(self, spec):
 		newspec = os.path.realpath(spec)

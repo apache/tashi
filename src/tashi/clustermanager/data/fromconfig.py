@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+#XXXstroucki: for compatibility with python 2.5
 from __future__ import with_statement
+
 import logging
 import threading
 import os

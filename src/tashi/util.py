@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+#XXXstroucki: for compatibility with python 2.5
+from __future__ import with_statement
+
 import ConfigParser
 #import cPickle
 import os
@@ -31,6 +34,7 @@ import functools
 
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
+from tashi.utils.timeout import *
 
 def broken(oldFunc):
 	"""Decorator that is used to mark a function as temporarily broken"""
@@ -163,6 +167,13 @@ def boolean(value):
 		return value
 	if (type(value) == types.IntType):
 		return (value != 0)
+
+	# See if it can be expressed as a string
+	try:
+		value = str(value)
+	except:
+		raise ValueError
+
 	lowercaseValue = value.lower()
 	if lowercaseValue in ['yes', 'true', '1']:
 		return True
@@ -270,6 +281,7 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 	return ns
 
 class Connection:
+
 	def __init__(self, host, port, authAndEncrypt=False, credentials=None):
 		self.host = host
 		self.port = port
@@ -312,11 +324,23 @@ class Connection:
 		if self.connection is None:
 			self.__connect()
 
-		remotefn = getattr(self.connection, name, None)
+		# XXXstroucki: Use 10 second timeout, ok?
+		# XXXstroucki: does this fn touch the network?
+		t = TimeoutThread(getattr, (self.connection, name, None))
+		threading.Thread(target=t.run).start()
+
+		try:
+			remotefn = t.wait(timeout=10)
+		except TimeoutException:
+			self.connection = None
+			raise
 
 		try:
 			if callable(remotefn):
-				returns = remotefn(*args, **kwargs)
+				# XXXstroucki: Use 10 second timeout, ok?
+				t = TimeoutThread(remotefn, args, kwargs)
+				threading.Thread(target=t.run).start()
+				returns = t.wait(timeout=10.0)
 
 			else:
 				raise TashiException({'msg':'%s not callable' % name})
