@@ -247,7 +247,14 @@ class NodeManagerService(object):
 	# qemu.py calls this in the matchSystemPids thread
 	# xenpv.py: i have no real idea why it is called there
 	def vmStateChange(self, vmId, old, cur):
-		instance = self.__getInstance(vmId)
+		try:
+			instance = self.__getInstance(vmId)
+		except TashiException, e:
+			if e.errno == Errors.NoSuchVmId:
+				self.log.warning("Asked to change state for unknown VM. Has it not completed starting yet?")
+				return False
+			else:
+				raise
 
 		if (instance.state == cur):
 			# Don't do anything if state is what it should be
