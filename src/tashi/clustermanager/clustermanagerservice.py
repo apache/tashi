@@ -65,7 +65,7 @@ class ClusterManagerService(object):
 		self.__initAccounting()
 		self.__initCluster()
 
-		threading.Thread(target=self.__monitorCluster).start()
+		threading.Thread(name="monitorCluster", target=self.__monitorCluster).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
