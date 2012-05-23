@@ -23,6 +23,7 @@ import time
 import logging.config
 
 from tashi.util import boolean, instantiateImplementation, getConfig, debugConsole
+from tashi.utils import Config
 import tashi
 
 from tashi.rpycservices import rpycservices
@@ -64,7 +65,8 @@ def main():
 	global log
 	
 	# setup configuration and logging
-	(config, configFiles) = getConfig(["ClusterManager"])
+	config = Config(["ClusterManager"])
+	configFiles = config.getFiles()
 	publisher = instantiateImplementation(config.get("ClusterManager", "publisher"), config)
 	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)
