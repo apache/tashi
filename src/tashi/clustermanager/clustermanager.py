@@ -22,8 +22,8 @@ import sys
 import time
 import logging.config
 
-from tashi.util import boolean, instantiateImplementation, getConfig, debugConsole
-from tashi.utils import Config
+from tashi.util import boolean, instantiateImplementation, debugConsole
+from tashi.utils.config import Config
 import tashi
 
 from tashi.rpycservices import rpycservices
