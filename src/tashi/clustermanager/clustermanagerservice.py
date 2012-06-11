@@ -636,7 +636,7 @@ class ClusterManagerService(object):
 		oldInstance.decayed = False
 
 		displayInstance = oldInstance
-		self.__stateTransition(displayInstance, None, instance.state)
+		displayInstance.state = instance.state
 		self.__ACCOUNT("CM VM UPDATE", instance=displayInstance)
 
 		if (instance.state == InstanceState.Exited):
