@@ -80,6 +80,9 @@ def startNodeManager():
 		users = {}
 		users[config.get('AllowedUsers', 'clusterManagerUser')] = config.get('AllowedUsers', 'clusterManagerPassword')
 		authenticator = TlsliteVdbAuthenticator.from_dict(users)
+
+		# XXXstroucki: ThreadedServer is liable to have exceptions
+		# occur within if an endpoint is lost.
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)

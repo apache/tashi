@@ -48,6 +48,9 @@ def startClusterManager(config):
 		users[config.get('AllowedUsers', 'nodeManagerUser')] = config.get('AllowedUsers', 'nodeManagerPassword')
 		users[config.get('AllowedUsers', 'agentUser')] = config.get('AllowedUsers', 'agentPassword')
 		authenticator = TlsliteVdbAuthenticator.from_dict(users)
+
+		# XXXstroucki ThreadedServer is liable to have exceptions
+		# occur within if an endpoint is lost.
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False)

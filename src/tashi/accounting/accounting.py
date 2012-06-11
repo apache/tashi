@@ -58,6 +58,8 @@ class Accounting(object):
 		if False:
 			pass
 		else:
+			# XXXstroucki: ThreadedServer is liable to have
+			# exceptions within if an endpoint is lost.
 			t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(self.config.get('AccountingService', 'port')), auto_register=False)
 
 		t.logger.setLevel(logging.ERROR)
