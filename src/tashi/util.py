@@ -262,7 +262,7 @@ def debugConsole(globalDict):
 		os._exit(0)
 
 	if (os.getenv("DEBUG", "0") == "1"):
-		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
+		threading.Thread(name="debugConsole", target=lambda: realDebugConsole(globalDict)).start()
 
 def stringPartition(s, field):
 	index = s.find(field)
@@ -324,10 +324,11 @@ class Connection:
 		if self.connection is None:
 			self.__connect()
 
+		threadname = "%s:%s" (self.host, self.port)
 		# XXXstroucki: Use 10 second timeout, ok?
 		# XXXstroucki: does this fn touch the network?
 		t = TimeoutThread(getattr, (self.connection, name, None))
-		threading.Thread(target=t.run).start()
+		threading.Thread(name=threadname, target=t.run).start()
 
 		try:
 			remotefn = t.wait(timeout=10)
@@ -339,7 +340,7 @@ class Connection:
 			if callable(remotefn):
 				# XXXstroucki: Use 10 second timeout, ok?
 				t = TimeoutThread(remotefn, args, kwargs)
-				threading.Thread(target=t.run).start()
+				threading.Thread(name=threadname, target=t.run).start()
 				returns = t.wait(timeout=10.0)
 
 			else:

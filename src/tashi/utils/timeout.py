@@ -53,7 +53,11 @@ class TimeoutThread:
 			raise TimeoutException("function %s timed out after %f seconds" % (str(self.function), timeout))
 
 	def run(self):
-		rval = self.function(*self.args, **self.kwargs)
+		try:
+			rval = self.function(*self.args, **self.kwargs)
+		except Exception, e:
+			rval = e
+
 		self.cv.acquire()
 		self.finished = True
 		self.rval	 = rval
