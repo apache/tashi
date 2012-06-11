@@ -642,18 +642,24 @@ class ClusterManagerService(object):
 		if (instance.state == InstanceState.Exited):
 			# determine why a VM has exited
 			hostname = self.data.getHost(oldInstance.hostId).name
+
 			if (oldInstance.state not in [InstanceState.ShuttingDown, InstanceState.Destroying, InstanceState.Suspending]):
 				self.log.warning('Unexpected exit on %s of instance %s (vmId %d)' % (hostname, oldInstance.name, oldInstance.vmId))
+
 			if (oldInstance.state == InstanceState.Suspending):
 				self.__stateTransition(oldInstance, InstanceState.Suspending, InstanceState.Suspended)
 				oldInstance.hostId = None
 				oldInstance.vmId = None
 				self.data.releaseInstance(oldInstance)
+
+			if (oldInstance.state == InstanceState.MigrateTrans):
+				# Just await update from target host
+				self.data.releaseInstance(oldInstance)
+
 			else:
 				del self.instanceLastContactTime[oldInstance.id]
-				self.log.worning("removing %s" % oldInstance)
 				self.data.removeInstance(oldInstance)
-				self.log.warning("done remove %s" % oldInstance)
+
 		else:
 			if (instance.state):
 				# XXXstroucki does this matter?

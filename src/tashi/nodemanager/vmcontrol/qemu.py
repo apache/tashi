@@ -162,14 +162,14 @@ class Qemu(VmControlInterface):
 		"""Will return a dict of instances by vmId to the caller"""
 		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
 
-	def __matchHostPids(self, controlledVMs):
+	def __matchHostPids(self):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
 
-		vmIds = controlledVMs.keys()
+		vmIds = self.controlledVMs.keys()
 		pids = self.__getHostPids()
 
 		for vmId in vmIds:
-			child = controlledVMs[vmId]
+			child = self.controlledVMs[vmId]
 			instance = child.instance
 			name = instance.name
 
@@ -180,9 +180,9 @@ class Qemu(VmControlInterface):
 				# remove info file
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
 
-				# XXXstroucki why not use self.controlledVMs
-				# argument, so why modify this fn's formal?
-				del controlledVMs[vmId]
+				# XXXstroucki python should handle
+				# locking here (?)
+				del self.controlledVMs[vmId]
 
 				# remove any stats (appropriate?)
 				try:
@@ -230,8 +230,11 @@ class Qemu(VmControlInterface):
 
 				# let the NM know
 				try:
-					if (not child.migratingOut):
-						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
+					# XXXstroucki: we don't want to treat
+					# the source VM of a migration exiting
+					# as an actual
+					# exit, but the NM should probably know.
+					self.nm.vmStateChange(vmId, None, InstanceState.Exited)
 				except Exception:
 					log.exception("vmStateChange failed for VM %s" % (name))
 			else:
@@ -290,7 +293,7 @@ class Qemu(VmControlInterface):
 		while True:
 			try:
 				time.sleep(self.POLL_DELAY)
-				self.__matchHostPids(self.controlledVMs)
+				self.__matchHostPids()
 			except:
 				log.exception("Exception in poolVMsLoop")
 	

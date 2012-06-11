@@ -78,8 +78,8 @@ class NodeManagerService(object):
 		self.id = self.cm.registerNodeManager(self.host, self.instances.values())
 
 		# start service threads
-		threading.Thread(target=self.__registerWithClusterManager).start()
-		threading.Thread(target=self.__statsThread).start()
+		threading.Thread(name="registerWithClusterManager", target=self.__registerWithClusterManager).start()
+		threading.Thread(name="statsThread", target=self.__statsThread).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
