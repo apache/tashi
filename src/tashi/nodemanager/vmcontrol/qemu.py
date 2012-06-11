@@ -221,7 +221,7 @@ class Qemu(VmControlInterface):
 				try:
 					if self.scratchVg is not None:
 						scratchName = "lv%s" % name
-						log.info("Removing any scratch for %s" % (scratchName))
+						log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove --quiet -f %s/%s" % (self.scratchVg, scratchName)
 						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
