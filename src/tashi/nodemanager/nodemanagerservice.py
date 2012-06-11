@@ -112,7 +112,10 @@ class NodeManagerService(object):
 					# XXXstroucki ValueError: need more than 1 value to unpack
 					# observed here. How?
 					value = self.notifyCM.pop(0)
-					(instanceId, newInst, old, success) = value
+					try:
+						(instanceId, newInst, old, success) = value
+					except:
+						self.log.exception("problem with value: %s" % value)
 					try:
 						self.cm.vmUpdate(instanceId, newInst, old)
 					except TashiException, e:
@@ -256,6 +259,7 @@ class NodeManagerService(object):
 			else:
 				raise
 
+		before = instance.state
 		if (instance.state == cur):
 			# Don't do anything if state is what it should be
 			return True
@@ -271,9 +275,18 @@ class NodeManagerService(object):
 
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
-		# send the state change up to the CM
-		self.notifyCM.append((instance.id, newInst, old, success))
-		self.__flushNotifyCM()
+
+		# if this instance was in MigrateTrans, and has exited
+		# then don't tell the CM; it is the source instance
+		# exiting, and the CM should have updated its information
+		# to the target instance's info.
+		# Otherwise, send the state change up to the CM
+
+		if before == InstanceState.MigrateTrans and cur == InstanceState.Exited:
+			pass
+		else:
+			self.notifyCM.append((instance.id, newInst, old, success))
+			self.__flushNotifyCM()
 
 		# cache change locally
 		self.instances[vmId] = instance
@@ -282,7 +295,6 @@ class NodeManagerService(object):
 			# At this point, the VMM will clean up,
 			# so forget about this instance
 			del self.instances[vmId]
-			return True
 
 		return True
 
@@ -358,7 +370,9 @@ class NodeManagerService(object):
 	# XXXstroucki migrate out?
 	def __migrateVmHelper(self, instance, target, transportCookie):
 		self.vmm.migrateVm(instance.vmId, target.name, transportCookie)
-		del self.instances[instance.vmId]
+		# removal from self.instances done by communication from
+		# VMM as part of above migrateVm function
+		return
 
 	# remote
 	# XXXstroucki migrate out?
@@ -367,7 +381,7 @@ class NodeManagerService(object):
 		self.__ACCOUNT("NM VM MIGRATE", instance=instance)
 		instance.state = InstanceState.MigrateTrans
 		self.instances[vmId] = instance
-		threading.Thread(target=self.__migrateVmHelper, args=(instance, target, transportCookie)).start()
+		threading.Thread(name="migrateVmHelper", target=self.__migrateVmHelper, args=(instance, target, transportCookie)).start()
 		return
 
 	# called by receiveVm as thread
@@ -380,15 +394,16 @@ class NodeManagerService(object):
 		self.instances[vmId] = instance
 		newInstance = Instance(d={'id':instance.id,'state':instance.state,'vmId':instance.vmId,'hostId':instance.hostId})
 		success = lambda: None
-		self.notifyCM.append((newInstance.id, newInstance, InstanceState.Running, success))
+		self.notifyCM.append((newInstance.id, newInstance, InstanceState.MigrateTrans, success))
 		self.__flushNotifyCM()
 
 	# remote
 	# XXXstroucki migrate in?
 	def receiveVm(self, instance, transportCookie):
 		instance.state = InstanceState.MigrateTrans
-		vmId = instance.vmId
-		self.instances[vmId] = instance
+		# XXXstroucki new vmId is not known yet until VM is received
+		#vmId = instance.vmId
+		#self.instances[vmId] = instance
 		self.__ACCOUNT("NM VM MIGRATE RECEIVE", instance=instance)
 		threading.Thread(target=self.__receiveVmHelper, args=(instance, transportCookie)).start()
 		return
