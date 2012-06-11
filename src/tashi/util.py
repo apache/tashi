@@ -324,7 +324,7 @@ class Connection:
 		if self.connection is None:
 			self.__connect()
 
-		threadname = "%s:%s" (self.host, self.port)
+		threadname = "%s:%s" % (self.host, self.port)
 		# XXXstroucki: Use 10 second timeout, ok?
 		# XXXstroucki: does this fn touch the network?
 		t = TimeoutThread(getattr, (self.connection, name, None))
