@@ -651,7 +651,9 @@ class ClusterManagerService(object):
 				self.data.releaseInstance(oldInstance)
 			else:
 				del self.instanceLastContactTime[oldInstance.id]
+				self.log.worning("removing %s" % oldInstance)
 				self.data.removeInstance(oldInstance)
+				self.log.warning("done remove %s" % oldInstance)
 		else:
 			if (instance.state):
 				# XXXstroucki does this matter?
