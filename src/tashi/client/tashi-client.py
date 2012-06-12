@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -49,6 +49,22 @@ def getUser():
 		if (users[user].name == userStr):
 			return users[user].id
 	raise ValueError("Unknown user %s" % (userStr))
+
+def checkHid(host):
+	userId = getUser()
+	hosts = client.getHosts()
+	hostId = None
+	try:
+		hostId = int(host)
+	except:
+		for h in hosts
+		if (h.name == host):
+			hostId = h.id
+	if (hostId is None):
+		raise ValueError("Unknown host %s" % (str(instance)))
+
+	# XXXstroucki permissions for host related stuff?
+	return hostId
 
 def checkIid(instance):
 	userId = getUser()
@@ -258,6 +274,7 @@ argLists = {
 'getImages': [],
 'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
+'setHostState': [('host', checkHid, lambda: requiredArg('host'), True), ('state', str, lambda: requiredArg('state'), True)],
 'getUsers': [],
 'getNetworks': [],
 'getInstances': [],
@@ -301,6 +318,7 @@ description = {
 'unpauseVm': 'Unpauses a paused VM',
 'getSlots': 'Get a count of how many VMs could be started in the cluster',
 'getHosts': 'Gets a list of hosts running Node Managers',
+'setHostState': 'Set the state of a host, eg. Normal or Drained',
 'getUsers': 'Gets a list of users',
 'getNetworks': 'Gets a list of available networks for VMs to be placed on',
 'getInstances': 'Gets a list of all VMs in the cluster',
@@ -327,6 +345,7 @@ examples = {
 'unpauseVm': ['--instance 12345', '--instance foobar'],
 'getSlots': ['--cores 1 --memory 128'],
 'getHosts': [''],
+'setHostState': ['--host fnord --state Drained'],
 'getUsers': [''],
 'getNetworks': [''],
 'getInstances': [''],

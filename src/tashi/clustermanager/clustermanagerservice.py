@@ -21,7 +21,7 @@ import time
 
 from tashi.rpycservices import rpycservices	     
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, Instance, HostState, TashiException
-from tashi import boolean, ConnectionManager, vmStates, version, scrubString
+from tashi import boolean, ConnectionManager, vmStates, hostStates, version, scrubString
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -565,6 +565,30 @@ class ClusterManagerService(object):
 		return self.data.getHosts().values()
 	
 	# extern
+	def setHostState(self, hostId, state):
+		state = state.lower()
+		hostState = None
+		if state == "normal":
+			hostState = HostState.Normal
+		if state == "drained":
+			hostState = HostState.Drained
+
+		if hostState is None:
+			return "%s is not a valid host state" % state
+		else:
+			hostList = [h for h in self.data.getHosts().itervalues() if h.id == hostId]                                                       
+			if (len(hostList) != 1):
+				raise TashiException(d={'errno':Errors.NoSuchHost, 'msg':'A host with name %s is not identifiable' % (host.name)})
+			host.id = hostList[0].id
+		host = self.data.acquireHost(host.id)
+		try:
+			host.state = hostState
+		finally:
+			self.data.releaseHost(host)
+
+		return "Host state set to %s." % hostStates[hostState]
+
+	# extern
 	def getNetworks(self):
 		networks = self.data.getNetworks()
 		for network in networks:
@@ -572,7 +596,6 @@ class ClusterManagerService(object):
 				setattr(networks[network], "default", True)
 
 		return networks.values()
-
 
 	# extern
 	def getUsers(self):
