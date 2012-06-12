@@ -575,12 +575,8 @@ class ClusterManagerService(object):
 
 		if hostState is None:
 			return "%s is not a valid host state" % state
-		else:
-			hostList = [h for h in self.data.getHosts().itervalues() if h.id == hostId]                                                       
-			if (len(hostList) != 1):
-				raise TashiException(d={'errno':Errors.NoSuchHost, 'msg':'A host with name %s is not identifiable' % (host.name)})
-			host.id = hostList[0].id
-		host = self.data.acquireHost(host.id)
+
+		host = self.data.acquireHost(hostId)
 		try:
 			host.state = hostState
 		finally:

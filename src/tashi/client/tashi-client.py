@@ -57,9 +57,9 @@ def checkHid(host):
 	try:
 		hostId = int(host)
 	except:
-		for h in hosts
-		if (h.name == host):
-			hostId = h.id
+		for h in hosts:
+			if (h.name == host):
+				hostId = h.id
 	if (hostId is None):
 		raise ValueError("Unknown host %s" % (str(instance)))
 
@@ -301,6 +301,7 @@ convertArgs = {
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
+'setHostState' : '[host, state]',
 }
 
 # Descriptions
