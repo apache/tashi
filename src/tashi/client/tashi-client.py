@@ -443,16 +443,16 @@ def makeTable(_list, keys=None):
 		stdout.close()
 	except:
 		pass
-	for obj in list:
+	for obj in _list:
 		transformState(obj)
 	if (keys == None):
-		keys = genKeys(list)
+		keys = genKeys(_list)
 	for (show, k) in show_hide:
 		if (show):
 			if (k != "all"):
 				keys.append(k)
 			else:
-				keys = genKeys(list)
+				keys = genKeys(_list)
 		else:
 			if (k in keys):
 				keys.remove(k)
@@ -461,7 +461,7 @@ def makeTable(_list, keys=None):
 	maxWidth = {}
 	for k in keys:
 		maxWidth[k] = len(k)
-	for row in list:
+	for row in _list:
 		for k in keys:
 			if (k in row.__dict__):
 				maxWidth[k] = max(maxWidth[k], len(str(row.__dict__[k])))
@@ -494,8 +494,8 @@ def makeTable(_list, keys=None):
 			return 1
 		else:
 			return 0
-	list.sort(cmp=sortFunction)
-	for row in list:
+	_list.sort(cmp=sortFunction)
+	for row in _list:
 		line = ""
 		for k in keys:
 			row.__dict__[k] = row.__dict__.get(k, "")

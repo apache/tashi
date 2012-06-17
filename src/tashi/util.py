@@ -184,15 +184,14 @@ def boolean(value):
 def instantiateImplementation(className, *args):
 	"""Create an instance of an object with the given class name and list 
 	   of args to __init__"""
-	obj = None
 	if (className.rfind(".") != -1):
 		package = className[:className.rfind(".")]
 		cmd = "import %s\n" % (package)
 	else:
 		cmd = ""
-	cmd += "obj = %s(*args)\n" % (className)
+	cmd += "_obj = %s(*args)\n" % (className)
 	exec cmd in locals()
-	return obj
+	return _obj
 
 def convertExceptions(oldFunc):
 	"""This converts any exception type into a TashiException so that 
