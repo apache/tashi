@@ -309,7 +309,7 @@ class ClusterManagerService(object):
 					continue
 
 				# update the information we have on the vm
-				before = instance.state
+				#before = instance.state
 				rv = self.__vmUpdate(instance, newInstance, None)
 				if (rv == "release"):
 					self.data.releaseInstance(instance)

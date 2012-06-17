@@ -191,6 +191,7 @@ def instantiateImplementation(className, *args):
 		cmd = ""
 	cmd += "_obj = %s(*args)\n" % (className)
 	exec cmd in locals()
+	# XXXstroucki: this is correct, even though pydev complains
 	return _obj
 
 def convertExceptions(oldFunc):

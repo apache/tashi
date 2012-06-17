@@ -150,9 +150,8 @@ class Qemu(VmControlInterface):
 
 		for f in os.listdir("/proc"):
 			try:
-				# XXXstroucki: pydev complains about bin being built-in
-				bin = os.readlink("/proc/%s/exe" % (f))
-				if (bin.find(real_bin) != -1):
+				binary = os.readlink("/proc/%s/exe" % (f))
+				if (binary.find(real_bin) != -1):
 					pids.append(int(f))
 			except Exception:
 				pass

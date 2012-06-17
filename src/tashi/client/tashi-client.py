@@ -63,7 +63,7 @@ def checkHid(host):
 			if (h.name == host):
 				hostId = h.id
 	if (hostId is None):
-		raise ValueError("Unknown host %s" % (str(instance)))
+		raise ValueError("Unknown host %s" % (str(host)))
 
 	# XXXstroucki permissions for host related stuff?
 	return hostId

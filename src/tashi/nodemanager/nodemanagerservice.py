@@ -22,8 +22,6 @@ import time
 
 from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
 from tashi import boolean, vmStates, ConnectionManager
-import tashi
-
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
