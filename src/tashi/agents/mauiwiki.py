@@ -22,9 +22,11 @@
 # This code is unmaintained.
 
 # XXXstroucki former file mauipacket.py
-import subprocess
+#import subprocess
 import time
-import tashi.utils.pseudoDes
+import SocketServer
+from tashi.utils import pseudoDes
+from tashi.rpycservices.rpyctypes import HostState, InstanceState
 
 class MauiPacket:
 	def __init__(self, key=0):
@@ -91,7 +93,7 @@ class MauiPacket:
 			self.auth = auth
 		if key != None:
 			self.key = key
-		self.timstamp=timestamp
+		self.timestamp=timestamp
 		self.fixup()
 	def fixup(self):
 		datastring = "TS=%i AUTH=%s DT=%s"%(self.timestamp, self.auth, (' '.join(self.data)))
@@ -124,19 +126,12 @@ data:
 		return s
 
 # XXXstroucki original file mauiwiki.py
-import time
-import hashlib
-import sys
-import subprocess
-import socket, SocketServer
-from socket import gethostname
-import os
 import threading
 import logging.config
 
 from tashi.parallel import synchronizedmethod
 from tashi.services.ttypes import *
-from tashi.util import getConfig, createClient, instantiateImplementation, boolean
+from tashi.util import getConfig, createClient, instantiateImplementation
 #from tashi.agents.mauipacket import MauiPacket
 import tashi.util
 
@@ -164,24 +159,24 @@ class InstanceHooks():
 	def postDestroy(self, inst):
 		for hook in self.hooks:
 			hook.postDestroy(inst)
-	def idToInst(self, id):
+	def idToInst(self, _id):
 		instances = self.client.getInstances()
 		print 'instances ', instances
-		insts = [i for i in instances if str(i.id)==str(id)]
+		insts = [i for i in instances if str(i.id)==str(_id)]
 		if len(insts) == 0:
-			raise "No instance with ID %s"%id
+			raise "No instance with ID %s"%_id
 		if len(insts) > 1:
-			raise "Multiple instances with ID %s"%id
+			raise "Multiple instances with ID %s"%_id
 		inst = insts[0]
 		return inst
-	def destroyById(self, id):
-		inst = self.idToInst(id)
-		self.client.destroyVm(int(id))
+	def destroyById(self, _id):
+		inst = self.idToInst(_id)
+		self.client.destroyVm(int(_id))
 		self.postDestroy(inst)
-	def activateById(self, id, host):
-		inst = self.idToInst(id)
+	def activateById(self, _id, host):
+		inst = self.idToInst(_id)
 		self.preCreate(inst)
-		self.client.activateVm(int(id), host)
+		self.client.activateVm(int(_id), host)
 
 def cmplists(a, b):
 	for i in range(len(a)):
@@ -408,8 +403,8 @@ class TashiConnection(threading.Thread):
 					if j.updateTime >= updatetime and j.id in joblist]
 		jl = {}
 		for job in jobs:
-			id = "%s.%i"%(job.name, job.id)
-			jl[id] = {'STATE':self.wikiInstanceState(job),
+			_id = "%s.%i"%(job.name, job.id)
+			jl[_id] = {'STATE':self.wikiInstanceState(job),
 			          'UNAME':self.users[job.userId].name,
 			          'GNAME':self.users[job.userId].name,
 			          'UPDATETIME':int(job.updateTime),
@@ -420,14 +415,14 @@ class TashiConnection(threading.Thread):
 			          'RMEM':str(job.memory),
 			          'WCLIMIT':str(self.defaultJobTime)}
 			if job.hostId != None:
-				jl[id]['TASKLIST'] = self.hosts[job.hostId].name
+				jl[_id]['TASKLIST'] = self.hosts[job.hostId].name
 		return jl
 	@synchronizedmethod
-	def activateById(self, id, host):
-		if not self.instances.has_key(id):
+	def activateById(self, _id, host):
+		if not self.instances.has_key(_id):
 			raise "no such instance"
-		self.ihooks.activateById(id, host)
-		self.instances[id].state=InstanceState.Activating
+		self.ihooks.activateById(_id, host)
+		self.instances[_id].state=InstanceState.Activating
 
 class MauiListener(SocketServer.StreamRequestHandler):
 	def setup(self):

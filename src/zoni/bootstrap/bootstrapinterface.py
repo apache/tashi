@@ -18,10 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
-import optparse
-
 
 class BootStrapInterface(object):
 	"""  Interface description for booting

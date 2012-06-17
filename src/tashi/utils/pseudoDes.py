@@ -27,7 +27,7 @@ def crc(short, char):
 	short = short & 0xffff
 	char = char & 0xff
 	value = short ^ (char << 8)
-	for i in range(0, 8):
+	for __i in range(0, 8):
 		if value & 0x8000:
 			value = (value << 1) ^ 4129
 		else:

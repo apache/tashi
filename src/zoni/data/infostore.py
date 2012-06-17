@@ -18,10 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
-import optparse
-
 
 class InfoStore (object):
 	"""  Interface description for query system resources

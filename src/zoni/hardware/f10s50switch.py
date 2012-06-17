@@ -26,15 +26,13 @@ import datetime
 import time
 import thread
 import string
-import getpass
 import socket
 import tempfile
 import logging
 
 #import zoni
-from zoni.data.resourcequerysql import *
-from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
+from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.agents.dhcpdns import DhcpDns
 
 
@@ -49,7 +47,7 @@ class HwF10S50Switch(HwSwitchInterface):
 		self.log = logging.getLogger(os.path.basename(__file__))
 
 
- 	def setVerbose(self, verbose):
+	def setVerbose(self, verbose):
 		self.verbose = verbose
 
 	def __login(self):
@@ -138,7 +136,7 @@ class HwF10S50Switch(HwSwitchInterface):
 		child.expect(["conf-if", pexpect.EOF])
 		child.sendline("switchport")
 		child.sendline("exit")
-		child.sendline("interface vlan " + vlan")
+		child.sendline("interface vlan %s" % vlan)
 		child.expect(["conf-if", pexpect.EOF])
 		cmd = "tagged port-channel 1"
 		child.sendline(cmd)
@@ -214,10 +212,10 @@ class HwF10S50Switch(HwSwitchInterface):
 				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				
-			except EOF:
+			except pexpect.EOF:
 				print "EOF", i
 				#child.sendline()
-			except TIMEOUT:
+			except pexpect.TIMEOUT:
 				print "TIMEOUT", i
 		#child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 
@@ -237,7 +235,7 @@ class HwF10S50Switch(HwSwitchInterface):
 		child = self.__login()
 		child.logfile = sys.stdout
 		child.sendline('config')
-		cmd = "interface vlan " + vlan)
+		cmd = "interface vlan %s" % (vlan)
 		child.sendline(cmd)
 		i=child.expect(['conf-if', pexpect.EOF, pexpect.TIMEOUT])
 		if i > 0:
@@ -270,7 +268,7 @@ class HwF10S50Switch(HwSwitchInterface):
 		child.logfile = sys.stdout
 		cmd = "show interfaces g 0/" + str(self.host['hw_port'])
 		child.sendline(cmd)
-		i = child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
+		__i = child.expect(['#', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()
 
 	def interactiveSwitchConfig(self):
@@ -374,12 +372,12 @@ class HwF10S50Switch(HwSwitchInterface):
 
 		user = "public"
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,1,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_model'] = str(varBinds[0][1])
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,3,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_make'] = str(varBinds[0][1])

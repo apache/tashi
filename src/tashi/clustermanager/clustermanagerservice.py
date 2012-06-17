@@ -19,7 +19,6 @@ import logging
 import threading
 import time
 
-from tashi.rpycservices import rpycservices	     
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, Instance, HostState, TashiException
 from tashi import boolean, ConnectionManager, vmStates, hostStates, version, scrubString
 
@@ -498,7 +497,7 @@ class ClusterManagerService(object):
 
 		try:
 			# Notify the target
-			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
+			__vmid = self.proxy[targetHost.name].receiveVm(instance, cookie)
 		except Exception:
 			self.log.exception('receiveVm failed')
 			raise

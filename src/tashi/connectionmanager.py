@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from tashi.rpycservices import rpycservices
 from tashi import Connection
 #from tashi.rpycservices.rpyctypes import *
 

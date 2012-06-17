@@ -25,11 +25,10 @@ import os
 import signal
 #import struct
 import sys
-import threading
+#import threading
 import time
 import traceback
 import types
-import getpass
 import functools
 
 from tashi.rpycservices import rpycservices
@@ -90,14 +89,14 @@ def timed(oldFunc):
 		return res
 	return newFunc
 
-def editAndContinue(file, mod, name):
+def editAndContinue(filespec, mod, name):
 	def wrapper(oldFunc):
 		persist = {}
 		persist['lastMod'] = time.time()
 		persist['oldFunc'] = oldFunc
 		persist['func'] = oldFunc
 		def newFunc(*args, **kw):
-			modTime = os.stat(file)[8]
+			modTime = os.stat(filespec)[8]
 			if (modTime > persist['lastMod']):
 				persist['lastMod'] = modTime
 				space = {}
@@ -185,6 +184,7 @@ def boolean(value):
 def instantiateImplementation(className, *args):
 	"""Create an instance of an object with the given class name and list 
 	   of args to __init__"""
+	obj = None
 	if (className.rfind(".") != -1):
 		package = className[:className.rfind(".")]
 		cmd = "import %s\n" % (package)
@@ -233,13 +233,12 @@ def __getShellFn():
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
-		import os
 		try :
 			import atexit
 			(calltype, shellfn) = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
-				(stdin, stdout) = os.popen2("reset")
+				(__stdin, stdout) = os.popen2("reset")
 				stdout.read()
 			atexit.register(resetConsole)
 			if calltype == 1:
@@ -250,12 +249,12 @@ def debugConsole(globalDict):
 				dbgshell(user_ns=globalDict)
 		except Exception, e:
 			CONSOLE_TEXT=">>> "
-			input = " " 
-			while (input != ""):
+			inputline = " " 
+			while (inputline != ""):
 				sys.stdout.write(CONSOLE_TEXT)
-				input = sys.stdin.readline()
+				inputline = sys.stdin.readline()
 				try:
-					exec(input) in globalDict
+					exec(inputline) in globalDict
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
 

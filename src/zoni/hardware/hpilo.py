@@ -19,7 +19,6 @@
 #
 
 import sys
-import os 
 import pexpect
 import time
 
@@ -40,8 +39,6 @@ def log(f):
 		return res
 	myF.__name__ = f.__name__
 	return myF
-
-import time
 
 def timeF(f):
 	def myF(*args, **kw):

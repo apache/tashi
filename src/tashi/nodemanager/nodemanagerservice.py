@@ -20,7 +20,6 @@ import socket
 import threading
 import time
 
-from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
 from tashi import boolean, vmStates, ConnectionManager
 import tashi
@@ -102,7 +101,6 @@ class NodeManagerService(object):
 	# send data to CM
 	# XXXstroucki adapt this for accounting?
 	def __flushNotifyCM(self):
-		start = time.time()
 		# send data to CM, adding message to buffer if
 		# it fails
 		try:
@@ -209,14 +207,16 @@ class NodeManagerService(object):
 						instance = self.instances.get(vmId, None)
 						if (not instance):
 							continue
-						id = instance.id
+						_id = instance.id
 						stats = self.vmm.getStats(vmId)
 						for stat in stats:
-							publishList.append({"vm_%d_%s" % (id, stat):stats[stat]})
+							publishList.append({"vm_%d_%s" % (_id, stat):stats[stat]})
 					except:
 						self.log.exception('statsThread threw an exception')
 				if (len(publishList) > 0):
-					tashi.publisher.publishList(publishList)
+					# XXXstroucki: no publisher currently
+					pass
+					#tashi.publisher.publishList(publishList)
 			except:
 				self.log.exception('statsThread threw an exception')
 			time.sleep(self.statsInterval)
@@ -224,7 +224,8 @@ class NodeManagerService(object):
 	def __registerHost(self):
 		hostname = socket.gethostname()
 		# populate some defaults
-		# XXXstroucki: I think it's better if the nodemanager fills these in properly when registering with the clustermanager
+		# XXXstroucki: I think it's better if the nodemanager fills these in
+		# properly when registering with the clustermanager
 		memory = 0
 		cores = 0
 		version = "empty"

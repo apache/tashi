@@ -20,10 +20,8 @@
 
 import os 
 import sys
-import string
 try:
 	import MySQLdb
-	import traceback
 	import optparse
 	import getpass
 except ImportError, e:
@@ -38,8 +36,8 @@ sys.path.append(a)
 a = os.path.join("../../..")
 sys.path.append(a)
 
-from zoni.version import *
-from zoni.extra.util import *
+from zoni.version import version, revision
+from zoni.extra.util import getConfig
 
 
 def main():
@@ -53,7 +51,7 @@ def main():
 	parser.add_option("-u", "--userName", "--username", dest="userName", help="Mysql username")
 	parser.add_option("-p", "--password", dest="password", help="Admin mysql password")
 	#parser.add_option("-v", "--verbose", dest="verbosity", help="Be verbose", action="store_true", default=False)
-	(options, args) = parser.parse_args()
+	(options, __args) = parser.parse_args()
 
 	if not options.userName:
 		parser.print_help()
@@ -63,7 +61,7 @@ def main():
 	if not options.password:
 		password = getpass.getpass()
 
-	(configs, configFiles) = getConfig()
+	(configs, __configFiles) = getConfig()
 
 	CreateZoniDb(configs, options.userName, password)
 
@@ -174,7 +172,7 @@ def createTables(conn):
 	sys.stdout.write("    Creating sysdomainmembermap...")
 	execQuery(conn, "CREATE TABLE IF NOT EXISTS `sysdomainmembermap` (`sys_id` int(11) unsigned NOT NULL, `domain_id` int(11) NOT NULL)")
 	sys.stdout.write("Success\n")
- 	#  Create allocationinfo
+	#  Create allocationinfo
 	sys.stdout.write("    Creating allocationinfo...")
 	execQuery(conn, "CREATE TABLE IF NOT EXISTS `allocationinfo` ( `allocation_id` int(11) unsigned NOT NULL auto_increment, `sys_id` int(11) unsigned NOT NULL, `reservation_id` int(11) unsigned NOT NULL, `pool_id` int(11) unsigned NULL, `hostname` varchar(64) default NULL, `domain_id` int(11) unsigned NOT NULL, `notes` tinytext, `expire_time` timestamp default 0 NOT NULL, PRIMARY KEY  (`allocation_id`)) ENGINE=INNODB")
 	sys.stdout.write("Success\n")
@@ -224,10 +222,10 @@ def createRegistration(conn, config):
 	if checkVal:
 		sys.stdout.write("    Kernel already exists in DB...\n")
 		#  Get the kernel_id
-		kernelId = str(checkVal[1][0][0])
+		#kernelId = str(checkVal[1][0][0])
 	else:
-		r = execQuery(conn, "INSERT into `kernelinfo` (kernel_name, kernel_release, kernel_arch) values ('linux-2.6.24-19-server', '2.6.24-19-server', 'x86_64' )")
-		kernelId = str(r.lastrowid)
+		__r = execQuery(conn, "INSERT into `kernelinfo` (kernel_name, kernel_release, kernel_arch) values ('linux-2.6.24-19-server', '2.6.24-19-server', 'x86_64' )")
+		#kernelId = str(r.lastrowid)
 		sys.stdout.write("    Success\n")
 
 	#  Initrd
@@ -325,7 +323,7 @@ def addInitialConfig(conn, config):
 	if checkVal:
 		sys.stdout.write("Default Domain (ZoniHome) already linked to vlan " + config['zoniHomeDomain'] + "...\n")
 		#  Get the domainId 
-		valId = str(checkVal[1][0][0])
+		#valId = str(checkVal[1][0][0])
 	else:
 		r = execQuery(conn, "INSERT into `domainmembermap` (domain_id, vlan_id) values (" + domainId + ", " + vlanId + ")")
 		domainId = str(r.lastrowid)
@@ -358,7 +356,7 @@ def addInitialConfig(conn, config):
 	if checkVal:
 		sys.stdout.write("Default pool (ZoniHome) already exists...\n")
 		#  Get the domainId 
-		poolId = str(checkVal[1][0][0])
+		#poolId = str(checkVal[1][0][0])
 	else:
 		r = execQuery(conn, "INSERT into `poolmap` (pool_id, vlan_id) values (" + zoniPoolId + ", " + vlanId + ")")
 		domainId = str(r.lastrowid)
@@ -370,7 +368,7 @@ def addInitialConfig(conn, config):
 		sys.stdout.write("Default pool (ZoniHome) already exists...\n")
 		#  XXX probably should delete first then add, do it later
 		#  Get the domainId 
-		poolId = str(checkVal[1][0][0])
+		#poolId = str(checkVal[1][0][0])
 	else:
 		r = execQuery(conn, "INSERT into `poolmap` (pool_id, vlan_id) values (" + zoniIpmiId + ", " + vlanId + ")")
 		domainId = str(r.lastrowid)

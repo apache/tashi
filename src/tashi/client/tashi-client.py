@@ -21,8 +21,10 @@ import os.path
 import random
 import sys
 import types
-from tashi.rpycservices.rpyctypes import *
-from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
+from tashi.rpycservices.rpyctypes import NetworkConfiguration,\
+	DiskConfiguration, HostState, Instance, Host, TashiException
+from tashi.utils.config import Config
+from tashi import vmStates, hostStates, boolean, stringPartition, createClient
 
 users = {}
 networks = {}
@@ -116,7 +118,7 @@ def parseDisks(arg):
 		disks = []
 		for strDisk in strDisks:
 			strDisk = strDisk.strip()
-			(l, s, r) = stringPartition(strDisk, ":")
+			(l, __s, r) = stringPartition(strDisk, ":")
 			if (r == ""):
 				r = "False"
 			r = boolean(r)
@@ -132,12 +134,12 @@ def parseNics(arg):
 		nics = []
 		for strNic in strNics:
 			strNic = strNic.strip()
-			(l, s, r) = stringPartition(strNic, ":")
+			(l, __s, r) = stringPartition(strNic, ":")
 			n = l
 			if (n == ''):
 				n = getDefaultNetwork()
 			n = int(n)
-			(l, s, r) = stringPartition(r, ":")
+			(l, __s, r) = stringPartition(r, ":")
 			ip = l
 			if (ip == ''):
 				ip = None
@@ -156,7 +158,7 @@ def parseHints(arg):
 		hints = {}
 		for strHint in strHints:
 			strHint = strHint.strip()
-			(l, s, r) = stringPartition(strHint, "=")
+			(l, __s, r) = stringPartition(strHint, "=")
 			hints[l] = r
 		return hints
 	except:
@@ -420,9 +422,9 @@ def transformState(obj):
 		except:
 			obj.state = 'Unknown'
 
-def genKeys(list):
+def genKeys(_list):
 	keys = {}
-	for row in list:
+	for row in _list:
 		for item in row.__dict__.keys():
 			keys[item] = item
 	if ('id' in keys):
@@ -432,12 +434,12 @@ def genKeys(list):
 		keys = keys.values()
 	return keys
 
-def makeTable(list, keys=None):
-	(consoleWidth, consoleHeight) = (9999, 9999)
+def makeTable(_list, keys=None):
+	(consoleWidth, __consoleHeight) = (9999, 9999)
 	try:
 # XXXpipe: get number of rows and column on current window
 		stdout = os.popen("stty size")
-		r = stdout.read()
+		__r = stdout.read()
 		stdout.close()
 	except:
 		pass
@@ -559,7 +561,7 @@ def main():
 	if (len(sys.argv) < 2):
 		usage()
 	function = matchFunction(sys.argv[1])
-	(config, configFiles) = getConfig(["Client"])
+	config = Config(["Client"])
 
 	# build a structure of possible arguments
 	possibleArgs = {}

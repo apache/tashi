@@ -34,7 +34,9 @@ class MessagingLogHandler(logging.Handler):
 		try:
 			key = "log_%s_%d_%d" % (self.name, self.msgIndex, int(time.time()*1000))
 			val = self.format(record)
-			tashi.publisher.publish({key:val})
+			#XXXstroucki publisher does not exist
+			(_,_) = (key,val)
+			#tashi.publisher.publish({key:val})
 			self.msgIndex = self.msgIndex + 1
 		except Exception, e:
 			print e

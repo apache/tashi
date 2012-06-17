@@ -18,9 +18,7 @@
 # under the License.    
 
 import os
-import time
 import sys
-import signal
 import logging.config
 
 from tashi.rpycservices import rpycservices
@@ -28,7 +26,7 @@ from rpyc.utils.server import ThreadedServer
 #from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
 #from tashi.rpycservices.rpyctypes import *
-from tashi.util import createClient, instantiateImplementation, boolean, debugConsole
+from tashi.util import createClient, instantiateImplementation, debugConsole
 from tashi.utils.config import Config
 
 import tashi
@@ -47,13 +45,14 @@ class Accounting(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
+					self.hooks.append(instantiateImplementation(value, self.config, self.cm, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
 					
 	def initAccountingServer(self):
 		service = instantiateImplementation(self.config.get("Accounting", "service"), self.config)
 
+		#XXXstroucki: disabled authAndEncrypt for now
 		#if boolean(self.config.get("Security", "authAndEncrypt")):
 		if False:
 			pass

@@ -50,12 +50,12 @@ def controlConsole(child, port):
 			output = child.monitorFd
 			#print "listen"
 			select.select([ls], [], [])
-			(s, clientAddr) = listenSocket.accept()
+			(s, __clientAddr) = listenSocket.accept()
 			while s:
 				if (output != -1):
-					(rl, wl, el) = select.select([s, output], [], [])
+					(rl, __wl, __el) = select.select([s, output], [], [])
 				else:
-					(rl, wl, el) = select.select([s], [], [])
+					(rl, __wl, __el) = select.select([s], [], [])
 				if (len(rl) > 0):
 					if (rl[0] == s):
 						#print "from s"
@@ -150,6 +150,7 @@ class Qemu(VmControlInterface):
 
 		for f in os.listdir("/proc"):
 			try:
+				# XXXstroucki: pydev complains about bin being built-in
 				bin = os.readlink("/proc/%s/exe" % (f))
 				if (bin.find(real_bin) != -1):
 					pids.append(int(f))
@@ -223,7 +224,7 @@ class Qemu(VmControlInterface):
 						scratchName = "lv%s" % name
 						log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove --quiet -f %s/%s" % (self.scratchVg, scratchName)
-						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
+						__result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
 					log.warning("Problem cleaning scratch volumes")
 					pass
@@ -314,7 +315,7 @@ class Qemu(VmControlInterface):
 		monitorFd = child.monitorFd
 		buf = ""
 		try:
-			(rlist, wlist, xlist) = select.select([monitorFd], [], [], 0.0)
+			(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], 0.0)
 			while (len(rlist) > 0):
 				c = os.read(monitorFd, 1)
 				if (c == ""):
@@ -322,7 +323,7 @@ class Qemu(VmControlInterface):
 					child.errorBit = True
 					raise RuntimeError
 				buf = buf + c
-				(rlist, wlist, xlist) = select.select([monitorFd], [], [], 0.0)
+				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], 0.0)
 		finally:
 			child.monitorHistory.append(buf)
 		return buf
@@ -337,7 +338,7 @@ class Qemu(VmControlInterface):
 			while (buf[-(len(needle)):] != needle):
 				#print "[BUF]: %s" % (buf)
 				#print "[NEE]: %s" % (needle)
-				(rlist, wlist, xlist) = select.select([monitorFd], [], [], timeout)
+				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], timeout)
 				if (len(rlist) == 0):
 					log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
@@ -487,7 +488,7 @@ class Qemu(VmControlInterface):
 				# XXXstroucki check for capacity
 				cmd = "/sbin/lvcreate --quiet -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
 				# XXXstroucki check result
-				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				__result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
 
 				thisDiskList = [ "file=/dev/%s/%s" % (self.scratchVg, scratchName) ]
@@ -710,7 +711,6 @@ class Qemu(VmControlInterface):
 		return vmId
 
 	def __checkPortListening(self, port):
-		lc = 0
 		# XXXpipe: find whether something is listening yet on the port
 		(stdin, stdout) = os.popen2("netstat -ln | grep 0.0.0.0:%d | wc -l" % (port))
 		stdin.close()
@@ -766,7 +766,9 @@ class Qemu(VmControlInterface):
 		try:
 			child = self.__getChildFromPid(vmId)
 		except:
-			log.error("Failed to get child info; transportCookie = %s; hostname = %s" % (str(cPickle.loads(transportCookie)), socket.hostname()))
+			# XXXstroucki: Does hostname contain the peer hostname?
+			log.error("Failed to get child info; transportCookie = %s; hostname = %s" %
+					(str(cPickle.loads(transportCookie)), _hostname))
 			raise
 		try:
 			self.__getPtyInfo(child, True)
@@ -936,10 +938,10 @@ class Qemu(VmControlInterface):
 		if (child):
 			res = self.__enterCommand(child, "info blockstats")
 			for l in res.split("\n"):
-				(device, sep, data) = stringPartition(l, ": ")
+				(device, __sep, data) = stringPartition(l, ": ")
 				if (data != ""):
 					for field in data.split(" "):
-						(label, sep, val) = stringPartition(field, "=")
+						(label, __sep, val) = stringPartition(field, "=")
 						if (val != ""):
 							self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
 							self.stats[vmId]['%s_%s' % (device, label)] = int(val)
@@ -964,7 +966,7 @@ class Qemu(VmControlInterface):
 				f.close()
 				for l in netData:
 					if (l.find(self.ifPrefix) != -1):
-						(dev, sep, ld) = stringPartition(l, ":")
+						(dev, __sep, ld) = stringPartition(l, ":")
 						dev = dev.strip()
 						ws = ld.split()
 						recvBytes = float(ws[0])

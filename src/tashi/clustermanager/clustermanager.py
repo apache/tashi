@@ -19,7 +19,6 @@
 
 import os
 import sys
-import time
 import logging.config
 
 from tashi.util import boolean, instantiateImplementation, debugConsole

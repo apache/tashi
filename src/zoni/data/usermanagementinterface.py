@@ -18,9 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
-
 
 class UserManagementInterface(object):
 	"""  Interface description for user management

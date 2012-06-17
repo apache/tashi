@@ -18,9 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
-
 
 class SystemManagementInterface(object):
 	"""  Interface description for hardware management controllers 

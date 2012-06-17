@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# XXXstroucki: shouldn't this be tashitypes.py instead?
+
 class Errors(object):
 	ConvertedException = 1
 	NoSuchInstanceId = 2

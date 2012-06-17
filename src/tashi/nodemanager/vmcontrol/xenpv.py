@@ -15,37 +15,35 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-import os
 import os.path
 import cPickle
-import subprocess		# FIXME: should switch os.system to this
+import subprocess
 import time 
 import threading
 import logging
 import socket
 
 from vmcontrolinterface import VmControlInterface
-from tashi.rpycservices.rpyctypes import Errors, InstanceState, TashiException
+from tashi.rpycservices.rpyctypes import InstanceState
 from tashi.rpycservices.rpyctypes import Instance, Host
-from tashi import boolean, convertExceptions, ConnectionManager, version
+from tashi import version
 from tashi.util import broken
 
-import tashi.parallel
-from tashi.parallel import synchronized, synchronizedmethod
+from tashi.parallel import synchronizedmethod
 
 log = logging.getLogger(__file__)
 
 # FIXME: these should throw errors on failure
 def domIdToName(domid):
 # XXXpipe: get domain name from id
-	f = os.popen("/usr/sbin/xm domname %i"%domid)
+	f = os.popen("/usr/sbin/xm domname %i"% domid)
 	name = f.readline().strip()
 	f.close()
 	return name
 
 def domNameToId(domname):
 # XXXpipe: get domain id from name
-	f = os.popen("/usr/sbin/xm domid %s"%domname)
+	f = os.popen("/usr/sbin/xm domid %s"% domname)
 	name = f.readline().strip()
 	f.close()
 	return int(name)
@@ -55,10 +53,10 @@ def nameToId(domname, prefix='tashi'):
 	if domname[0:(len(prefix))] != prefix:
 		return None
 	try:
-		id = int(domname[len(prefix):])
+		_id = int(domname[len(prefix):])
 	except:
 		return None
-	return id
+	return _id
 
 
 # Try to do a listVms call using info from xend
@@ -80,12 +78,12 @@ def listVms(prefix='tashi'):
 			vminfo[fields[i]] = line[i]
 		# if the name begins with our prefix, get the id,
 		# otherwise skip this record
-		id = nameToId(vminfo['name'], prefix)
-		if id == None:
+		_id = nameToId(vminfo['name'], prefix)
+		if _id == None:
 			continue
 
 		# fill in the instance object
-		instance.id = int(id)
+		instance.id = int(_id)
 		instance.vmId = int(vminfo['vmId'])
 		instance.state = InstanceState.Running
 		if(vminfo['state'][2] !='-'):
@@ -142,8 +140,8 @@ class XenPV(VmControlInterface, threading.Thread):
 				self.nm.vmStateChange(a.vmId, a.state, InstanceState.Exited)
 		for vmId in vmlist.keys():
 			if not self.newvms.has_key(vmId):
+				# FIXME: log this
 				print 'WARNING: found vm that should be managed, but is not'
-				# FIXME: log that
 			
 
 	def run(self):
@@ -155,7 +153,7 @@ class XenPV(VmControlInterface, threading.Thread):
 # a lot easier
 ########################################
 	def createXenConfig(self, vmName, 
-	                    image, macAddr, netID, memory, cores, hints, id):
+	                    image, macAddr, netID, memory, cores, hints, _id):
 		bootstr = None
 		rootconfig = None
 		diskconfig = None
@@ -171,6 +169,7 @@ class XenPV(VmControlInterface, threading.Thread):
 		disk0 = 'tap:%s' % self.disktype
 		diskU = 'xvda1'
 
+		# XXXstroucki: use soft config
 		try:
 			bridgeformat = self.config.get('XenPV', 'defaultBridgeFormat')
 		except:
@@ -360,9 +359,9 @@ extra='xencons=tty'
 		r = os.system(cmd)
 #		self.deleteXenConfig(name)
 		if r != 0:
+			# FIXME: log/handle error
 			print 'WARNING: "%s" returned %i' % ( cmd, r)
 			raise Exception, 'WARNING: "%s" returned %i' % ( cmd, r)
-			# FIXME: log/handle error
 		vmId = domNameToId(name)
 		self.newvms[vmId] = instance
 		instance.vmId = vmId
@@ -387,7 +386,7 @@ extra='xencons=tty'
 		instance = self.newvms[vmId]
 		instance.suspendCookie = suspendCookie
 		infof = self.dfs.open(infofile, "w")
-		name = domIdToName(vmId)
+		#name = domIdToName(vmId)
 		cPickle.dump(instance, infof)
 		infof.close()
 		
@@ -416,7 +415,7 @@ extra='xencons=tty'
 		self.dfs.unlink(infofile)
 
 		self.dfs.copyFrom(source, tmpfile)
-		r = os.system("/usr/sbin/xm restore %s"%(tmpfile))
+		__r = os.system("/usr/sbin/xm restore %s"%(tmpfile))
 		os.unlink(tmpfile)
 		
 		# FIXME: if the vmName function changes, suspended vms will become invalid

@@ -18,10 +18,8 @@
 # under the License.    
 
 import logging.config
-import signal
 import sys
 import os
-import time
 
 from tashi.util import instantiateImplementation, debugConsole
 import tashi
