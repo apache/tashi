@@ -27,7 +27,7 @@
 #add max_loop=x and loop.max_part=y to the /etc/default/grub and update-grub.
 #Version $thisver: Written 2011 by Jing-Yuan Luke at MIMOS
 
-export PYTHONPATH=/opt/tashi/tashi/branches/luke-zoni/src
+#export PYTHONPATH=/opt/tashi/tashi/branches/luke-zoni/src
 export PATH=$PATH:$PYTHONPATH/zoni/extra
 thisver="1.0"
 
@@ -36,7 +36,7 @@ usage()
 cat << EOF
 usage: $0 options
 
-This script converts an VM image to a live boot image and register it to Zoni.
+This script converts an VM image to a live boot image and registers it to Zoni.
 Currently it only support Ubuntu/Debian based VM images using the live-boot,
 live-config and live-tools packages.
 
@@ -376,7 +376,7 @@ check_img_info
 MYFREELOOP=`losetup -f`
 if [ -z $MYFREELOOP ]
 then
-	echo "No more loop device."
+	echo "No more loop devices available."
 	exit 1
 else
 	echo "loop device available: $MYFREELOOP"
@@ -385,11 +385,11 @@ fi
 losetup $MYFREELOOP $FORLOOPMNT &> /dev/null
 if [ ! $? == "0" ]
 then
-	echo "Error attach ${FORLOOPMNT} to ${MYFREELOOP}"
+	echo "Error attaching ${FORLOOPMNT} to ${MYFREELOOP}"
 	clean_tmp
 	exit 1
 else
-	echo "losetup attach success."
+	echo "losetup attached successfully."
 fi
 
 # Mount the loop device partition assuming image is created with only 2 partitions else user need to determine themselves but first create a temp dir

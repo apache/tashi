@@ -1137,7 +1137,7 @@ class ResourceQuerySql(InfoStore):
 
 		# Extensions from MIMOS - to take care of the addition of kernel_id and initrd_id
 		#query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
-		query = "insert into imageinfo (image_name, dist, dist_ver, kernel_id, initrd_id) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\", \"" + kernel_id + "\", \"" + initrd_id + "\")"
+		query = "insert into imageinfo (image_name, dist, dist_ver, kernel_id, initrd_id) values ('%s', '%s', '%s', '%s', '%s')" % (name, dist, dist_ver, kernel_id, initrd_id)
 		self.insertDb(query)
 
 

@@ -52,7 +52,7 @@ class mimos(InfoStore):
 		try:
 			return MySQLdb.connect(host = self.host, port = self.port, user = self.user, passwd = self.passwd, db = self.db)
 		except MySQLdb.OperationalError, e:
-			msg = "Error: " + str(e[1])
+			msg = "Error: %s" % str(e[1])
 			self.log.error(msg)
 			return
 
@@ -70,18 +70,19 @@ class mimos(InfoStore):
 		return
 
 	def getDestFile(self, configs, host):
-		return (configs['tftpImageDir'] + "/01-" + ((host['mac_addr']).replace(":","-")).lower())
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
+		return therole
 
 	def addRoletoNode(self, configs, host, thenode, roletemplate):
-		therole = configs['tftpImageDir'] + "/01-" + ((host['mac_addr']).replace(":","-")).lower()
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
 		self.log.info("Roles: addRole for %s" % thenode)
-		srctpl = configs['tftpTemplateDir'] + "/" + roletemplate
+		srctpl = "%s/%s" % (configs['tftpTemplateDir'], roletemplate)
 		if os.path.isfile(therole):
-			mesg = "Roles: Role File Exist! Exiting!"
+			mesg = "Roles: Role file exists! Exiting!"
 			self.log.error(mesg)
 			exit()
 		if not os.path.isfile(srctpl):
-			mesg = "Roles: Role Template Missing! Exiting!"
+			mesg = "Roles: Role template missing! Exiting!"
 			self.log.error(mesg)
 			exit()
 		#shutil.copy(srctpl,therole) #this is direct copy approach, template is not customized, retained here just in case we still need it
@@ -105,7 +106,7 @@ class mimos(InfoStore):
 		return 0
 
 	def removeRolefromNode(self, configs, host, thenode):
-		therole = configs['tftpImageDir'] + "/01-" + ((host['mac_addr']).replace(":","-")).lower()
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
 		self.log.info("Roles: removeRole for %s" % thenode)
 		if not os.path.isfile(therole):
 			mesg = "No Role File for %s! Exiting!" % thenode
@@ -119,26 +120,26 @@ class mimos(InfoStore):
 	# A new temp table rolemap added to support this but should merge back to imagemap
 	def assignRoletoHost(self, host, image):
 		cur_image = host['pxe_image_name']
-		query = "select image_id from imageinfo where image_name = " + "\"" + image + "\""
+		query = "select image_id from imageinfo where image_name = '%s'" % image
 		row = self.queryDb(query)
 		if len(row) < 1:
-			mesg = "assignRoletoHost: Image \"" + image + "\" does not exist in db"
+			mesg = "assignRoletoHost: Image \"%s\" does not exist in db" % image
 			self.log.error(mesg)
 			return 1
 		new_image_id = str(row[0][0])
-		query = "select * from rolemap where sys_id = \"" + str(host['sys_id']) + "\""
+		query = "select * from rolemap where sys_id = '%s'" % host['sys_id']
 		result = self.selectDb(query)
 		if result.rowcount > 0:
 			mesg = "assignRoletoHost: detected assigned role - removing from db first"
 			self.log.info(mesg)
-			query = "delete from rolemap where sys_id = \"" + str(host['sys_id']) + "\""
+			query = "delete from rolemap where sys_id = '%s'" % host['sys_id']
 			self.delDb(query)
-		query = "insert into rolemap (sys_id, image_id) values (\"" + str(host['sys_id']) + "\", " + new_image_id + ")"
+		query = "insert into rolemap (sys_id, image_id) values ('%s', %s)" % (host['sys_id'], new_image_id)
 		self.insertDb(connection,query)
 		return 0
 
 	def unassignRolefromHost(self, host):
-		query="delete from rolemap where sys_id = \"" + str(host['sys_id']) + "\""
+		query="delete from rolemap where sys_id = '%s'" % str(host['sys_id'])
 		self.delDb(query)
 		return 0
 
@@ -178,7 +179,11 @@ class mimos(InfoStore):
 		return 0
 
 	def getKernelInitrdID(self, info):
-		query="select k.kernel_id, i.initrd_id from kernelinfo k, initrdinfo i where k.kernel_name=\"" + info.split(":")[0] + "\" and i.initrd_name=\"" + info.split(":")[1] + "\" and k.kernel_arch=\"" + info.split(":")[2] + "\" and i.initrd_arch=\"" + info.split(":")[2] + "\""
+		kernel_name = info.split(":")[0]
+		initrd_name = info.split(":")[1]
+		kernel_arch = info.split(":")[2]
+
+		query = "select k.kernel_id, i.initrd_id from kernelinfo k, initrdinfo i where k.kernel_name='%s' and i.initrd_name='%s' and k.kernel_arch='%s' and i.initrd_arch='%s'" % (kernel_name, initrd_name, kernel_arch, kernel_arch)
 		rows=self.queryDb(query)
 		if len(rows) > 0:
 			for row in rows:
@@ -187,10 +192,20 @@ class mimos(InfoStore):
 				print "%s:%s" % (kid, iid)
 		return 0
 
-	def registerKernelInitrd(self, configs, KernelInitrd):
-		query="insert into kernelinfo (kernel_name, kernel_release, kernel_arch) values (\"" + KernelInitrd.split(":")[0] + "\", \"" + KernelInitrd.split(":")[1] + "\", \"" + KernelInitrd.split(":")[2] + "\")"
+	def registerKernelInitrd(self, configs, info):
+		foo = info.split(":")
+		kernel_name = foo[0]
+		kernel_release = foo[1]
+		kernel_arch = foo[2]
+		initrd_name = foo[3]
+		initrd_arch = foo[4]
+		kernel_something = foo[5]
+
+		initrd_options = "boot=live toram nopersistent fetch=http://%s/%s/%s initrd=%s/%s" % (configs['imageServerIP'], configs['fsImagesBaseDir'], kernel_something, configs['initrdRoot'], initrd_name)
+
+		query = "insert into kernelinfo (kernel_name, kernel_release, kernel_arch) values ('%s', '%s', '%s)" % (kernel_name, kernel_release, kernel_arch)
 		k_id=self.insertDb(query)
-		query="insert into initrdinfo (initrd_name, initrd_arch, initrd_options) values (\"" + KernelInitrd.split(":")[3] + "\", \"" + KernelInitrd.split(":")[4] + "\", \"boot=live toram nopersistent fetch=http://" + configs['imageServerIP'] + "/" + configs['fsImagesBaseDir'] + "/" + KernelInitrd.split(":")[5] + " initrd=" + configs['initrdRoot'] + "/" + KernelInitrd.split(":")[3] + "\")"
+		query = "insert into initrdinfo (initrd_name, initrd_arch, initrd_options) values ('%s', '%s', '%s')" % (initrd_name, initrd_arch, initrd_options)
 		i_id=self.insertDb(query)
 		print "%s:%s" % (k_id, i_id)
 		return 0

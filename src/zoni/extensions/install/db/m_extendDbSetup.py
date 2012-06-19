@@ -51,7 +51,7 @@ def main():
 	ver = version.split(" ")[0]
 	rev = revision
 
-	parser = optparse.OptionParser(usage="%prog -u username ", version="%prog " + ver + " " + rev)
+	parser = optparse.OptionParser(usage="prog -u username ", version="prog %s %s" % (ver, rev))
 	parser.add_option("-u", "--userName", "--username", dest="userName", help="Mysql username")
 	parser.add_option("-p", "--password", dest="password", help="Admin mysql password")
 	(options, args) = parser.parse_args()
@@ -101,7 +101,7 @@ def connectDb (host, port, user, passwd, db=None):
 
 	except MySQLdb.OperationalError, e:
 		if e[0] == 2005:
-			print "ERROR :" + str(e[1])
+			print "ERROR: %s" % str(e[1])
 			exit(1)
 		else:
 			print "Connection Error : ", e
@@ -128,7 +128,7 @@ def execQuery(conn, query):
 		conn.commit()
 	except MySQLdb.OperationalError, e:
 		sys.stdout.write("Fail\n")
-		msg = "ERROR: " + e[1]
+		msg = "ERROR: %s" % e[1]
 		sys.stderr.write(msg)
 		exit()
 	return cursor
@@ -162,7 +162,8 @@ def entryExists(config):
 			query = "UPDATE hardwareinfo set hw_blenc = hw_notes"
 			r = execQuery(conn, query)
 			for repl in res:
-				query="update hardwareinfo set hw_notes = NULL where hw_notes = \"" + repl[0] + "\""
+				query="update hardwareinfo set hw_notes = NULL where hw_notes = '%s'" % repl[0]
+
 				execQuery(conn, query)
 			sys.stdout.write("    Sync and Update Success\n\n")
 		else:

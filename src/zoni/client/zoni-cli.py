@@ -202,7 +202,7 @@ def main():
 
 	# Extensions from MIMOS
 	group = optparse.OptionGroup(parser, "Zoni MIMOS Extensions", "Special Functions created by MIMOS Lab:")
-	group.add_option("--addRole", "--addrole", dest="addRole", help="Create a disk based installation default file for a node based on it's role or function, e.g. one|oned|cc|clc|walrus|sc|nc|preseed|kickstart", default=None, action="store")
+	group.add_option("--addRole", "--addrole", dest="addRole", help="Create a disk based installation default file for a node based on its role or function, e.g. one|oned|cc|clc|walrus|sc|nc|preseed|kickstart", default=None, action="store")
 	group.add_option("--removeRole", "--removerole", dest="removeRole", help="Remove the default file of a node", action="store_true", default=False)
 	group.add_option("--showRoleMap", dest="showRoleMap", help="Show Role to Host Mapping", action="store_true", default=False)
 	group.add_option("--showKernel", dest="showKernelInfo", help="Show Kernel Info", action="store_true", default=False)
@@ -250,7 +250,7 @@ def main():
 			if "drac_name" in host:
 				hw= dellDrac(configs, options.nodeName, host)
 			else:
-				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
+				mesg = "Host (%s) does not have a DRAC card!!\n" % options.nodeName
 				sys.stdout.write(mesg)
 				exit(1)
 
