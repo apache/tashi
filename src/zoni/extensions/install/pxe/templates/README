@@ -1,0 +1,7 @@
+Files in this folder serve as template for an alternative way of using zoni
+to provision OS into local disk instead of booting of live images.
+
+They are used in conjuction with several additional functions added by MIMOS to
+support OS provisioning and should be if possible copy to
+/var/lib/tfpboot/templates folder or if this is changed then you need to change
+the CUSTOM_TEMPLATES_DIR in the ZoniDefaults.cfg file.

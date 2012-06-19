@@ -1,0 +1,71 @@
+.\" Process this file with
+.\" groff -man -Tascii convertz.8
+.\"
+.TH convertz 8 "December 2011" convertz "convertz admin manual"
+.SH NAME
+convertz \- A Simple Tool for Converting VM image to Live Image for Zoni
+.SH SYNOPSIS
+.B zoni [-i 
+.I input VM image
+.B ] [-n
+.I live image name
+.B ] [-u
+.I update image
+.B ] [-p
+.I partition number (optional)
+.B ] [-h] [-v]
+.SH DESCRIPTION
+.BI convertz
+is a simple tool that will convert your VM image to a Live Image for Zoni.
+It accepts any VM image formats such as raw, vdi, qcow, etc.
+(generally formats supported by qemu-img), converts it to raw format and
+make all necessary adjustments before converting it a squashfs image. It
+also obtains other information of the image such as the Linux Kernel
+(vmlinuz) and initial ramdisk (initrd.img) before making necessary steps
+to register the information into Zoni and move the necessary files to their
+respective folders.
+.PP
+Currently
+.BI convertz
+only supports full Ubuntu based VM images (with vmlinuz and initrd.img in
+/boot folder) and it assumes that the VM images file system in Non LVM
+based and only contains a / or root partition and a swap partition.
+.SH OPTIONS
+.IP "-i input VM image"
+The input is the actual VM image that a user wants to convert to live image.
+.IP "-n live image name"
+This is the live image name that will be register into Zoni as well as the 
+name that the converted live image be named (with a .squashfs extension).
+.IP "-u"
+Use this option to update existing Image.
+.IP "-p partition number"
+This is the partition number of the / or root of the VM image. This parameter
+is optional as
+.BI convertz
+will try to detect the partition itself. It is usefull only if the VM image
+has more than 2 partitions during creation of the VM image.
+.IP -h
+Print usage/help information and exit.
+.IP -v
+Print version and exit.
+.SH FILES
+.I convertz
+depends on several other tools in order to perform its task. They are:
+.RS
+zoni, qemu-img, parted, mksquashfs and uuidgen.
+.RE
+.PP
+In addition, it expects the Debian Live Project deb files are compiled
+and prepared. They are:
+.RS
+live-boot, live-config and live-tools
+.RE
+Information on preparing these files are available at http://live.debian.net
+.SH BUGS
+This is still a work in progress. As mentioned earlier,
+.BI convertz
+only supports Ubuntu based VM images only. A fair amount of steps had been
+added to try to capture any errors as early as possible, any bugs please
+contact the author. Thanks.
+.SH AUTHOR
+Jing-Yuan Luke (jyluke(alias)gmail.com)

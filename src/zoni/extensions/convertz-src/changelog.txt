@@ -1,0 +1,17 @@
+convertz - simple vm to live image conversion for zoni
+
+Version 1.0:
+Initial version, some self check for dependent tools/files, supports only Ubuntu
+images with standard non-LVM 2 partitions (root and swap).
+
+To Dos:
+- possible bug in treating raw (.img) image as we work on the original image
+  and not a copy of it thus lossing the original state after injecting live-*
+  packages
+- make self check independent or to run it during the installation/make process,
+  possible even make necessary changes to the /etc/default/grub if necessary
+- make use of nbd/qemu-nbd to skip conversion but possibly need to consider
+  preserving the original image (in case user want it back)
+- sync some of the variables in the script with those in the ZoniDefaults.cfg,
+  will require some additional codes to be added to zoni
+- probably need to port this to python

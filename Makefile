@@ -117,7 +117,7 @@ rmdoc:
 #  Zoni 
 bin/zoni-cli:
 	@echo Symlinking in zoni-cli...
-	(cd bin; ln -s ../src/zoni/client/zoni-cli .)
+	(cd bin; ln -s ../src/zoni/client/zoni-cli.py .)
 # why necessarily put this in /usr/local/bin like nothing else?
 usr/local/bin/zoni:
 	@echo Creating /usr/local/bin/zoni
