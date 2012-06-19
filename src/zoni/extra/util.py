@@ -63,6 +63,10 @@ def loadConfigFile(parser):
 	config['initrdRoot'] = parser.get("pxe", "INITRD_ROOT").split()[0]
 	config['kernelRoot'] = parser.get("pxe", "KERNEL_ROOT").split()[0]
 
+	# Extensions from MIMOS
+	config['ntpsvrIP'] = parser.get("pxe", "NTPSVR").split()[0] # NTP Server IP Address Support
+	config['tftpTemplateDir'] = parser.get("pxe", "CUSTOM_TEMPLATES_DIR") # Custom Templates for Disk Image
+
 	#  Image store
 	config['imageServerIP'] = parser.get("imageStore", "IMAGE_SERVER_IP").split()[0]
 	config['fsImagesBaseDir'] = parser.get("imageStore", "FS_IMAGES_BASE_DIR").split()[0]
@@ -107,7 +111,8 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 	"""Creates many permutations of a list of locations to look for config 
 	   files and then loads them"""
 	config = ConfigParser.ConfigParser()
-	baseLocations = ['./etc/', '/usr/share/zoni/', '/etc/zoni/', os.path.expanduser('~/.zoni/')]
+	# added /usr/local/tashi/etc - MIMOS
+	baseLocations = ['./etc/', '/usr/share/zoni/', '/usr/local/tashi/etc/', '/etc/zoni/', os.path.expanduser('~/.zoni/')]
 	names = ['Zoni'] + additionalNames
 	names = reduce(lambda x, y: x + [y+"Defaults", y], names, [])
 	allLocations = reduce(lambda x, y: x + reduce(lambda z, a: z + [y + a + ".cfg"], names, []), baseLocations, []) + additionalFiles

@@ -60,6 +60,9 @@ from tashi.util import instantiateImplementation, signalHandler
 #import zoni.data.usermanagement 
 #from usermanagement import UserManagement
 
+# Extensions from MIMOS
+from zoni.extensions.m_extensions import *
+
 def parseTable():
 	pass
 
@@ -99,6 +102,8 @@ def main():
 	group.add_option("--powerOn", "--poweron", dest="POWERON", help="Power on node", action="store_true", default=False)
 	group.add_option("--powerReset", "--powerreset", dest="POWERRESET", help="Power reset node", action="store_true", default=False)
 	group.add_option("--console", dest="CONSOLE", help="Console mode", action="store_true", default=False)
+	# Extensions from MIMOS - specific only for HP Blades and HP c7000 Blade Enclosures
+	group.add_option("--powerOnNet", "--poweronnet", dest="POWERONENET", help="Power on Node into PXE (Currently support on HP Blades through HP c7000 Blade Enclosure)", action="store_true", default=False)
 	parser.add_option_group(group)
 
 	#  Query Interface
@@ -195,6 +200,18 @@ def main():
 	group.add_option("--removeDhcp", dest="removeDhcp", help="Remove a DHCP entry", action="store_true", default=False)
 	parser.add_option_group(group)
 
+	# Extensions from MIMOS
+	group = optparse.OptionGroup(parser, "Zoni MIMOS Extensions", "Special Functions created by MIMOS Lab:")
+	group.add_option("--addRole", "--addrole", dest="addRole", help="Create a disk based installation default file for a node based on its role or function, e.g. one|oned|cc|clc|walrus|sc|nc|preseed|kickstart", default=None, action="store")
+	group.add_option("--removeRole", "--removerole", dest="removeRole", help="Remove the default file of a node", action="store_true", default=False)
+	group.add_option("--showRoleMap", dest="showRoleMap", help="Show Role to Host Mapping", action="store_true", default=False)
+	group.add_option("--showKernel", dest="showKernelInfo", help="Show Kernel Info", action="store_true", default=False)
+	group.add_option("--showInitrd", dest="showInitrdInfo", help="Show Initrd Info", action="store_true", default=False)
+	group.add_option("--registerKernelInitrd", dest="registerKernelInitrd", help="Register Kernel and Initrd - vmlinuz:vmlinuz-ver:vmlinuz-arch:initrd:initrd-arch:imagename")
+	group.add_option("--getKernelInitrdID", dest="getKernelInitrdID", help="Get corresponding Kernel and Initrd Info - vmlinuz:initrd:arch")
+	group.add_option("--getConfig", dest="getConfig", help="Get a value from ZoniDefault.cfg - e.g. tftpRootDir, initrdRoot, kernelRoot, fsImagesBaseDir, etc.", default=None, action="store")
+	parser.add_option_group(group)
+
 	(options, args) = parser.parse_args()
 
 	
@@ -208,6 +225,8 @@ def main():
 	data = instantiateImplementation("zoni.data.resourcequerysql.ResourceQuerySql", configs, options.verbosity)
 	reservation = instantiateImplementation("zoni.data.reservation.reservationMysql", configs, data, options.verbosity)
 	#query = zoni.data.resourcequerysql.ResourceQuerySql(configs, options.verbosity)
+	# Extensions from MIMOS
+	mimos = instantiateImplementation("zoni.extensions.m_extensions.mimos",configs)
 
 	#  Get host info
 	host=None
@@ -231,12 +250,21 @@ def main():
 			if "drac_name" in host:
 				hw= dellDrac(configs, options.nodeName, host)
 			else:
-				mesg = "Host (" + options.nodeName + ") does not have a DRAC card!!\n"
+				mesg = "Host (%s) does not have a DRAC card!!\n" % options.nodeName
 				sys.stdout.write(mesg)
 				exit(1)
+
+		## Extensions from MIMOS - For Dell Blades - calling Dell Blades via the Blade Enclosure, some DRAC commands are slightly different from the ones in blade enclosure when compared to those in the actual blade, this allow a bit more flexiblity and standard calls to the blades
+		if options.hardwareType == "dracblade":
+			hw = dellBlade(configs, options.nodeName, host)
+
+		## Extensions from MIMOS - For HP Blades - calling HP Blades via the HP c7000 Blade Enclosure instead of direct to the blade server itself, this allow a bit more flexiblity and standard calls to the blades
+		if options.hardwareType == "hpilo":
+			hw = hpILO(configs, options.nodeName, host)
+
 		if (options.REBOOTNODE or options.POWERCYCLE  or options.POWEROFF or options.POWEROFFSOFT or \
 			options.POWERON or options.POWERSTATUS or options.CONSOLE or \
-			options.POWERRESET) and options.nodeName:
+			options.POWERONNET or options.POWERRESET) and options.nodeName: # Extensions from MIMOS - added POWERONNET
 
 			if options.verbosity:
 				hw.setVerbose(True)
@@ -264,6 +292,10 @@ def main():
 				exit()
 			if options.CONSOLE:
 				hw.activateConsole()
+				exit()
+			## Extensions from MIMOS - For HP Blade via c7000 Blade Enclosure
+			if options.POWERONNET:
+				hw.powerOnNet()
 				exit()
 			hw.getPowerStatus()
 			exit()
@@ -823,6 +855,30 @@ def main():
 			else: 
 				mesg = "[SUCCESS]\n"
 				sys.stdout.write(mesg) 
+
+	## Extensions from MIMOS - functions are defined in m_extensions.py
+	if ( options.addRole and options.nodeName ) or ( options.removeRole and options.nodeName ):
+		if options.addRole:
+			mimos.assignRoletoHost(host,options.addRole)
+			mimos.addRoletoNode(configs,host,options.nodeName,options.addRole)
+		if options.removeRole:
+			mimos.unassignRolefromHost(host)
+			mimos.removeRolefromNode(configs,host,options.nodeName)
+	if ( options.addRole and not options.nodeName ) or ( options.removeRole and not options.nodeName ):
+		mesg = "Roles: Missing Parameter(s)!"
+		log.error(mesg)
+	if options.showRoleMap:
+		mimos.showRoletoHost(configs)
+	if options.showKernelInfo:
+		mimos.showKernelInfo()
+	if options.showInitrdInfo:
+		mimos.showInitrdInfo()
+	if options.registerKernelInitrd:
+		mimos.registerKernelInitrd(configs,options.registerKernelInitrd)
+	if options.getKernelInitrdID:
+		mimos.getKernelInitrdID(options.getKernelInitrdID)
+	if options.getConfig:
+		mimos.getConfig(configs,options.getConfig)
 
 if __name__ == "__main__":
 	main()

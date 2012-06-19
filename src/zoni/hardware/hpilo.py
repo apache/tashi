@@ -24,46 +24,25 @@ import pexpect
 import time
 
 from systemmanagementinterface import SystemManagementInterface
-
-
-#class systemmagement():
-	#def __init__(self, proto):
-		#self.proto = proto
+from zoni.extra.util import timeF, log
 
 #XXX  Need to add more error checking!
-
-def log(f):
-	def myF(*args, **kw):
-		print "calling %s%s" % (f.__name__, str(args))
-		res = f(*args, **kw)
-		print "returning from %s -> %s" % (f.__name__, str(res))
-		return res
-	myF.__name__ = f.__name__
-	return myF
-
-import time
-
-def timeF(f):
-	def myF(*args, **kw):
-		start = time.time()
-		res = f(*args, **kw)
-		end = time.time()
-		print "%s took %f" % (f.__name__, end-start)
-		return res
-	myF.__name__ = f.__name__
-	return myF
-
+#XXX  Need to consider difference in responses between a rackmount server and a blade server - MIMOS
 
 class hpILo(SystemManagementInterface):
-	def __init__(self, host):
-		self.hostname = host['location']
-		self.host = host['ilo_name']
+	def __init__(self, config, nodeName, hostInfo):
+		self.config = config
+		self.nodename = nodeName
+		self.hostname = hostInfo['location']
+		## Need to add in checking to differentiate between rackmount and blade server
+		#self.host = host['ilo_name']
+		self.host = hostInfo['ilo_enclosure']
 		self.user = host['ilo_userid']
 		self.password = host['ilo_password']
 		self.port = host['ilo_port']
 		self.powerStatus = None
 		self.verbose = 0
-		#self.server = "Server-" + str(self.port)
+		self.log = logging.getLogger(__name__)
 
 	def setVerbose(self, verbose):
 		self.verbose = verbose
@@ -86,7 +65,7 @@ class hpILo(SystemManagementInterface):
 			i=child.expect(['>', 'please try again.', pexpect.EOF, pexpect.TIMEOUT])
 		else:
 			mesg = "Error"
-			sys.stderr.write(mesg)
+			self.log.error(mesg)
 			exit(1)
 
 		if i == 1:
@@ -102,7 +81,6 @@ class hpILo(SystemManagementInterface):
 
 
 	@timeF
-	@log
 	def getPowerStatus(self):
 		child = self.__login()
 		cmd = "show server status " + str(self.port)
@@ -118,7 +96,7 @@ class hpILo(SystemManagementInterface):
 			mesg = self.hostname + " Power is off\n\n"
 			self.powerStatus = 0
 
-		sys.stdout.write(mesg)
+		self.log.info(mesg)
 
 		child.close()
 		child.terminate()
@@ -131,7 +109,6 @@ class hpILo(SystemManagementInterface):
 			return 1;
 		if not self.powerStatus:
 			return 0;
-	
 
 	@timeF
 	def powerOn(self):
@@ -151,7 +128,28 @@ class hpILo(SystemManagementInterface):
 			mesg = self.hostname + " Power On\n\n"
 		else:
 			mesg = self.hostname + " Power On Fail\n\n"
-		sys.stdout.write(mesg)
+		self.log.info(mesg)
+		child.sendline("quit")
+		child.terminate()
+
+	@timeF
+	def powerOnNet(self):
+		if self.powerStatus == 1:
+			mesg = self.hostname + " Power On\n\n"
+			exit(1)
+
+		child = self.__login()
+		cmd = "poweron server " + str(self.port) + " PXE"
+		child.sendline(cmd)
+		val = child.readline()
+		while "Powering" not in val and "powered" not in val:
+			val = child.readline()
+
+		if "Powering" in val or "already" in val:
+			mesg = self.hostname + " Power On\n\n"
+		else:
+			mesg = self.hostname + " Power On Fail\n\n"
+		self.log.info(mesg)
 		child.sendline("quit")
 		child.terminate()
 
@@ -169,7 +167,7 @@ class hpILo(SystemManagementInterface):
 		else:
 			mesg = self.hostname + " Power Off Fail\n\n"
 
-		sys.stdout.write(mesg)
+		self.log.info(mesg)
 		child.sendline("quit")
 		child.terminate()
 
@@ -189,7 +187,7 @@ class hpILo(SystemManagementInterface):
 		mesg = self.hostname + " Power Reset\n\n"
 		#else:
 			#mesg = self.hostname + " Power Reset Fail\n\n"
-		sys.stdout.write(mesg)
+		self.log.info(mesg)
 		child.sendline("quit")
 		child.terminate()
 		

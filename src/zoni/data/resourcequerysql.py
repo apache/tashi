@@ -303,6 +303,11 @@ class ResourceQuerySql(InfoStore):
 		query = "select " + defaultFields + "from sysinfo " + queryopt
 		result = self.selectDb(query)	
 
+		# Extensions from MIMOS - allow showResources to fail gracefully if the Zoni DB is not populated yet
+		if result.rowcount < 1:
+			print "Zoni Hardware/System Database is empty."
+			exit(1)
+
 		line = ""
 		for i in defaultFields.split(","):
 			#line += string.strip(str(i)) + "\t"
@@ -736,7 +741,7 @@ class ResourceQuerySql(InfoStore):
 			host['hw_port'] = int(i[6])
 
 		#  Get drac info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, h.hw_blenc, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
 		result = self.selectDb(query)
 		if result.rowcount > 0:
 			for i in result.fetchall():
@@ -746,7 +751,9 @@ class ResourceQuerySql(InfoStore):
 				host['drac_ipaddr'] = i[3]
 				host['drac_userid'] = i[4]
 				host['drac_password'] = i[5]
-				host['drac_port'] = int(i[6])
+				# Extensions from MIMOS - for Dell Blade
+				host['drac_enclosure'] = i[6]
+				host['drac_port'] = int(i[7])
 
 		#  Get PDU info
 		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and h.hw_type = 'pdu' and p.sys_id = " +  str(host['sys_id'])
@@ -760,6 +767,18 @@ class ResourceQuerySql(InfoStore):
 			host['pdu_password'] = i[5]
 			host['pdu_port'] = int(i[6])
 
+		# Extensions from MIMOS - for HP Blade iLO
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, h.hw_blenc, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'hpilo' and sys_id = " +  str(host['sys_id'])
+		result = self.selectDb(query)
+		for i in result.fetchall():
+			host['ilo_id'] = int(i[0])
+			host['ilo_name'] = i[1]
+			host['ilo_model'] = i[2]
+			host['ilo_ipaddr'] = i[3]
+			host['ilo_userid'] = i[4]
+			host['ilo_password'] = i[5]
+			host['ilo_enclosure'] = i[6]
+			host['ilo_port'] = int(i[7])
 
 		#print "host is ", host
 		return host
@@ -1092,8 +1111,14 @@ class ResourceQuerySql(InfoStore):
 			name = imageName.split(":")[0]
 		if len(imageName.split(":")) > 2:
 			dist = imageName.split(":")[1]
-		if len(imageName.split(":")) >= 3:
+		# Extensions from MIMOS - allow adding 2 more pieces of info - kernel_id and initrd_id
+		#if len(imageName.split(":")) >= 3:
+		if len(imageName.split(":")) > 3:
 			dist_ver = imageName.split(":")[2]
+		if len(imageName.split(":")) > 4:
+			kernel_id = imageName.split(":")[3]
+		if len(imageName.split(":")) >= 5:
+			initrd_id = imageName.split(":")[4]
 
 		query = "select * from imageinfo where image_name = \"" + name + "\""
 		result = self.selectDb(query)
@@ -1110,7 +1135,9 @@ class ResourceQuerySql(InfoStore):
 			sys.stderr.write(mesg)
 			return 
 
-		query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
+		# Extensions from MIMOS - to take care of the addition of kernel_id and initrd_id
+		#query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
+		query = "insert into imageinfo (image_name, dist, dist_ver, kernel_id, initrd_id) values ('%s', '%s', '%s', '%s', '%s')" % (name, dist, dist_ver, kernel_id, initrd_id)
 		self.insertDb(query)
 
 

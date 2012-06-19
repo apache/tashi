@@ -1,0 +1,12 @@
+The files in here are to demo using zoni (with some additional
+changes/extensions) to support direct OS provisioning into local disk
+as suppose to using live images that zoni is doing now.
+
+The files bootnode.py, getnpass.py, kickstart and preseed are to be
+copied to /usr/lib/cgi-bin/ assuming we are dealing with Apache 
+running in Ubuntu. The preseed and kickstart as just samples and would
+need to be tweaked.
+
+It is also necessary that a proper Ubuntu and/or CentOS repositor is
+setup and served via Apache as the preseed and kickstart are setup
+to install the OS via HTTP.
