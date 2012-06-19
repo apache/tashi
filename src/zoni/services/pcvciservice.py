@@ -19,7 +19,6 @@
 #  $Id$
 #
 
-import threading
 import logging
 
 from tashi.util import instantiateImplementation
@@ -49,10 +48,11 @@ class pcmService(object):
 			
 	def requestResources(self, key, specs, quantity):
 		vcm = self.__key2vcm(key)
-		node = specs
+		#node = specs
 		'''  Check for keys later  '''
 		self.log.info("VCM_REQUEST_RESOURCE: VCM %s RESOURCE %s(%s)" % (vcm, specs, quantity))
-		# go to scheduler val = self.agent.requestResource(specs)
+		# go to scheduler
+		val = self.agent.requestResource(specs)
 		if val:
 			return 1
 		return 0

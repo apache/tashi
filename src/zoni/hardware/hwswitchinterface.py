@@ -18,8 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
 
 class HwSwitchInterface(object):
 	"""  Interface description for hardware switches

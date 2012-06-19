@@ -15,22 +15,3 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-typedef map<string, string> strstrmap
-
-service SubscriberThrift{
-  # the async keyword seems to slow things down in the simple
-  # tests.  However, with non-trivial subscribers it will be 
-  # necessary to use async here.
-  async void publish(strstrmap message)
-  async void publishList(list<strstrmap> messages)
-}
-
-service MessageBrokerThrift{
-  void log(strstrmap message),
-  void addSubscriber(string host, i16 port)
-  void removeSubscriber(string host, i16 port)
-  async void publish(strstrmap message)
-  async void publishList(list<strstrmap> messages)
-
-}
-

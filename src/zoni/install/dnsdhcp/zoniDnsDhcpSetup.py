@@ -21,10 +21,7 @@
 
 import os 
 import sys
-import string
-import traceback
 import optparse
-import getpass
 
 a = os.path.join("../")
 sys.path.append(a)
@@ -33,8 +30,8 @@ sys.path.append(a)
 a = os.path.join("../../..")
 sys.path.append(a)
 
-from zoni.version import *
-from zoni.extra.util import *
+from zoni.version import version, revision
+from zoni.extra.util import createKey
 
 
 def main():
@@ -47,13 +44,13 @@ def main():
 	parser = optparse.OptionParser(usage="%prog -k keyname", version="%prog " + ver + " " + rev)
 	parser.add_option("-k", "--keyName", "--keyname", dest="keyName", help="Key name")
 	#parser.add_option("-v", "--verbose", dest="verbosity", help="Be verbose", action="store_true", default=False)
-	(options, args) = parser.parse_args()
+	(options, __args) = parser.parse_args()
 
 	if not options.keyName:
 		parser.print_help()
 		exit(1)
 
-	(configs, configFiles) = getConfig()
+	#(configs, configFiles) = getConfig()
 
 
 	key = createKey(options.keyName)
@@ -79,5 +76,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+	main()
 

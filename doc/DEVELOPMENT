@@ -8,3 +8,9 @@ Future goals:
 
 Other ideas:
    * Make available a console aggregator for user's VMs.
+
+Python caveats:
+   * We've liked to use variables like bin, id, sum, input, etc. are
+     built-in, and will be flagged by pydev
+   * pydev does not like python modules with a dash in the name
+

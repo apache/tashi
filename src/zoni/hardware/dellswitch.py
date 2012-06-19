@@ -18,24 +18,22 @@
 #  $Id$
 #
 
-import os
-import sys
+
 import pexpect
 import datetime
-import time
 import thread
-import string
-import getpass
 import socket
 import tempfile
+import os
 import logging
+import sys
+import time
+import string
 
-#import zoni
-from zoni.data.resourcequerysql import *
 from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.data.resourcequerysql import ResourceQuerySql
 from zoni.agents.dhcpdns import DhcpDns
-from zoni.extra.util import *
+from zoni.extra.util import normalizeMac
 
 
 '''  Using pexpect to control switches because couldn't get snmp to work 
@@ -54,7 +52,7 @@ class HwDellSwitch(HwSwitchInterface):
 			pass
 
 
- 	def setVerbose(self, verbose):
+	def setVerbose(self, verbose):
 		self.verbose = verbose
 
 	def __login(self):
@@ -261,10 +259,10 @@ class HwDellSwitch(HwSwitchInterface):
 				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				i=child.expect(['console','#', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				
-			except EOF:
+			except pexpect.EOF:
 				print "EOF", i
 				#child.sendline()
-			except TIMEOUT:
+			except pexpect.TIMEOUT:
 				print "TIMEOUT", i
 		#child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 
@@ -463,16 +461,16 @@ class HwDellSwitch(HwSwitchInterface):
 		child = self.__login()
 		cmd = "copy running-config startup-config"
 		child.sendline(cmd)
-		i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
+		__i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
 		child.sendline("y")
 		child.terminate()
 
-	def __saveConfig(self):
-		cmd = "copy running-config startup-config"
-		child.sendline(cmd)
-		i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
-		child.sendline("y")
-		child.terminate()
+#	def __saveConfig(self):
+#		cmd = "copy running-config startup-config"
+#		child.sendline(cmd)
+#		__i = child.expect(['y/n', pexpect.EOF, pexpect.TIMEOUT])
+#		child.sendline("y")
+#		child.terminate()
 
 	
 	def registerToZoni(self, user, password, host):
@@ -511,7 +509,7 @@ class HwDellSwitch(HwSwitchInterface):
 		child.sendline(cmd)
 		val = host + "#"
 		tval = host + ">"
-		i = child.expect([val, tval, '\n\r\n\r', "--More--",  pexpect.EOF, pexpect.TIMEOUT])
+		__i = child.expect([val, tval, '\n\r\n\r', "--More--",  pexpect.EOF, pexpect.TIMEOUT])
 		cmd = "show version"
 		child.sendline(cmd)
 		i = child.expect([val, tval, '\n\r\n\r', pexpect.EOF, pexpect.TIMEOUT])
@@ -547,19 +545,19 @@ class HwDellSwitch(HwSwitchInterface):
 
 		user = "public"
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,1,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_model'] = str(varBinds[0][1])
 
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,3,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_make'] = str(varBinds[0][1])
 
 		oid = eval("1,3,6,1,4,1,674,10895,3000,1,2,100,4,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_version_sw'] = str(varBinds[0][1])

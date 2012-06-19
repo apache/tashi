@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -21,8 +21,10 @@ import os.path
 import random
 import sys
 import types
-from tashi.rpycservices.rpyctypes import *
-from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
+from tashi.rpycservices.rpyctypes import NetworkConfiguration,\
+	DiskConfiguration, HostState, Instance, Host, TashiException
+from tashi.utils.config import Config
+from tashi import vmStates, hostStates, boolean, stringPartition, createClient
 
 users = {}
 networks = {}
@@ -49,6 +51,22 @@ def getUser():
 		if (users[user].name == userStr):
 			return users[user].id
 	raise ValueError("Unknown user %s" % (userStr))
+
+def checkHid(host):
+	userId = getUser()
+	hosts = client.getHosts()
+	hostId = None
+	try:
+		hostId = int(host)
+	except:
+		for h in hosts:
+			if (h.name == host):
+				hostId = h.id
+	if (hostId is None):
+		raise ValueError("Unknown host %s" % (str(host)))
+
+	# XXXstroucki permissions for host related stuff?
+	return hostId
 
 def checkIid(instance):
 	userId = getUser()
@@ -78,10 +96,17 @@ def randomMac():
 
 def getDefaultNetwork():
 	fetchNetworks()
-	networkId = 1
+	networkId = 0
 	for network in networks:
+		if (getattr(networks[network], "default", False) is True):
+			networkId = network
+			break
+
+		# Naming the network "default" is deprecated, and
+		# this functionality will be removed soon
 		if (networks[network].name == "default"):
 			networkId = network
+			break
 	return networkId
 
 def randomNetwork():
@@ -93,7 +118,7 @@ def parseDisks(arg):
 		disks = []
 		for strDisk in strDisks:
 			strDisk = strDisk.strip()
-			(l, s, r) = stringPartition(strDisk, ":")
+			(l, __s, r) = stringPartition(strDisk, ":")
 			if (r == ""):
 				r = "False"
 			r = boolean(r)
@@ -109,12 +134,12 @@ def parseNics(arg):
 		nics = []
 		for strNic in strNics:
 			strNic = strNic.strip()
-			(l, s, r) = stringPartition(strNic, ":")
+			(l, __s, r) = stringPartition(strNic, ":")
 			n = l
 			if (n == ''):
 				n = getDefaultNetwork()
 			n = int(n)
-			(l, s, r) = stringPartition(r, ":")
+			(l, __s, r) = stringPartition(r, ":")
 			ip = l
 			if (ip == ''):
 				ip = None
@@ -133,7 +158,7 @@ def parseHints(arg):
 		hints = {}
 		for strHint in strHints:
 			strHint = strHint.strip()
-			(l, s, r) = stringPartition(strHint, "=")
+			(l, __s, r) = stringPartition(strHint, "=")
 			hints[l] = r
 		return hints
 	except:
@@ -186,12 +211,26 @@ def createMany(instance, count):
 		instances.append(client.createVm(instance))
 	return instances
 
+def shutdownMany(basename):
+	return __shutdownOrDestroyMany("shutdown", basename)
+
 def destroyMany(basename):
+	return __shutdownOrDestroyMany("destroy", basename)
+
+def __shutdownOrDestroyMany(method, basename):
 	instances = client.getInstances()
 	count = 0
 	for i in instances:
 		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
-			client.destroyVm(i.id)
+			if method == "shutdown":
+				client.shutdownVm(i.id)
+
+			elif method == "destroy":
+				client.destroyVm(i.id)
+
+			else:
+				raise ValueError("Unknown method")
+
 			count = count + 1
 	if (count == 0):
 		raise ValueError("That is an unused basename")
@@ -213,6 +252,7 @@ extraViews = {
 'copyImage': (None, None), 
 'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
+'shutdownMany': (shutdownMany, None),
 'destroyMany': (destroyMany, None),
 'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
 'getInstances': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
@@ -225,6 +265,7 @@ argLists = {
 'createMany': [('userId', int, getUser, False), ('basename', str, lambda: requiredArg('basename'), True), ('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False), ('disks', parseDisks, lambda: requiredArg('disks'), True), ('nics', parseNics, randomNetwork, False), ('hints', parseHints, lambda: {}, False), ('count', int, lambda: requiredArg('count'), True)],
 'shutdownVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'destroyVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
+'shutdownMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'destroyMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'suspendVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'resumeVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
@@ -235,6 +276,7 @@ argLists = {
 'getImages': [],
 'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
+'setHostState': [('host', checkHid, lambda: requiredArg('host'), True), ('state', str, lambda: requiredArg('state'), True)],
 'getUsers': [],
 'getNetworks': [],
 'getInstances': [],
@@ -250,6 +292,7 @@ convertArgs = {
 'createMany': '[Instance(d={"userId":userId,"name":basename,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), count]',
 'shutdownVm': '[instance]',
 'destroyVm': '[instance]',
+'shutdownMany': '[basename]',
 'destroyMany': '[basename]',
 'suspendVm': '[instance]',
 'resumeVm': '[instance]',
@@ -260,6 +303,7 @@ convertArgs = {
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
+'setHostState' : '[host, state]',
 }
 
 # Descriptions
@@ -268,6 +312,7 @@ description = {
 'createMany': 'Utility function that creates many VMs with the same set of parameters',
 'shutdownVm': 'Attempts to shutdown a VM nicely',
 'destroyVm': 'Immediately destroys a VM -- it is the same as unplugging a physical machine and should be used for non-persistent VMs or when all else fails',
+'shutdownMany': 'Attempts to gracefully shut down a group of VMs created with createMany',
 'destroyMany': 'Destroys a group of VMs created with createMany',
 'suspendVm': 'Suspends a running VM to disk',
 'resumeVm': 'Resumes a suspended VM from disk',
@@ -276,6 +321,7 @@ description = {
 'unpauseVm': 'Unpauses a paused VM',
 'getSlots': 'Get a count of how many VMs could be started in the cluster',
 'getHosts': 'Gets a list of hosts running Node Managers',
+'setHostState': 'Set the state of a host, eg. Normal or Drained',
 'getUsers': 'Gets a list of users',
 'getNetworks': 'Gets a list of available networks for VMs to be placed on',
 'getInstances': 'Gets a list of all VMs in the cluster',
@@ -293,6 +339,7 @@ examples = {
 'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance foobar'],
 'destroyVm': ['--instance 12345', '--instance foobar'],
+'shutdownMany': ['--basename foobar'],
 'destroyMany': ['--basename foobar'],
 'suspendVm': ['--instance 12345', '--instance foobar'],
 'resumeVm': ['--instance 12345', '--instance foobar'],
@@ -301,6 +348,7 @@ examples = {
 'unpauseVm': ['--instance 12345', '--instance foobar'],
 'getSlots': ['--cores 1 --memory 128'],
 'getHosts': [''],
+'setHostState': ['--host fnord --state Drained'],
 'getUsers': [''],
 'getNetworks': [''],
 'getInstances': [''],
@@ -321,7 +369,8 @@ def usage(func = None):
 			print "Unknown function %s" % (func)
 			print
 		functions = argLists
-		print "%s is the client program for Tashi, a system for cloud-computing on BigData." % (os.path.basename(sys.argv[0]))
+		print "%s is the client program for Tashi" % (os.path.basename(sys.argv[0]))
+		print "Tashi, a system for cloud-computing on BigData"
 		print "Visit http://incubator.apache.org/tashi/ for more information."
 		print
 	else:
@@ -373,9 +422,9 @@ def transformState(obj):
 		except:
 			obj.state = 'Unknown'
 
-def genKeys(list):
+def genKeys(_list):
 	keys = {}
-	for row in list:
+	for row in _list:
 		for item in row.__dict__.keys():
 			keys[item] = item
 	if ('id' in keys):
@@ -385,25 +434,25 @@ def genKeys(list):
 		keys = keys.values()
 	return keys
 
-def makeTable(list, keys=None):
-	(consoleWidth, consoleHeight) = (9999, 9999)
+def makeTable(_list, keys=None):
+	(consoleWidth, __consoleHeight) = (9999, 9999)
 	try:
 # XXXpipe: get number of rows and column on current window
 		stdout = os.popen("stty size")
-		r = stdout.read()
+		__r = stdout.read()
 		stdout.close()
 	except:
 		pass
-	for obj in list:
+	for obj in _list:
 		transformState(obj)
 	if (keys == None):
-		keys = genKeys(list)
+		keys = genKeys(_list)
 	for (show, k) in show_hide:
 		if (show):
 			if (k != "all"):
 				keys.append(k)
 			else:
-				keys = genKeys(list)
+				keys = genKeys(_list)
 		else:
 			if (k in keys):
 				keys.remove(k)
@@ -412,7 +461,7 @@ def makeTable(list, keys=None):
 	maxWidth = {}
 	for k in keys:
 		maxWidth[k] = len(k)
-	for row in list:
+	for row in _list:
 		for k in keys:
 			if (k in row.__dict__):
 				maxWidth[k] = max(maxWidth[k], len(str(row.__dict__[k])))
@@ -445,8 +494,8 @@ def makeTable(list, keys=None):
 			return 1
 		else:
 			return 0
-	list.sort(cmp=sortFunction)
-	for row in list:
+	_list.sort(cmp=sortFunction)
+	for row in _list:
 		line = ""
 		for k in keys:
 			row.__dict__[k] = row.__dict__.get(k, "")
@@ -507,11 +556,12 @@ def main():
 	"""Main function for the client program"""
 	global INDENT, exitCode, client
 	exitCode = 0
+	exception = None
 	INDENT = (os.getenv("INDENT", 4))
 	if (len(sys.argv) < 2):
 		usage()
 	function = matchFunction(sys.argv[1])
-	(config, configFiles) = getConfig(["Client"])
+	config = Config(["Client"])
 
 	# build a structure of possible arguments
 	possibleArgs = {}
@@ -551,30 +601,54 @@ def main():
 			if (arg.startswith("--")):
 				if (arg[2:] in possibleArgs):
 					(parg, conv, default, required) = possibleArgs[arg[2:]]
-					val = conv(args.pop(0))
+					try:
+						val = None
+						lookahead = args[0]
+						if not lookahead.startswith("--"):
+							val = args.pop(0)
+					except:
+						pass
+
+					val = conv(val)
 					if (val == None):
 						val = default()
 
 					vals[parg] = val
 					continue
+			# somewhat lame, but i don't want to rewrite the fn at this time
+			exception = ValueError("Unknown argument %s" % (arg)) 
 
-			raise ValueError("Unknown argument %s" % (arg)) 
-
-		
-		f = getattr(client, function, None)
+		f = None
+		try:
+			f = extraViews[function][0]
+		except:
+			pass
 
 		if (f is None):
-			f = extraViews[function][0]
-		if (function in convertArgs):
-			fargs = eval(convertArgs[function], globals(), vals)
-		else:
-			fargs = []
-		res = f(*fargs)
+			f = getattr(client, function, None)
+
+		try:
+			if exception is not None:
+				raise exception
+
+			if (function in convertArgs):
+				fargs = eval(convertArgs[function], globals(), vals)
+			else:
+				fargs = []
+
+			res = f(*fargs)
+		except Exception, e:
+			print "Failed in calling %s: %s" % (function, e)
+			print "Please run tashi-client --examples for syntax information"
+			sys.exit(-1)
+
 		if (res != None):
 			keys = extraViews.get(function, (None, None))[1]
 			try:
 				if (type(res) == types.ListType):
 					makeTable(res, keys)
+				elif (type(res) == types.StringType):
+					print res
 				else:
 					makeTable([res], keys)
 					

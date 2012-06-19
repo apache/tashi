@@ -43,25 +43,28 @@ class DataInterface(object):
 	def getHosts(self):
 		raise NotImplementedError
 	
-	def getHost(self, id):
+	def getHost(self, _id):
+		raise NotImplementedError
+
+	def getImages(self):
 		raise NotImplementedError
 	
 	def getInstances(self):
 		raise NotImplementedError
 	
-	def getInstance(self, id):
+	def getInstance(self, _id):
 		raise NotImplementedError
 	
 	def getNetworks(self):
 		raise NotImplementedError
 	
-	def getNetwork(self, id):
+	def getNetwork(self, _id):
 		raise NotImplementedError
 	
 	def getUsers(self):
 		raise NotImplementedError
 	
-	def getUser(self, id):
+	def getUser(self, _id):
 		raise NotImplementedError
 
 	def registerHost(self, hostname, memory, cores, version):

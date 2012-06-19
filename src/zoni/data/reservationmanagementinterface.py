@@ -18,9 +18,6 @@
 #  $Id:$
 #
 
-import sys
-import os 
-
 
 class ReservationManagementInterface(object):
 	"""  Interface description for reservation management
@@ -50,9 +47,9 @@ class ReservationManagementInterface(object):
 	def delReservation (self, userId):
 		raise NotImplementedError
 	
-	def defineReservation():
+	def defineReservation(self):
 		raise NotImplementedError
 
-	def showReservation():
+	def showReservation(self):
 		raise NotImplementedError
 

@@ -15,15 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-from tashi.rpycservices import rpycservices
+from tashi import Connection
 #from tashi.rpycservices.rpyctypes import *
 
 class ConnectionManager(object):
-	def __init__(self, username, password, port, timeout=10000.0):
+	def __init__(self, username, password, port, timeout=10000.0, authAndEncrypt=False):
 		self.username = username
 		self.password = password
 		self.timeout = timeout
 		self.port = port
+		self.authAndEncrypt = authAndEncrypt
 	
 	def __getitem__(self, hostname):
 		port = self.port
@@ -31,4 +32,4 @@ class ConnectionManager(object):
 			port = hostname[1]
 			hostname = hostname[0]
 
-		return rpycservices.client(hostname, port, username=self.username, password=self.password)
+		return Connection(hostname, port, credentials=(self.username, self.password), authAndEncrypt=self.authAndEncrypt)

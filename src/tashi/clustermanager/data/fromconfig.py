@@ -15,17 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+#XXXstroucki: for compatibility with python 2.5
 from __future__ import with_statement
+
+import logging
 import threading
 import os
 import ConfigParser
 
-from tashi.rpycservices.rpyctypes import Host, Network, User, TashiException, Errors, HostState
+from tashi.rpycservices.rpyctypes import Host, Network, User, TashiException, Errors, HostState, Instance
 from tashi.clustermanager.data import DataInterface
 
 class FromConfig(DataInterface):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
+		self.log = logging.getLogger(__name__)
 		self.hosts = {}
 		self.instances = {}
 		self.networks = {}
@@ -78,6 +82,10 @@ class FromConfig(DataInterface):
 		return instanceId
 	
 	def registerInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.acquireLock(self.instanceLock)
 		try:
 			if (instance.id is not None and instance.id not in self.instances):
@@ -107,6 +115,10 @@ class FromConfig(DataInterface):
 		return instance
 	
 	def releaseInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		try:
 			if (instance.id not in self.instances): # MPR: should never be true, but good to check
 				raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (instance.id)})
@@ -114,6 +126,10 @@ class FromConfig(DataInterface):
 			self.releaseLock(instance._lock)
 	
 	def removeInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.acquireLock(self.instanceLock)
 		try:
 			del self.instances[instance.id]
@@ -122,6 +138,10 @@ class FromConfig(DataInterface):
 			self.releaseLock(self.instanceLock)
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
+
 		self.hostLock.acquire()
 		host = self.hosts.get(hostId, None)
 		if (host is None):
@@ -134,6 +154,10 @@ class FromConfig(DataInterface):
 
 	
 	def releaseHost(self, host):
+		if type(host) is not Host:
+			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+			raise TypeError
+
 		try:
 			if (host.id not in self.hosts): # MPR: should never be true, but good to check
 				raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (host.id)})
@@ -145,47 +169,47 @@ class FromConfig(DataInterface):
 	def getHosts(self):
 		return self.hosts
 	
-	def getHost(self, id):
-		host = self.hosts.get(id, None)
+	def getHost(self, _id):
+		host = self.hosts.get(_id, None)
 		if (not host):
-			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (_id)})
 		return host
 
 	def getInstances(self):
 		return self.instances
 	
-	def getInstance(self, id):
-		instance = self.instances.get(id, None)
+	def getInstance(self, _id):
+		instance = self.instances.get(_id, None)
 		if (not instance):
-			raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchInstanceId,'msg':"No such instanceId - %d" % (_id)})
 		return instance
 	
 	def getNetworks(self):
 		return self.networks
 	
-	def getNetwork(self, id):
-		return self.networks[id]
+	def getNetwork(self, _id):
+		return self.networks[_id]
 	
 	def getUsers(self):
 		return self.users
 	
-	def getUser(self, id):
-		return self.users[id]
+	def getUser(self, _id):
+		return self.users[_id]
 		
 	def registerHost(self, hostname, memory, cores, version):
 		self.hostLock.acquire()
-		for id in self.hosts.keys():
-			if self.hosts[id].name == hostname:
-				host = Host(d={'id':id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
-				self.hosts[id] = host
+		for _id in self.hosts.keys():
+			if self.hosts[_id].name == hostname:
+				host = Host(d={'id':_id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
+				self.hosts[_id] = host
 				self.save()
 				self.hostLock.release()
-				return id, True
-		id = self.getNewId("hosts")
-		self.hosts[id] = Host(d={'id':id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
+				return _id, True
+		_id = self.getNewId("hosts")
+		self.hosts[_id] = Host(d={'id':_id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
 		self.save()
 		self.hostLock.release()
-		return id, False
+		return _id, False
 		
 	def unregisterHost(self, hostId):
 		self.hostLock.acquire()
@@ -200,10 +224,10 @@ class FromConfig(DataInterface):
 		maxId = 0
 		l = []
 		if(table == "hosts"):
-			for id in self.hosts.keys():
-				l.append(id)
-				if id >= maxId:
-					maxId = id
+			for _id in self.hosts.keys():
+				l.append(_id)
+				if _id >= maxId:
+					maxId = _id
 		l.sort() # sort to enable comparing with range output
 		# check if some id is released:
 		t = range(maxId + 1)
@@ -221,9 +245,9 @@ class FromConfig(DataInterface):
 		# and in what order does it get loaded
 		fileName = "./etc/Tashi.cfg"
 		if not os.path.exists(fileName):
-			file = open(fileName, "w")
-			file.write("[FromConfig]")
-			file.close()	
+			filehandle = open(fileName, "w")
+			filehandle.write("[FromConfig]")
+			filehandle.close()	
 		parser = ConfigParser.ConfigParser()
 		parser.read(fileName)
 		
@@ -231,7 +255,7 @@ class FromConfig(DataInterface):
 			parser.add_section("FromConfig")
 		
 		hostsInFile = []
-		for (name, value) in parser.items("FromConfig"):
+		for (name, __value) in parser.items("FromConfig"):
 			name = name.lower()
 			if (name.startswith("host")):
 				hostsInFile.append(name)

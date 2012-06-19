@@ -130,6 +130,10 @@ class SQL(DataInterface):
 		return h
 	
 	def registerInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			if (instance.id is not None and instance.id not in self.getInstances()):
@@ -173,6 +177,10 @@ class SQL(DataInterface):
 		return instance
 	
 	def releaseInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			l = self.makeInstanceList(instance)
@@ -191,6 +199,10 @@ class SQL(DataInterface):
 			self.instanceLock.release()
 	
 	def removeInstance(self, instance):
+		if type(instance) is not Instance:
+			self.log.exception("Argument is not of type Instance, but of type %s" % (type(instance)))
+			raise TypeError
+
 		self.instanceLock.acquire()
 		try:
 			self.executeStatement("DELETE FROM instances WHERE id = %d" % (instance.id))
@@ -205,6 +217,10 @@ class SQL(DataInterface):
 			self.instanceLock.release()
 	
 	def acquireHost(self, hostId):
+		if type(hostId) is not int:
+			self.log.exception("Argument is not of type int, but of type %s" % (type(hostId)))
+			raise TypeError
+
 		host = self.getHost(hostId)
 		self.hostLock.acquire()
 		self.hostLocks[host.id] = self.hostLocks.get(host.id, threading.Lock())
@@ -214,6 +230,10 @@ class SQL(DataInterface):
 		return host
 	
 	def releaseHost(self, host):
+		if type(host) is not Host:
+			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
+			raise TypeError
+
 		l = self.makeHostList(host)
 		s = ""
 		for e in range(0, len(self.hostOrder)):
@@ -234,14 +254,14 @@ class SQL(DataInterface):
 	
 	def getHost(self, in_id):
 		try:
-			id = int(in_id)
+			_id = int(in_id)
 		except:
 			self.log.exception("Argument to getHost was not integer: %s" % in_id)
 
-		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % id)
+		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % _id)
 		r = cur.fetchone()
 		if (r == None):
-			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (_id)})
 		host = self.makeListHost(r)
 		return host
 	
@@ -256,16 +276,16 @@ class SQL(DataInterface):
 	
 	def getInstance(self, in_id):
 		try:
-			id = int(in_id)
+			_id = int(in_id)
 		except:
 			self.log.exception("Argument to getInstance was not integer: %s" % in_id)
 
-		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (id))
+		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (_id))
 		# XXXstroucki should only return one row.
 		# what about migration? should it be enforced?
 		r = cur.fetchone()
 		if (not r):
-			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (_id)})
 		instance = self.makeListInstance(r)
 		return instance
 	
@@ -278,22 +298,23 @@ class SQL(DataInterface):
 			networks[network.id] = network
 		return networks
 	
-	def getNetwork(self, id):
-		cur = self.executeStatement("SELECT * FROM networks WHERE id = %d" % (id))
+	def getNetwork(self, _id):
+		cur = self.executeStatement("SELECT * FROM networks WHERE id = %d" % (_id))
 		r = cur.fetchone()
 		network = Network(d={'id':r[0], 'name':r[1]})
 		return network
 
-        def getImages(self):
-                count = 0
-                myList = []
-                for i in self.dfs.list("images"):
-                        myFile = self.dfs.getLocalHandle("images/" + i)
-                        if os.path.isfile(myFile):
-                                image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
-                                myList.append(image)
-                                count += 1
-                return myList
+	def getImages(self):
+		count = 0
+		myList = []
+		for i in self.dfs.list("images"):
+			myFile = self.dfs.getLocalHandle("images/" + i)
+			if os.path.isfile(myFile):
+				image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+				myList.append(image)
+				count += 1
+
+		return myList
 	
 	def getUsers(self):
 		cur = self.executeStatement("SELECT * from users")
@@ -304,8 +325,8 @@ class SQL(DataInterface):
 			users[user.id] = user
 		return users
 	
-	def getUser(self, id):
-		cur = self.executeStatement("SELECT * FROM users WHERE id = %d" % (id))
+	def getUser(self, _id):
+		cur = self.executeStatement("SELECT * FROM users WHERE id = %d" % (_id))
 		r = cur.fetchone()
 		user = User(d={'id':r[0], 'name':r[1], 'passwd':r[2]})
 		return user
@@ -316,20 +337,20 @@ class SQL(DataInterface):
 		res = cur.fetchall()
 		for r in res:
 			if r[1] == hostname:
-				id = r[0]
-				self.log.warning("Host %s already registered, update will be done" % id)
+				_id = r[0]
+				self.log.warning("Host %s already registered, update will be done" % _id)
 				s = ""
-				host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+				host = Host(d={'id': _id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 				l = self.makeHostList(host)
 				for e in range(0, len(self.hostOrder)):
 					s = s + self.hostOrder[e] + "=" + l[e]
 					if (e < len(self.hostOrder)-1):
 						s = s + ", "
-				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, id))
+				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, _id))
 				self.hostLock.release()
 				return r[0], True
-		id = self.getNewId("hosts")
-		host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+		_id = self.getNewId("hosts")
+		host = Host(d={'id': _id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 		l = self.makeHostList(host)
 		self.executeStatement("INSERT INTO hosts VALUES (%s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		self.hostLock.release()
@@ -353,10 +374,10 @@ class SQL(DataInterface):
 		maxId = 0 # the first id would be 1
 		l = []
 		for r in res:
-			id = r[0]
-			l.append(id)
-			if id >= maxId:
-				maxId = id
+			_id = r[0]
+			l.append(_id)
+			if _id >= maxId:
+				maxId = _id
 		l.sort() # sort to enable comparing with range output
 		# check if some id is released:
 		t = range(maxId + 1)

@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+import logging
 import cPickle
 import os
 import threading
@@ -24,6 +25,7 @@ from tashi.clustermanager.data import FromConfig, DataInterface
 class Pickled(FromConfig):
 	def __init__(self, config):
 		DataInterface.__init__(self, config)
+		self.log = logging.getLogger(__name__)
 		self.file = self.config.get("Pickled", "file")
 		self.locks = {}
 		self.lockNames = {}
@@ -39,39 +41,51 @@ class Pickled(FromConfig):
 	
 	def cleanInstances(self):
 		ci = {}
-		for i in self.instances.itervalues():
+		for __ignore, i in self.instances.items():
 			i2 = Instance(d=i.__dict__)
 			ci[i2.id] = i2
 		return ci
 	
 	def cleanHosts(self):
 		ch = {}
-		for h in self.hosts.itervalues():
+		for __ignore, h in self.hosts.items():
 			h2 = Host(d=h.__dict__)
 			ch[h2.id] = h2
 		return ch
 	
 	def save(self):
-		file = open(self.file, "w")
-		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), file)
-		file.close()
+		# XXXstroucki lock here to serialize saves
+		filename = self.file
+		# XXXstroucki could be better
+		tempfile = "%s.new" % filename
+
+		filehandle = open(tempfile, "w")
+		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), filehandle)
+		filehandle.close()
+		try:
+			os.rename(tempfile, filename)
+		except OSError:
+			# XXXstroucki: regular save will take place
+			# soon enough, ignore this until locking is
+			# in place.
+			pass
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
-			file = open(self.file, "r")
-			(hosts, instances, networks, users) = cPickle.load(file)
-			file.close()
+			filehandle = open(self.file, "r")
+			(hosts, instances, networks, users) = cPickle.load(filehandle)
+			filehandle.close()
 		else:
 			(hosts, instances, networks, users) = ({}, {}, {}, {})
 		self.hosts = hosts
 		self.instances = instances
 		self.networks = networks
 		self.users = users
-		for i in self.instances.itervalues():
+		for __ignore, i in self.instances.items():
 			if (i.id >= self.maxInstanceId):
 				self.maxInstanceId = i.id + 1
 			i._lock = threading.Lock()
 			self.lockNames[i._lock] = "i%d" % (i.id)
-		for h in self.hosts.itervalues():
+		for __ignore, h in self.hosts.items():
 			h._lock = threading.Lock()
 			self.lockNames[h._lock] = "h%d" % (h.id)

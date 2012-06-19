@@ -17,7 +17,6 @@
 
 import os
 import time
-import types
 
 from tashi import scrubString
 

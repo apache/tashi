@@ -17,9 +17,11 @@
 
 import subprocess
 import time
-from tashi.rpycservices.rpyctypes import User
+#XXXstroucki getImages requires os?
+import os
+from tashi.rpycservices.rpyctypes import User, LocalImages
+from tashi.util import instantiateImplementation, humanReadable
 from tashi.clustermanager.data import DataInterface
-from tashi.util import instantiateImplementation
 
 class LdapOverride(DataInterface):
 	def __init__(self, config):
@@ -31,6 +33,7 @@ class LdapOverride(DataInterface):
 		self.nameKey = config.get("LdapOverride", "nameKey")
 		self.idKey = config.get("LdapOverride", "idKey")
 		self.ldapCommand = config.get("LdapOverride", "ldapCommand")
+		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
 	
 	def registerInstance(self, instance):
 		return self.baseDataObject.registerInstance(instance)
@@ -53,20 +56,31 @@ class LdapOverride(DataInterface):
 	def getHosts(self):
 		return self.baseDataObject.getHosts()
 	
-	def getHost(self, id):
-		return self.baseDataObject.getHost(id)
+	def getHost(self, _id):
+		return self.baseDataObject.getHost(_id)
 	
 	def getInstances(self):
 		return self.baseDataObject.getInstances()
 	
-	def getInstance(self, id):
-		return self.baseDataObject.getInstance(id)
+	def getInstance(self, _id):
+		return self.baseDataObject.getInstance(_id)
 	
 	def getNetworks(self):
 		return self.baseDataObject.getNetworks()
 	
-	def getNetwork(self, id):
-		return self.baseDataObject.getNetwork(id)
+	def getNetwork(self, _id):
+		return self.baseDataObject.getNetwork(_id)
+
+	def getImages(self):
+		count = 0
+		myList = []
+		for i in self.dfs.list("images"):
+			myFile = self.dfs.getLocalHandle("images/" + i)
+			if os.path.isfile(myFile):
+				image = LocalImages(d={'id':count, 'imageName':i, 'imageSize':humanReadable(self.dfs.stat(myFile)[6])})
+				myList.append(image)
+				count += 1
+		return myList
 
 	def fetchFromLdap(self):
 		now = time.time()
@@ -86,7 +100,7 @@ class LdapOverride(DataInterface):
 								myUsers[user.id] = user
 							thisUser = {}
 						else:
-							(key, sep, val) = l.partition(":")
+							(key, __sep, val) = l.partition(":")
 							key = key.strip()
 							val = val.strip()
 							thisUser[key] = val
@@ -101,9 +115,9 @@ class LdapOverride(DataInterface):
 		self.fetchFromLdap()
 		return self.users
 	
-	def getUser(self, id):
+	def getUser(self, _id):
 		self.fetchFromLdap()
-		return self.users[id]
+		return self.users[_id]
 		
 	def registerHost(self, hostname, memory, cores, version):
 		return self.baseDataObject.registerHost(hostname, memory, cores, version)

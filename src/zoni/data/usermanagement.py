@@ -18,7 +18,6 @@
 #  $Id$
 #
 
-import sys
 import os 
 
 from usermanagementinterface import UserManagementInterface

@@ -19,14 +19,13 @@
 #
 
 import sys
-import os 
 import pexpect
 import time
 import logging
 import tempfile
 
 from systemmanagementinterface import SystemManagementInterface
-from zoni.extra.util import timeF, log
+from zoni.extra.util import timeF
 
 
 class dellDrac(SystemManagementInterface):
@@ -116,19 +115,19 @@ class dellDrac(SystemManagementInterface):
 			
 		child = self.__login()
 		child.logfile = fout
-		cmd = "racadm serveraction -m " +  self.server + " powerup"
+		cmd = "racadm serveraction -m %s powerup" % (self.server)
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
-		self.log.info("Hardware power on : %s", self.hostname)
+		self.log.info("Hardware power on : %s" % self.hostname)
 		for val in fout.readlines():
 			if "OK" in val:
 				code = 1 
 			if "ALREADY POWER-ON" in val:
 				code = 1 
-				self.log.info("Hardware already powered on : %s", self.hostname)
+				self.log.info("Hardware already powered on : %s" % self.hostname)
 		if code < 1:
-			self.log.info("Hardware power on failed : %s", self.hostname)
+			self.log.info("Hardware power on failed : %s" % self.hostname)
 		fout.close()
 		child.terminate()
 		return code
@@ -139,15 +138,15 @@ class dellDrac(SystemManagementInterface):
 		fout = tempfile.TemporaryFile()
 		child = self.__login()
 		child.logfile = fout
-		cmd = "racadm serveraction -m " + self.server + " powerdown"
+		cmd = "racadm serveraction -m %s powerdown" % (self.server)
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
-		self.log.info("Hardware power off : %s", self.hostname)
+		self.log.info("Hardware power off : %s" % self.hostname)
 		for val in fout.readlines():
 			if "OK" in val:
 				code = 1
- 			if "CURRENTLY POWER-OFF" in val:
+			if "CURRENTLY POWER-OFF" in val:
 				self.log.info("Hardware already power off : %s", self.hostname)
 				code = 1
 		if code < 1:
@@ -164,14 +163,14 @@ class dellDrac(SystemManagementInterface):
 		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " graceshutdown"
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
 		self.log.info("Hardware power off (soft): %s", self.hostname)
 
 		for val in fout.readlines():
 			if "OK" in val:
 				code = 1
- 			if "CURRENTLY POWER-OFF" in val:
+			if "CURRENTLY POWER-OFF" in val:
 				self.log.info("Hardware already power off : %s", self.hostname)
 				code = 1
 		if code < 1:
@@ -188,7 +187,7 @@ class dellDrac(SystemManagementInterface):
 		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " powercycle"
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
 		self.log.info("Hardware power cycle : %s", self.hostname)
 		for val in fout.readlines():
@@ -208,7 +207,7 @@ class dellDrac(SystemManagementInterface):
 		child.logfile = fout
 		cmd = "racadm serveraction -m " + self.server + " hardreset"
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		fout.seek(0)
 		for val in fout.readlines():
 			if "OK" in val:
@@ -225,5 +224,5 @@ class dellDrac(SystemManagementInterface):
 		child = self.__login()
 		cmd = "connect -F " + self.server
 		child.sendline(cmd)
-		i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
+		__i=child.expect(['DRAC/MC:', pexpect.EOF, pexpect.TIMEOUT])
 		child.terminate()

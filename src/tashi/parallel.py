@@ -34,7 +34,8 @@ class ThreadPool(Queue.Queue):
 	def __init__(self, size=8, maxsize=0):
 		Queue.Queue.__init__(self, maxsize)
 		for i in range(size):
-			thread = threading.Thread(target=self._worker)
+			name = "parallel.ThreadPool#%s" % (i)
+			thread = threading.Thread(name=name, target=self._worker)
 			thread.setDaemon(True)
 			thread.start()
 	def _worker(self):
@@ -129,9 +130,9 @@ class TestThreadPool(unittest.TestCase):
 			time.sleep(sleep)
 			queue.put(None)
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			slowfunc()
-		for i in range(4):
+		for _ in range(4):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 4, 1) 
@@ -143,9 +144,9 @@ class TestThreadPool(unittest.TestCase):
 			time.sleep(sleep)
 			queue.put(None)
 		tt = time.time()
-		for i in range(8):
+		for _ in range(8):
 			slowthreadfunc()
-		for i in range(8):
+		for _ in range(8):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 1, 1) 
@@ -158,9 +159,9 @@ class TestThreadPool(unittest.TestCase):
 			time.sleep(sleep)
 			queue.put(None)
 		tt = time.time()
-		for i in range(8):
+		for _ in range(8):
 			slowpoolfunc()
-		for i in range(8):
+		for _ in range(8):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 2, 1) 
@@ -175,9 +176,9 @@ class TestThreadPool(unittest.TestCase):
 				queue.put(None)
 		sc = slowclass()
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			sc.beslow()
-		for i in range(4):
+		for _ in range(4):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 4, 1)
@@ -193,9 +194,9 @@ class TestThreadPool(unittest.TestCase):
 				queue.put(None)
 		sc = slowclass()
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			sc.beslow()
-		for i in range(4):
+		for _ in range(4):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 1, 1)
@@ -211,9 +212,9 @@ class TestThreadPool(unittest.TestCase):
 				queue.put(None)
 		sc = slowclass()
 		tt = time.time()
-		for i in range(16):
+		for _ in range(16):
 			sc.beslow()
-		for i in range(16):
+		for _ in range(16):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 2, 1)
@@ -228,9 +229,9 @@ class TestThreadPool(unittest.TestCase):
 		def slowthreadfunc():
 			addtoqueue()
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			slowthreadfunc()
-		for i in range(4):
+		for _ in range(4):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 4, 1) 
@@ -254,10 +255,10 @@ class TestThreadPool(unittest.TestCase):
 		def slowthreadfunc2():
 			atc.addtoqueue2()
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			slowthreadfunc1()
 			slowthreadfunc2()
-		for i in range(8):
+		for _ in range(8):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 8, 1) 
@@ -279,10 +280,10 @@ class TestThreadPool(unittest.TestCase):
 		def slowthreadfunc2():
 			atc.addtoqueue2()
 		tt = time.time()
-		for i in range(4):
+		for _ in range(4):
 			slowthreadfunc1()
 			slowthreadfunc2()
-		for i in range(8):
+		for _ in range(8):
 			queue.get()
 		tt = time.time() - tt
 		self.assertAlmostEqual(tt, 1, 1) 

@@ -18,7 +18,6 @@
 # implementation of dfs interface functions
 
 import shutil
-import os
 import os.path
 from dfsinterface import DfsInterface
 

@@ -21,9 +21,6 @@
 
 import os 
 import sys
-import string
-import traceback
-import optparse
 import shutil
 import urllib
 import tarfile
@@ -38,21 +35,21 @@ sys.path.append(a)
 a = os.path.join("../../..")
 sys.path.append(a)
 
-from zoni.extra.util import *
-from zoni.version import *
+from zoni.extra.util import getConfig, checkSuper, createDir
+#from zoni.version import version, revision
 from zoni.bootstrap.pxe import Pxe
 
 
 def main():
 	''' This file sets up PXE for Zoni '''
 
-	ver = version.split(" ")[0]
-	rev = revision
+	#ver = version.split(" ")[0]
+	#rev = revision
 
-	parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
-	(options, args) = parser.parse_args()
+	#parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
+	#(options, args) = parser.parse_args()
 
-	(configs, configFile) = getConfig()
+	(configs, __configFile) = getConfig()
 
 	ZoniPxeSetup(configs)
 	ZoniGetSyslinux(configs)
@@ -62,11 +59,11 @@ def ZoniPxeSetup(config):
 	tftpRootDir = config['tftpRootDir']
 	tftpImageDir = config['tftpImageDir']
 	tftpBootOptionsDir = config['tftpBootOptionsDir']
-	tftpUpdateFile =  config['tftpUpdateFile'] 
+	#tftpUpdateFile =  config['tftpUpdateFile'] 
 	tftpBaseFile = config['tftpBaseFile'] 
 	tftpBaseMenuFile = config['tftpBaseMenuFile'] 
 	installBaseDir = config['installBaseDir']
-	registrationBaseDir = config['registrationBaseDir']
+	#registrationBaseDir = config['registrationBaseDir']
 	
 
 	#  Create the directory structure

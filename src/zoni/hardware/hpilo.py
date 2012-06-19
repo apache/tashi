@@ -19,7 +19,6 @@
 #
 
 import sys
-import os 
 import pexpect
 import time
 
@@ -28,6 +27,26 @@ from zoni.extra.util import timeF, log
 
 #XXX  Need to add more error checking!
 #XXX  Need to consider difference in responses between a rackmount server and a blade server - MIMOS
+
+def log(f):
+	def myF(*args, **kw):
+		print "calling %s%s" % (f.__name__, str(args))
+		res = f(*args, **kw)
+		print "returning from %s -> %s" % (f.__name__, str(res))
+		return res
+	myF.__name__ = f.__name__
+	return myF
+
+def timeF(f):
+	def myF(*args, **kw):
+		start = time.time()
+		res = f(*args, **kw)
+		end = time.time()
+		print "%s took %f" % (f.__name__, end-start)
+		return res
+	myF.__name__ = f.__name__
+	return myF
+
 
 class hpILo(SystemManagementInterface):
 	def __init__(self, config, nodeName, hostInfo):
