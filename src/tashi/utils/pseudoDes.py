@@ -1,5 +1,4 @@
-#! /usr/bin/env python
-
+#!/usr/bin/python
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -17,6 +16,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# XXXstroucki: why pseudo?
+
 values = {1:(0xcba4e531, 0x12be4590),
           2:(0x537158eb, 0xab54ce58),
           3:(0x145cdc3c, 0x6954c7a6),
@@ -26,7 +27,7 @@ def crc(short, char):
 	short = short & 0xffff
 	char = char & 0xff
 	value = short ^ (char << 8)
-	for i in range(0, 8):
+	for __i in range(0, 8):
 		if value & 0x8000:
 			value = (value << 1) ^ 4129
 		else:

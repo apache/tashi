@@ -22,7 +22,7 @@ import socket
 import subprocess
 import time
 from instancehook import InstanceHook
-from tashi.rpycservices.rpyctypes import Instance, NetworkConfiguration
+from tashi.rpycservices.rpyctypes import Instance
 from tashi import boolean
 
 class DhcpDns(InstanceHook):
@@ -55,15 +55,21 @@ class DhcpDns(InstanceHook):
 		self.ipMax = {}
 		self.currentIP = {}
 		self.usedIPs = {}
-		for k in self.ipRange:
-			ipRange = self.ipRange[k]
-			(min, max) = ipRange.split("-")	
-			min = min.strip()
-			max = max.strip()
-			ipNum = self.strToIp(min)
-			self.ipMin[k] = self.strToIp(min)
-			self.ipMax[k] = self.strToIp(max)
-			self.currentIP[k] = self.ipMin[k]
+
+		self.initIPs()
+
+	def initIPs(self):
+		self.usedIPs = {}
+		for network in self.ipRange:
+			ipRange = self.ipRange[network]
+			(ipMin, ipMax) = ipRange.split("-")	
+			ipMin = ipMin.strip()
+			ipMax = ipMax.strip()
+			ipNum = self.strToIp(ipMin)
+			self.ipMin[network] = self.strToIp(ipMin)
+			self.ipMax[network] = self.strToIp(ipMax)
+			self.currentIP[network] = self.ipMin[network]
+
 		instances = self.client.getInstances()
 		for i in instances:
 			for nic in i.nics:
@@ -72,7 +78,7 @@ class DhcpDns(InstanceHook):
 					ipNum = self.strToIp(ip)
 					self.log.info('Added %s->%s during reinitialization' % (i.name, ip))
 					self.usedIPs[ipNum] = ip
-				except Exception, e:
+				except Exception:
 					pass
 		
 	def strToIp(self, s):
@@ -87,12 +93,17 @@ class DhcpDns(InstanceHook):
 		return "%d.%d.%d.%d" % ((ip>>24)&0xff, (ip>>16)&0xff, (ip>>8)&0xff, ip&0xff)
 	
 	def allocateIP(self, nic):
+		# XXXstroucki: if the network is not defined having an ip
+		# range, this will throw a KeyError. Should be logged.
 		network = nic.network
 		allocatedIP = None
 		requestedIP = self.strToIp(nic.ip)
 		wrapToMinAlready = False
 		if (requestedIP <= self.ipMax[network] and requestedIP >= self.ipMin[network] and (requestedIP not in self.usedIPs)):
 			allocatedIP = requestedIP
+
+		# nic.ip will be updated later in preCreate if chosen
+		# ip not available
 		while (allocatedIP == None):
 			if (self.currentIP[network] > self.ipMax[network] and wrapToMinAlready):
 				raise UserWarning("No available IP addresses for network %d" % (network))
@@ -127,7 +138,7 @@ class DhcpDns(InstanceHook):
 		stdin.write("set hardware-type = 00:00:00:01\n") # Ethernet
 		stdin.write("create\n")
 		stdin.close()
-		output = stdout.read()
+		__output = stdout.read()
 		stdout.close()
 
 	def removeDhcp(self, name, ipaddr=None):
@@ -146,7 +157,7 @@ class DhcpDns(InstanceHook):
 		stdin.write("open\n")
 		stdin.write("remove\n")
 		stdin.close()
-		output = stdout.read()
+		__output = stdout.read()
 		stdout.close()
 	
 	def addDns(self, name, ip):
@@ -169,15 +180,15 @@ class DhcpDns(InstanceHook):
 				stdin.write("update add %s %d IN PTR %s.%s.\n" % (reverseIpStr, self.dnsExpire, name, self.dnsDomain))
 				stdin.write("\n")
 			stdin.close()
-			output = stdout.read()
+			__output = stdout.read()
 			stdout.close()
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
-			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+			(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
 			while (pid == 0): 
 				time.sleep(0.5)
 				os.kill(child.pid, signal.SIGTERM)
-				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+				(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
 	
 	def removeDns(self, name):
 		cmd = "nsupdate"
@@ -196,15 +207,15 @@ class DhcpDns(InstanceHook):
 			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
 			stdin.write("\n")
 			stdin.close()
-			output = stdout.read()
+			__output = stdout.read()
 			stdout.close()
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
-			(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+			(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
 			while (pid == 0): 
 				time.sleep(0.5)
 				os.kill(child.pid, signal.SIGTERM)
-				(pid, status) = os.waitpid(child.pid, os.WNOHANG)
+				(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
 	
 	def doUpdate(self, instance):
 		newInstance = Instance()
@@ -229,7 +240,7 @@ class DhcpDns(InstanceHook):
 					dhcpName = instance.name + "-nic%d" % (i)
 				self.log.info("Adding %s:{%s->%s} to DHCP" % (dhcpName, nic.mac, ip))
 				self.addDhcp(dhcpName, ip, nic.mac)
-			except Exception, e:
+			except Exception:
 				self.log.exception("Failed to add host %s to DHCP/DNS" % (instance.name))
 		self.doUpdate(instance)
 
@@ -242,8 +253,11 @@ class DhcpDns(InstanceHook):
 			ip = nic.ip
 			try:
 				ipNum = self.strToIp(ip)
+				# XXXstroucki: if this fails with KeyError,
+				# we must have double-assigned the same IP
+				# address. How does this happen?
 				del self.usedIPs[ipNum]
-			except Exception, e:
+			except Exception:
 				self.log.exception("Failed to remove host %s, ip %s from pool of usedIPs" % (instance.name, ip))
 			try:
 				if (i == 0):
@@ -251,9 +265,13 @@ class DhcpDns(InstanceHook):
 				else:
 					dhcpName = instance.name + "-nic%d" % (i)
 				self.removeDhcp(dhcpName)
-			except Exception, e:
+			except Exception:
 				self.log.exception("Failed to remove host %s from DHCP" % (instance.name))
 		try:
+			# XXXstroucki: this can fail if the resolver can't
+			# resolve the dns server name (line 190). Perhaps
+			# the hostname should be then pushed onto a list
+			# to try again next time.
 			self.removeDns(instance.name)
-		except Exception, e:
+		except Exception:
 			self.log.exception("Failed to remove host %s from DNS" % (instance.name))

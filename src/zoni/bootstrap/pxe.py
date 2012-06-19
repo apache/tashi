@@ -22,7 +22,6 @@ import os
 import sys
 import string
 import datetime
-import subprocess
 import MySQLdb
 import traceback
 import logging

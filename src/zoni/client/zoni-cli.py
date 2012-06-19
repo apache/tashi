@@ -20,43 +20,36 @@
 #
 #  $Id$
 #
-import os
-import sys
+
 import optparse
 import socket
 import logging.config
 import getpass
+import os
+import sys
 import re
+import string
 import subprocess
-
-
 
 #from zoni import *
 #from zoni.data.resourcequerysql import ResourceQuerySql
-import zoni
-from zoni.data.resourcequerysql import *
+#import zoni
+#from zoni.data.resourcequerysql import *
 
-from zoni.data.usermanagementinterface import UserManagementInterface
-from zoni.data.usermanagementinterface import UserManagementInterface
-
-from zoni.bootstrap.bootstrapinterface import BootStrapInterface
 from zoni.bootstrap.pxe import Pxe
 
-from zoni.hardware.systemmanagementinterface import SystemManagementInterface
 from zoni.hardware.ipmi import Ipmi
-from zoni.hardware.hwswitchinterface import HwSwitchInterface
 from zoni.hardware.dellswitch import HwDellSwitch
 from zoni.hardware.raritanpdu import raritanDominionPx
 from zoni.hardware.delldrac import dellDrac
+import zoni.hardware.systemmanagement
+from zoni.data import usermanagement
 from zoni.agents.dhcpdns import DhcpDns
 
-from zoni.hardware.systemmanagement import SystemManagement
+from zoni.extra.util import validIp, validMac 
+from zoni.version import version, revision
 
-
-from zoni.extra.util import * 
-from zoni.version import *
-
-from tashi.util import instantiateImplementation, signalHandler
+from tashi.util import instantiateImplementation, getConfig
 #import zoni.data.usermanagement 
 #from usermanagement import UserManagement
 
@@ -74,7 +67,7 @@ def main():
 	(configs, configFiles) = getConfig()
 
 	logging.config.fileConfig(configFiles)
-	log = logging.getLogger(os.path.basename(__file__))
+	#log = logging.getLogger(os.path.basename(__file__))
 	#logit(configs['logFile'], "Starting Zoni client")
 	#logit(configs['logFile'], "Loading config file")
 
@@ -359,11 +352,11 @@ def main():
 	if (options.nodeName):
 		cmdargs["sys_id"] = options.nodeName
 
-	if 	(options.numCores or options.clockSpeed or options.numMemory or options.numProcs or options.cpuFlags) and not options.showResources:
-			usage = "MISSING OPTION: When specifying hardware parameters, you need the -s or --showResources switch"
-			print usage
-			parser.print_help()	
-			exit()
+	if (options.numCores or options.clockSpeed or options.numMemory or options.numProcs or options.cpuFlags) and not options.showResources:
+		usage = "MISSING OPTION: When specifying hardware parameters, you need the -s or --showResources switch"
+		print usage
+		parser.print_help()	
+		exit()
 
 	if options.getResources:
 		print "ALL resources"
@@ -464,7 +457,7 @@ def main():
 			userId = usermgt.getUserId(options.userName)
 
 		if userId:
-			reservationId = reservation.createReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
+			__reservationId = reservation.createReservation(userId, options.reservationDuration, options.myNotes + " " + str(string.join(args[0:len(args)])))
 
 		else:
 			print "user doesn't exist"
@@ -771,7 +764,7 @@ def main():
 				try:
 					socket.gethostbyname(hostName)
 					sys.stdout.write("[Success]\n")
-				except Exception, e:
+				except Exception:
 					sys.stdout.write("[Fail]\n")
 			else:
 				mesg = "ERROR:  Malformed IP Address\n"
@@ -794,7 +787,7 @@ def main():
 				try:
 					socket.gethostbyname(hostName)
 					sys.stdout.write("[Fail]\n")
-				except Exception, e:
+				except Exception:
 					sys.stdout.write("[Success]\n")
 			if options.removeDhcp:	
 				dhcpdns.removeDhcp(hostName)

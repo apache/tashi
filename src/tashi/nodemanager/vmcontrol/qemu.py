@@ -50,12 +50,12 @@ def controlConsole(child, port):
 			output = child.monitorFd
 			#print "listen"
 			select.select([ls], [], [])
-			(s, clientAddr) = listenSocket.accept()
+			(s, __clientAddr) = listenSocket.accept()
 			while s:
 				if (output != -1):
-					(rl, wl, el) = select.select([s, output], [], [])
+					(rl, __wl, __el) = select.select([s, output], [], [])
 				else:
-					(rl, wl, el) = select.select([s], [], [])
+					(rl, __wl, __el) = select.select([s], [], [])
 				if (len(rl) > 0):
 					if (rl[0] == s):
 						#print "from s"
@@ -87,17 +87,19 @@ class Qemu(VmControlInterface):
 	
 	def __init__(self, config, dfs, nm):
 		VmControlInterface.__init__(self, config, dfs, nm)
-		self.QEMU_BIN = self.config.get("Qemu", "qemuBin")
-		self.INFO_DIR = self.config.get("Qemu", "infoDir")
-		self.POLL_DELAY = float(self.config.get("Qemu", "pollDelay"))
-		self.migrationRetries = int(self.config.get("Qemu", "migrationRetries"))
-		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout"))
-		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout"))
-		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument"))
-		self.statsInterval = float(self.config.get("Qemu", "statsInterval"))
-		# XXXstroucki amount of reserved memory could be configurable
-		self.reservedMem = 512
-		# XXXstroucki perhaps make this configurable
+		self.QEMU_BIN = self.config.get("Qemu", "qemuBin", default = "/usr/bin/kvm")
+		self.INFO_DIR = self.config.get("Qemu", "infoDir", default = "/var/tmp/VmControlQemu/")
+		self.POLL_DELAY = float(self.config.get("Qemu", "pollDelay", default = 1))
+		self.migrationRetries = int(self.config.get("Qemu", "migrationRetries", default = 10))
+		self.monitorTimeout = float(self.config.get("Qemu", "monitorTimeout", default = 60))
+		self.migrateTimeout = float(self.config.get("Qemu", "migrateTimeout", default = 300))
+		self.useMigrateArgument = boolean(self.config.get("Qemu", "useMigrateArgument", default = False))
+		self.statsInterval = float(self.config.get("Qemu", "statsInterval", default = 0))
+		reservedMem = self.config.get("Qemu", "reservedMem", default = 512)
+		reservedMem = int(reservedMem)
+
+		self.reservedMem = reservedMem
+
 		self.ifPrefix = "tashi"
 		self.controlledVMs = {}
 		self.usedPorts = []
@@ -106,13 +108,20 @@ class Qemu(VmControlInterface):
 		self.vncPortLock = threading.Lock()
 		self.consolePort = 10000
 		self.consolePortLock = threading.Lock()
-		self.migrationSemaphore = threading.Semaphore(int(self.config.get("Qemu", "maxParallelMigrations")))
+		maxParallelMigrations = self.config.get("Qemu", "maxParallelMigrations")
+		maxParallelMigrations = int(maxParallelMigrations)
+		if maxParallelMigrations < 1:
+			maxParallelMigrations = 1
+
+		self.migrationSemaphore = threading.Semaphore(maxParallelMigrations)
 		self.stats = {}
+
+		self.suspendHandler = self.config.get("Qemu", "suspendHandler", default = "gzip")
+		self.resumeHandler = self.config.get("Qemu", "resumeHandler", default = "zcat")
+
 		self.scratchVg = self.config.get("Qemu", "scratchVg")
-		# XXXstroucki revise
-		self.scratchDir = self.config.get("Qemu", "scratchDir")
-		if len(self.scratchDir) == 0:
-			self.scratchDir = "/tmp"
+
+		self.scratchDir = self.config.get("Qemu", "scratchDir", default = "/tmp")
 
 		try:
 			os.mkdir(self.INFO_DIR)
@@ -129,13 +138,20 @@ class Qemu(VmControlInterface):
 		def __init__(self, **attrs):
 			self.__dict__.update(attrs)
 
+	def __dereferenceLink(self, spec):
+		newspec = os.path.realpath(spec)
+		return newspec
+
+
 	def __getHostPids(self):
 		"""Utility function to get a list of system PIDs that match the QEMU_BIN specified (/proc/nnn/exe)"""
 		pids = []
+		real_bin = self.__dereferenceLink(self.QEMU_BIN)
+
 		for f in os.listdir("/proc"):
 			try:
-				bin = os.readlink("/proc/%s/exe" % (f))
-				if (bin.find(self.QEMU_BIN) != -1):
+				binary = os.readlink("/proc/%s/exe" % (f))
+				if (binary.find(real_bin) != -1):
 					pids.append(int(f))
 			except Exception:
 				pass
@@ -146,14 +162,14 @@ class Qemu(VmControlInterface):
 		"""Will return a dict of instances by vmId to the caller"""
 		return dict((x, self.controlledVMs[x].instance) for x in self.controlledVMs.keys())
 
-	def __matchHostPids(self, controlledVMs):
+	def __matchHostPids(self):
 		"""This is run in a separate polling thread and it must do things that are thread safe"""
 
-		vmIds = controlledVMs.keys()
+		vmIds = self.controlledVMs.keys()
 		pids = self.__getHostPids()
 
 		for vmId in vmIds:
-			child = controlledVMs[vmId]
+			child = self.controlledVMs[vmId]
 			instance = child.instance
 			name = instance.name
 
@@ -164,9 +180,9 @@ class Qemu(VmControlInterface):
 				# remove info file
 				os.unlink(self.INFO_DIR + "/%d"%(vmId))
 
-				# XXXstroucki why not use self.controlledVMs
-				# argument, so why modify this fn's formal?
-				del controlledVMs[vmId]
+				# XXXstroucki python should handle
+				# locking here (?)
+				del self.controlledVMs[vmId]
 
 				# remove any stats (appropriate?)
 				try:
@@ -187,7 +203,7 @@ class Qemu(VmControlInterface):
 					try:
 						os.waitpid(vmId, 0)
 					except:
-						log.exception("waitpid failed for vmId" % (vmId))
+						log.exception("waitpid failed for vmId %s" % (vmId))
 				# recover the child's stderr and monitor
 				# output if possible
 				if (child.errorBit):
@@ -204,17 +220,21 @@ class Qemu(VmControlInterface):
 				# remove scratch storage
 				try:
 					if self.scratchVg is not None:
+						scratchName = "lv%s" % name
 						log.info("Removing any scratch for %s" % (name))
-						cmd = "/sbin/lvremove --quiet -f %s" % self.scratchVg
-    						result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
+						cmd = "/sbin/lvremove --quiet -f %s/%s" % (self.scratchVg, scratchName)
+						__result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
 					log.warning("Problem cleaning scratch volumes")
 					pass
 
 				# let the NM know
 				try:
-					if (not child.migratingOut):
-						self.nm.vmStateChange(vmId, None, InstanceState.Exited)
+					# XXXstroucki: we don't want to treat
+					# the source VM of a migration exiting
+					# as an actual
+					# exit, but the NM should probably know.
+					self.nm.vmStateChange(vmId, None, InstanceState.Exited)
 				except Exception:
 					log.exception("vmStateChange failed for VM %s" % (name))
 			else:
@@ -273,7 +293,7 @@ class Qemu(VmControlInterface):
 		while True:
 			try:
 				time.sleep(self.POLL_DELAY)
-				self.__matchHostPids(self.controlledVMs)
+				self.__matchHostPids()
 			except:
 				log.exception("Exception in poolVMsLoop")
 	
@@ -294,7 +314,7 @@ class Qemu(VmControlInterface):
 		monitorFd = child.monitorFd
 		buf = ""
 		try:
-			(rlist, wlist, xlist) = select.select([monitorFd], [], [], 0.0)
+			(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], 0.0)
 			while (len(rlist) > 0):
 				c = os.read(monitorFd, 1)
 				if (c == ""):
@@ -302,7 +322,7 @@ class Qemu(VmControlInterface):
 					child.errorBit = True
 					raise RuntimeError
 				buf = buf + c
-				(rlist, wlist, xlist) = select.select([monitorFd], [], [], 0.0)
+				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], 0.0)
 		finally:
 			child.monitorHistory.append(buf)
 		return buf
@@ -317,14 +337,14 @@ class Qemu(VmControlInterface):
 			while (buf[-(len(needle)):] != needle):
 				#print "[BUF]: %s" % (buf)
 				#print "[NEE]: %s" % (needle)
-				(rlist, wlist, xlist) = select.select([monitorFd], [], [], timeout)
+				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], timeout)
 				if (len(rlist) == 0):
-					log.error("Timeout getting results from monitor for vmId %d" % (child.pid))
+					log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise RuntimeError
 				c = os.read(monitorFd, 1)
 				if (c == ""):
-					log.error("Early termination on monitor for vmId %d" % (child.pid))
+					log.error("Early termination on monitor FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise RuntimeError
 				buf = buf + c
@@ -426,6 +446,7 @@ class Qemu(VmControlInterface):
 			disk = instance.disks[index]
 			uri = scrubString(disk.uri)
 			imageLocal = self.dfs.getLocalHandle("images/" + uri)
+			imageLocal = self.__dereferenceLink(imageLocal)
 			thisDiskList = [ "file=%s" % imageLocal ]
 			thisDiskList.append("if=%s" % diskInterface)
 			thisDiskList.append("index=%d" % index)
@@ -466,7 +487,7 @@ class Qemu(VmControlInterface):
 				# XXXstroucki check for capacity
 				cmd = "/sbin/lvcreate --quiet -n%s -L %dG %s" % (scratchName, scratchSize, self.scratchVg)
 				# XXXstroucki check result
-				result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
+				__result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).wait()
 				index += 1
 
 				thisDiskList = [ "file=/dev/%s/%s" % (self.scratchVg, scratchName) ]
@@ -500,8 +521,14 @@ class Qemu(VmControlInterface):
 		nicModel = self.__stripSpace(nicModel)
 
 		nicString = ""
+		nicNetworks = {}
 		for i in range(0, len(instance.nics)):
+			# Don't allow more than one interface per vlan
 			nic = instance.nics[i]
+			if nicNetworks.has_key(nic.network):
+				continue
+			nicNetworks[nic.network] = True
+
 			nicString = nicString + "-net nic,macaddr=%s,model=%s,vlan=%d -net tap,ifname=%s%d.%d,vlan=%d,script=/etc/qemu-ifup.%d " % (nic.mac, nicModel, nic.network, self.ifPrefix, instance.id, i, nic.network, nic.network)
 
 		#  ACPI
@@ -593,10 +620,15 @@ class Qemu(VmControlInterface):
 				# trying to restart the migration by running
 				# the command again (when qemu is ready to
 				# listen again) is probably not helpful
+				# XXXstroucki: failures observed:
+				# "migration failed"
+				# "Block format 'qcow' used by device '' does not support feature 'live migration'
 				success = False
+				# see if migration can be speeded up
+				res = self.__enterCommand(child, "migrate_set_speed 1g", timeout=self.migrateTimeout)
 				res = self.__enterCommand(child, "migrate -i %s" % (target), timeout=self.migrateTimeout)
 				retry = retry - 1
-				if (res.find("migration failed") == -1):
+				if (res.find("Block migration completed") != -1):
 					success = True
 					retry = 0
 					break
@@ -613,6 +645,8 @@ class Qemu(VmControlInterface):
 
 	# extern	
 	def instantiateVm(self, instance):
+		# XXXstroucki: check capacity before instantiating
+
 		try:
 			(vmId, cmd) = self.__startVm(instance, None)
 			child = self.__getChildFromPid(vmId)
@@ -632,16 +666,23 @@ class Qemu(VmControlInterface):
 	
 	# extern
 	def suspendVm(self, vmId, target):
-		tmpTarget = "/%s/tashi_qemu_suspend_%d_%d" % (self.scratchDir, os.getpid(), vmId)
 		# XXX: Use fifo to improve performance
-		vmId = self.__stopVm(vmId, "\"exec:gzip -c > %s\"" % (tmpTarget), True)
-		self.dfs.copyTo(tmpTarget, target)
-		os.unlink(tmpTarget)
+		# XXXstroucki: we could create a fifo on the local fs,
+		# then start a thread to copy it to dfs. But if we're
+		# reading from dfs directly on resume, why not write
+		# directly here?
+
+		#tmpTarget = "/%s/tashi_qemu_suspend_%d_%d" % (self.scratchDir, os.getpid(), vmId)
+		fn = self.dfs.getLocalHandle("%s" % target)
+		vmId = self.__stopVm(vmId, "\"exec:%s > %s\"" % (self.suspendHandler, fn), True)
+		#self.dfs.copyTo(tmpTarget, target)
+		#os.unlink(tmpTarget)
 		return vmId
 	
 	# extern
 	def resumeVmHelper(self, instance, source):
-		child = self.__getChildFromPid(instance.vmId)
+		vmId = instance.vmId
+		child = self.__getChildFromPid(vmId)
 		try:
 			self.__getPtyInfo(child, True)
 		except RuntimeError:
@@ -650,21 +691,25 @@ class Qemu(VmControlInterface):
 			raise
 		status = "paused"
 		while ("running" not in status):
-			status = self.__enterCommand(child, "info status")
-			time.sleep(1)
+			try:
+				status = self.__enterCommand(child, "info status")
+			except RuntimeError:
+				pass
+			time.sleep(60)
+
+		self.nm.vmStateChange(vmId, None, InstanceState.Running)
 		child.instance.state = InstanceState.Running
 		self.__saveChildInfo(child)
 	
 	# extern
 	def resumeVm(self, instance, source):
 		fn = self.dfs.getLocalHandle("%s" % (source))
-		(vmId, cmd) = self.__startVm(instance, "exec:zcat %s" % (fn))
+		(vmId, cmd) = self.__startVm(instance, "exec:%s < %s" % (self.resumeHandler, fn))
 		child = self.__getChildFromPid(vmId)
 		child.cmd = cmd
 		return vmId
 
 	def __checkPortListening(self, port):
-		lc = 0
 		# XXXpipe: find whether something is listening yet on the port
 		(stdin, stdout) = os.popen2("netstat -ln | grep 0.0.0.0:%d | wc -l" % (port))
 		stdin.close()
@@ -720,7 +765,9 @@ class Qemu(VmControlInterface):
 		try:
 			child = self.__getChildFromPid(vmId)
 		except:
-			log.error("Failed to get child info; transportCookie = %s; hostname = %s" % (str(cPickle.loads(transportCookie)), socket.hostname()))
+			# XXXstroucki: Does hostname contain the peer hostname?
+			log.error("Failed to get child info; transportCookie = %s; hostname = %s" %
+					(str(cPickle.loads(transportCookie)), _hostname))
 			raise
 		try:
 			self.__getPtyInfo(child, True)
@@ -808,6 +855,11 @@ class Qemu(VmControlInterface):
 		threading.Thread(target=controlConsole, args=(child,consolePort)).start()
 		return "Control console listening on %s:%d" % (hostname, consolePort)
 
+	def __specificReset(self, vmId):
+		child = self.__getChildFromPid(vmId)
+		self.__enterCommand(child, "system_reset")
+		return "Sent reset signal to instance"
+
 	# extern
 	def vmmSpecificCall(self, vmId, arg):
 		arg = arg.lower()
@@ -826,12 +878,16 @@ class Qemu(VmControlInterface):
 		elif (arg == "startconsole"):
 			return self.__specificStartConsole(vmId)
 
+		elif (arg == "reset"):
+			return self.__specificReset(vmId)
+
 		elif (arg == "list"):
 			commands = [
 				"startVnc",
 				"stopVnc",
 				"changeCdrom:<image.iso>",
 				"startConsole",
+				"reset",
 				]
 			return "\n".join(commands)
 				
@@ -842,11 +898,63 @@ class Qemu(VmControlInterface):
 	def listVms(self):
 		return self.controlledVMs.keys()
 
+	def __processVmStats(self, vmId):
+		try:
+			f = open("/proc/%d/stat" % (vmId))
+			procData = f.read()
+			f.close()
+		except:
+			log.warning("Unable to get data for instance %d" % vmId)
+			return
+
+		ws = procData.strip().split()
+		userTicks = float(ws[13])
+		sysTicks = float(ws[14])
+		myTicks = userTicks + sysTicks
+		vsize = (int(ws[22]))/1024.0/1024.0
+		rss = (int(ws[23])*4096)/1024.0/1024.0
+		cpuSeconds = myTicks/self.ticksPerSecond
+		# XXXstroucki be more exact here?
+		last = time.time() - self.statsInterval
+		lastCpuSeconds = self.cpuStats.get(vmId, cpuSeconds)
+		if lastCpuSeconds is None:
+			lastCpuSeconds = cpuSeconds
+		cpuLoad = (cpuSeconds - lastCpuSeconds)/(time.time() - last)
+		self.cpuStats[vmId] = cpuSeconds
+		try:
+			child = self.controlledVMs[vmId]
+		except:
+			log.warning("Unable to obtain information on instance %d" % vmId)
+			return
+
+		(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
+		for i in range(0, len(child.instance.nics)):
+			netDev = "%s%d.%d" % (self.ifPrefix, child.instance.id, i)
+			(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = self.netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
+			(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
+		self.stats[vmId] = self.stats.get(vmId, {})
+		child = self.controlledVMs.get(vmId, None)
+		if (child):
+			res = self.__enterCommand(child, "info blockstats")
+			for l in res.split("\n"):
+				(device, __sep, data) = stringPartition(l, ": ")
+				if (data != ""):
+					for field in data.split(" "):
+						(label, __sep, val) = stringPartition(field, "=")
+						if (val != ""):
+							self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
+							self.stats[vmId]['%s_%s' % (device, label)] = int(val)
+		self.stats[vmId]['cpuLoad'] = cpuLoad
+		self.stats[vmId]['rss'] = rss
+		self.stats[vmId]['vsize'] = vsize
+		self.stats[vmId]['recvMBs'] = sendMBs
+		self.stats[vmId]['sendMBs'] = recvMBs
+
 	# thread
 	def statsThread(self):
-		ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
-		netStats = {}
-		cpuStats = {}
+		self.ticksPerSecond = float(os.sysconf('SC_CLK_TCK'))
+		self.netStats = {}
+		self.cpuStats = {}
 		# XXXstroucki be more exact here?
 		last = time.time() - self.statsInterval
 		while True:
@@ -857,12 +965,12 @@ class Qemu(VmControlInterface):
 				f.close()
 				for l in netData:
 					if (l.find(self.ifPrefix) != -1):
-						(dev, sep, ld) = stringPartition(l, ":")
+						(dev, __sep, ld) = stringPartition(l, ":")
 						dev = dev.strip()
 						ws = ld.split()
 						recvBytes = float(ws[0])
 						sendBytes = float(ws[8])
-						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = netStats.get(dev, (0.0, 0.0, recvBytes, sendBytes))
+						(recvMBs, sendMBs, lastRecvBytes, lastSendBytes) = self.netStats.get(dev, (0.0, 0.0, recvBytes, sendBytes))
 						if (recvBytes < lastRecvBytes):
 							# We seem to have overflowed
 							# XXXstroucki How likely is this to happen?
@@ -878,44 +986,12 @@ class Qemu(VmControlInterface):
 								lastSendBytes = lastSendBytes - 2**32
 						recvMBs = (recvBytes-lastRecvBytes)/(now-last)/1024.0/1024.0
 						sendMBs = (sendBytes-lastSendBytes)/(now-last)/1024.0/1024.0
-						netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
+						self.netStats[dev] = (recvMBs, sendMBs, recvBytes, sendBytes)
+
+
 				for vmId in self.controlledVMs:
-					f = open("/proc/%d/stat" % (vmId))
-					procData = f.read()
-					f.close()
-					ws = procData.strip().split()
-					userTicks = float(ws[13])
-					sysTicks = float(ws[14])
-					myTicks = userTicks + sysTicks
-					vsize = (int(ws[22]))/1024.0/1024.0
-					rss = (int(ws[23])*4096)/1024.0/1024.0
-					cpuSeconds = myTicks/ticksPerSecond
-					lastCpuSeconds = cpuStats.get(vmId, cpuSeconds)
-					cpuLoad = (cpuSeconds - lastCpuSeconds)/(now - last)
-					cpuStats[vmId] = cpuSeconds
-					child = self.controlledVMs[vmId]
-					(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
-					for i in range(0, len(child.instance.nics)):
-						netDev = "%s%d.%d" % (self.ifPrefix, child.instance.id, i)
-						(tmpRecvMBs, tmpSendMBs, tmpRecvBytes, tmpSendBytes) = netStats.get(netDev, (0.0, 0.0, 0.0, 0.0))
-						(recvMBs, sendMBs, recvBytes, sendBytes) = (recvMBs + tmpRecvMBs, sendMBs + tmpSendMBs, recvBytes + tmpRecvBytes, sendBytes + tmpSendBytes)
-					self.stats[vmId] = self.stats.get(vmId, {})
-					child = self.controlledVMs.get(vmId, None)
-					if (child):
-						res = self.__enterCommand(child, "info blockstats")
-						for l in res.split("\n"):
-							(device, sep, data) = stringPartition(l, ": ")
-							if (data != ""):
-								for field in data.split(" "):
-									(label, sep, val) = stringPartition(field, "=")
-									if (val != ""):
-										self.stats[vmId]['%s_%s_per_s' % (device, label)] = (float(val) - float(self.stats[vmId].get('%s_%s' % (device, label), 0)))/self.statsInterval
-										self.stats[vmId]['%s_%s' % (device, label)] = int(val)
-					self.stats[vmId]['cpuLoad'] = cpuLoad
-					self.stats[vmId]['rss'] = rss
-					self.stats[vmId]['vsize'] = vsize
-					self.stats[vmId]['recvMBs'] = sendMBs
-					self.stats[vmId]['sendMBs'] = recvMBs
+					self.__processVmStats(vmId)
+
 			except:
 				log.exception("statsThread threw an exception")
 			last = now

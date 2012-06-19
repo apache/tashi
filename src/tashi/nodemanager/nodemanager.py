@@ -18,30 +18,57 @@
 # under the License.    
 
 import logging.config
-import signal
 import sys
+import os
 
-from tashi.util import instantiateImplementation, getConfig, debugConsole, signalHandler
+from tashi.util import instantiateImplementation, debugConsole
 import tashi
 from tashi import boolean
 
 from tashi.rpycservices import rpycservices
+from tashi.utils.config import Config
+
 from rpyc.utils.server import ThreadedServer
 from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
-@signalHandler(signal.SIGTERM)
-def handleSIGTERM(signalNumber, stackFrame):
-	sys.exit(0)
-
 def main():
-	global config, dfs, vmm, service, server, log, notifier
+	global config, log
 	
-	(config, configFiles) = getConfig(["NodeManager"])
-	publisher = instantiateImplementation(config.get("NodeManager", "publisher"), config)
-	tashi.publisher = publisher
+	config = Config(["NodeManager"])
+	configFiles = config.getFiles()
+
 	logging.config.fileConfig(configFiles)
 	log = logging.getLogger(__name__)
 	log.info('Using configuration file(s) %s' % configFiles)
+
+	# handle keyboard interrupts (http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/)
+	child = os.fork()
+	
+	if child == 0:
+		startNodeManager()
+		# shouldn't exit by itself
+		sys.exit(0)
+
+	else:
+		# main
+		try:
+			os.waitpid(child, 0)
+		except KeyboardInterrupt:
+			log.info("Exiting node manager after receiving a SIGINT signal")
+			os._exit(0)
+		except Exception:
+			log.exception("Abnormal termination of node manager")
+			os._exit(-1)
+
+		log.info("Exiting node manager after service thread exited")
+		os._exit(-1)
+
+	return
+
+def startNodeManager():
+	global config, dfs, vmm, service, server, log, notifier
+	publisher = instantiateImplementation(config.get("NodeManager", "publisher"), config)
+	tashi.publisher = publisher
 	dfs = instantiateImplementation(config.get("NodeManager", "dfs"), config)
 	vmm = instantiateImplementation(config.get("NodeManager", "vmm"), config, dfs, None)
 	service = instantiateImplementation(config.get("NodeManager", "service"), config, vmm)
@@ -51,6 +78,9 @@ def main():
 		users = {}
 		users[config.get('AllowedUsers', 'clusterManagerUser')] = config.get('AllowedUsers', 'clusterManagerPassword')
 		authenticator = TlsliteVdbAuthenticator.from_dict(users)
+
+		# XXXstroucki: ThreadedServer is liable to have exceptions
+		# occur within if an endpoint is lost.
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)
@@ -59,14 +89,11 @@ def main():
 	t.service._type = 'NodeManagerService'
 
 	debugConsole(globals())
-	
-	try:
-		t.start()
-	except KeyboardInterrupt:
-		handleSIGTERM(signal.SIGTERM, None)
-	except Exception, e:
-		sys.stderr.write(str(e) + "\n")
-		sys.exit(-1)
+
+	t.start()
+	# shouldn't exit by itself
+	sys.exit(0)
+
 
 if __name__ == "__main__":
 	main()

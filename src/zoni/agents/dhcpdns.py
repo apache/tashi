@@ -27,6 +27,7 @@ import time
 #from instancehook import InstanceHook
 #from tashi.services.ttypes import Instance, NetworkConfiguration
 #from tashi import boolean
+from tashi.rpycservices.rpyctypes import Instance
 
 
 class DhcpDns():

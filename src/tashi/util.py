@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+#XXXstroucki: for compatibility with python 2.5
+from __future__ import with_statement
+
 import ConfigParser
 #import cPickle
 import os
@@ -22,14 +25,15 @@ import os
 import signal
 #import struct
 import sys
-import threading
+#import threading
 import time
 import traceback
 import types
-import getpass
+import functools
 
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
+from tashi.utils.timeout import *
 
 def broken(oldFunc):
 	"""Decorator that is used to mark a function as temporarily broken"""
@@ -85,14 +89,14 @@ def timed(oldFunc):
 		return res
 	return newFunc
 
-def editAndContinue(file, mod, name):
+def editAndContinue(filespec, mod, name):
 	def wrapper(oldFunc):
 		persist = {}
 		persist['lastMod'] = time.time()
 		persist['oldFunc'] = oldFunc
 		persist['func'] = oldFunc
 		def newFunc(*args, **kw):
-			modTime = os.stat(file)[8]
+			modTime = os.stat(filespec)[8]
 			if (modTime > persist['lastMod']):
 				persist['lastMod'] = modTime
 				space = {}
@@ -148,14 +152,6 @@ class reference(object):
 	def __delattr__(self, name):
 		return delattr(self.__dict__['__real_obj__'], name)
 
-def isolatedRPC(client, method, *args, **kw):
-	"""Opens and closes a thrift transport for a single RPC call"""
-	if (not client._iprot.trans.isOpen()):
-		client._iprot.trans.open()
-	res = getattr(client, method)(*args, **kw)
-	client._iprot.trans.close()
-	return res
-
 def signalHandler(signalNumber):
 	"""Used to denote a particular function as the signal handler for a 
 	   specific signal"""
@@ -170,6 +166,13 @@ def boolean(value):
 		return value
 	if (type(value) == types.IntType):
 		return (value != 0)
+
+	# See if it can be expressed as a string
+	try:
+		value = str(value)
+	except:
+		raise ValueError
+
 	lowercaseValue = value.lower()
 	if lowercaseValue in ['yes', 'true', '1']:
 		return True
@@ -186,13 +189,14 @@ def instantiateImplementation(className, *args):
 		cmd = "import %s\n" % (package)
 	else:
 		cmd = ""
-	cmd += "obj = %s(*args)\n" % (className)
+	cmd += "_obj = %s(*args)\n" % (className)
 	exec cmd in locals()
-	return obj
+	# XXXstroucki: this is correct, even though pydev complains
+	return _obj
 
 def convertExceptions(oldFunc):
 	"""This converts any exception type into a TashiException so that 
-	   it can be passed over a Thrift RPC"""
+	   it can be passed over an RPC"""
 	def newFunc(*args, **kw):
 		try:
 			return oldFunc(*args, **kw)
@@ -218,31 +222,46 @@ def getConfig(additionalNames=[], additionalFiles=[]):
 		raise Exception("No config file could be found: %s" % (str(allLocations)))
 	return (config, configFiles)
 
+def __getShellFn():
+	try:
+		from IPython.Shell import IPShellEmbed
+		return (1, IPShellEmbed)
+	except ImportError:
+		import IPython
+		return (2, IPython.embed)
+
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
 		try :
 			import atexit
-			from IPython.Shell import IPShellEmbed
+			(calltype, shellfn) = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
-				(stdin, stdout) = os.popen2("reset")
+				(__stdin, stdout) = os.popen2("reset")
 				stdout.read()
-			dbgshell = IPShellEmbed()
 			atexit.register(resetConsole)
-			dbgshell(local_ns=globalDict, global_ns=globalDict)
-		except Exception:
+			if calltype == 1:
+				dbgshell=shellfn(user_ns=globalDict)
+				dbgshell()
+			elif calltype == 2:
+				dbgshell=shellfn
+				dbgshell(user_ns=globalDict)
+		except Exception, e:
 			CONSOLE_TEXT=">>> "
-			input = " " 
-			while (input != ""):
+			inputline = " " 
+			while (inputline != ""):
 				sys.stdout.write(CONSOLE_TEXT)
-				input = sys.stdin.readline()
+				inputline = sys.stdin.readline()
 				try:
-					exec(input) in globalDict
+					exec(inputline) in globalDict
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
+
+		os._exit(0)
+
 	if (os.getenv("DEBUG", "0") == "1"):
-		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
+		threading.Thread(name="debugConsole", target=lambda: realDebugConsole(globalDict)).start()
 
 def stringPartition(s, field):
 	index = s.find(field)
@@ -260,6 +279,82 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 			ns = ns + c
 	return ns
 
+class Connection:
+
+	def __init__(self, host, port, authAndEncrypt=False, credentials=None):
+		self.host = host
+		self.port = port
+		self.credentials = credentials
+		self.authAndEncrypt = authAndEncrypt
+		self.connection = None
+		# XXXstroucki some thing may still depend on this (client)
+		self.username = None
+		if credentials is not None:
+			self.username = credentials[0]
+
+	def __connect(self):
+		# create new connection
+
+		username = None
+		password = None
+
+		if self.credentials is not None:
+			username = self.credentials[0]
+			password = self.credentials[1]
+
+		if self.authAndEncrypt:
+			if username is None:
+				username = raw_input("Enter Username:")
+
+			if password is None:
+				password = raw_input("Enter Password:")
+
+			if self.credentials != (username, password):
+				self.credentials = (username, password)
+
+			client = rpycservices.client(self.host, self.port, username=username, password=password)
+		else:
+			client = rpycservices.client(self.host, self.port)
+
+		self.connection = client
+
+
+	def __do(self, name, *args, **kwargs):
+		if self.connection is None:
+			self.__connect()
+
+		threadname = "%s:%s" % (self.host, self.port)
+		# XXXstroucki: Use 10 second timeout, ok?
+		# XXXstroucki: does this fn touch the network?
+		t = TimeoutThread(getattr, (self.connection, name, None))
+		threading.Thread(name=threadname, target=t.run).start()
+
+		try:
+			remotefn = t.wait(timeout=10)
+		except TimeoutException:
+			self.connection = None
+			raise
+
+		try:
+			if callable(remotefn):
+				# XXXstroucki: Use 10 second timeout, ok?
+				t = TimeoutThread(remotefn, args, kwargs)
+				threading.Thread(name=threadname, target=t.run).start()
+				returns = t.wait(timeout=10.0)
+
+			else:
+				raise TashiException({'msg':'%s not callable' % name})
+
+		except:
+			self.connection = None
+			raise
+
+		return returns
+
+	def __getattr__(self, name):
+		return functools.partial(self.__do, name)
+
+
 def createClient(config):
 	cfgHost = config.get('Client', 'clusterManagerHost')
 	cfgPort = config.get('Client', 'clusterManagerPort')
@@ -273,14 +368,12 @@ def createClient(config):
 	authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
 	if authAndEncrypt:
 		username = config.get('AccessClusterManager', 'username')
-		if username == '':
-			username = raw_input('Enter Username:')
 		password = config.get('AccessClusterManager', 'password')
-		if password == '':
-			password = getpass.getpass('Enter Password:')
-		client = rpycservices.client(host, port, username=username, password=password)
+		client = Connection(host, port, authAndEncrypt, (username, password))
+
 	else:
-		client = rpycservices.client(host, port)
+		client = Connection(host, port)
+
 	return client
 
 def enumToStringDict(cls):

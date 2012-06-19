@@ -18,11 +18,8 @@
 #  $Id$
 #
 
-import sys
-import os 
 import subprocess
 import logging
-import string
 
 from systemmanagementinterface import SystemManagementInterface
 
