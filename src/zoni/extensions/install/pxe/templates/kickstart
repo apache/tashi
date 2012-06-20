@@ -1,0 +1,8 @@
+prompt 0
+timeout 1
+default centos_generic
+
+label centos_generic
+	menu label ^CentOS Generic
+	kernel centos-installer/amd64/linux
+	append initrd=centos-installer/amd64/initrd.gz ksdevice=eth0 ks=http://$IMAGEHOST/cgi-bin/bootnode.py?IMGSVR=$IMAGEHOST&NTPSVR=$NTPSVRIP&BOOTTYPE=$ROLE&HDDTYPE=$USEHDDTYPE
