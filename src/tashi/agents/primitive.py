@@ -63,7 +63,7 @@ class Primitive(object):
 
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
-			#if (h.up == True and h.state == HostState.Normal):
+			#if (__isReady(h)):
 			hosts[ctr] = h
 			ctr = ctr + 1
 			load[h.id] = []
@@ -104,6 +104,11 @@ class Primitive(object):
 		if name in self.clearHints[hint]:
 			popit = self.clearHints[hint].index(name)
 			self.clearHints[hint].pop(popit)
+
+	def __isReady(host):
+		if host.up == False or host.state != HostState.Normal:
+			return False
+		return True
 	
 	def __scheduleInstance(self, inst):
 
@@ -135,7 +140,7 @@ class Primitive(object):
 			# has a host preference been expressed?
 			if (targetHost != None):
 				for h in self.hosts.values():
-					if (h.state == HostState.Normal):
+					if (__isReady(h)):
 						self.__clearHints("targetHost", h.name)
 					# if this is not the host we are looking for, continue
 					if ((str(h.id) != targetHost and h.name != targetHost)):
@@ -163,13 +168,8 @@ class Primitive(object):
 				for ctr in range(self.lastScheduledHost, len(self.hosts)) + range(0, self.lastScheduledHost):
 					h = self.hosts[ctr]
 
-					# XXXstroucki if it's down, find another machine
-					if (h.up == False):
-						continue
-
-					#  If the host not in normal operating state, 
-					#  find another machine
-					if (h.state != HostState.Normal):
+					# XXXstroucki if it's unavailable, find another machine
+					if (__isReady(h) == False):
 						continue
 					else:
 						#  If the host is back to normal, get rid of the entry in clearHints
