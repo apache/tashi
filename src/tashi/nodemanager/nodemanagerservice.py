@@ -189,6 +189,11 @@ class NodeManagerService(object):
 				self.log.exception('Failed to register with the CM')
 				happy = False
 
+			# make sure we flush our notification buffers
+			# if we have good comms with the CM
+			if happy:
+				self.__flushNotifyCM()
+
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):
 				time.sleep(toSleep)
