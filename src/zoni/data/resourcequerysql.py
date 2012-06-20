@@ -737,7 +737,7 @@ class ResourceQuerySql(InfoStore):
 			host['hw_port'] = int(i[6])
 
 		#  Get drac info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, h.hw_blenc, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, 0, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
 		result = self.selectDb(query)
 		if result.rowcount > 0:
 			for i in result.fetchall():
@@ -748,7 +748,8 @@ class ResourceQuerySql(InfoStore):
 				host['drac_userid'] = i[4]
 				host['drac_password'] = i[5]
 				# Extensions from MIMOS - for Dell Blade
-				host['drac_enclosure'] = i[6]
+				# XXXstroucki removed hw_blenc from query
+				# host['drac_enclosure'] = i[6]
 				host['drac_port'] = int(i[7])
 
 		#  Get PDU info
@@ -764,7 +765,7 @@ class ResourceQuerySql(InfoStore):
 			host['pdu_port'] = int(i[6])
 
 		# Extensions from MIMOS - for HP Blade iLO
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, h.hw_blenc, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'hpilo' and sys_id = " +  str(host['sys_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, 0, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'hpilo' and sys_id = " +  str(host['sys_id'])
 		result = self.selectDb(query)
 		for i in result.fetchall():
 			host['ilo_id'] = int(i[0])
@@ -773,7 +774,8 @@ class ResourceQuerySql(InfoStore):
 			host['ilo_ipaddr'] = i[3]
 			host['ilo_userid'] = i[4]
 			host['ilo_password'] = i[5]
-			host['ilo_enclosure'] = i[6]
+			# XXXstroucki removed hw_blenc from query
+			#host['ilo_enclosure'] = i[6]
 			host['ilo_port'] = int(i[7])
 
 		#print "host is ", host
