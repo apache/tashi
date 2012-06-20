@@ -63,7 +63,8 @@ class SystemManagementInterface(object):
 		'''  register hardware to zoni'''
 		raise NotImplementedError
 
-
-
-
+	# Extensions from MIMOS - specific to HP Blade via c7000 Blade Enclosure
+	def powerOnNet(self):
+		''' Power HP Blade Server directly from PXE '''
+		raise NotImplementedError
 
