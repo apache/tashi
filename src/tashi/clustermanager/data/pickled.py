@@ -37,6 +37,7 @@ class Pickled(FromConfig):
 		self.hostLock = threading.Lock()
 		self.hostLocks = {}
 		self.idLock = threading.Lock()
+		self.dbLock = threading.Lock()
 		self.load()
 	
 	def cleanInstances(self):
@@ -54,21 +55,22 @@ class Pickled(FromConfig):
 		return ch
 	
 	def save(self):
-		# XXXstroucki lock here to serialize saves
 		filename = self.file
 		# XXXstroucki could be better
 		tempfile = "%s.new" % filename
 
-		filehandle = open(tempfile, "w")
-		cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), filehandle)
-		filehandle.close()
+		self.dbLock.acquire()
 		try:
+			filehandle = open(tempfile, "w")
+			cPickle.dump((self.cleanHosts(), self.cleanInstances(), self.networks, self.users), filehandle)
+			filehandle.close()
 			os.rename(tempfile, filename)
+
 		except OSError:
-			# XXXstroucki: regular save will take place
-			# soon enough, ignore this until locking is
-			# in place.
-			pass
+			self.log.exception("Error saving database")
+
+		finally:
+			self.dbLock.release()
 
 	def load(self):
 		if (os.access(self.file, os.F_OK)):
