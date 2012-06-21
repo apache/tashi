@@ -63,7 +63,7 @@ class Primitive(object):
 
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
-			#if (__isReady(h)):
+			#if (self.__isReady(h)):
 			hosts[ctr] = h
 			ctr = ctr + 1
 			load[h.id] = []
@@ -105,7 +105,7 @@ class Primitive(object):
 			popit = self.clearHints[hint].index(name)
 			self.clearHints[hint].pop(popit)
 
-	def __isReady(host):
+	def __isReady(self, host):
 		if host.up == False or host.state != HostState.Normal:
 			return False
 		return True
@@ -140,7 +140,7 @@ class Primitive(object):
 			# has a host preference been expressed?
 			if (targetHost != None):
 				for h in self.hosts.values():
-					if (__isReady(h)):
+					if (self.__isReady(h)):
 						self.__clearHints("targetHost", h.name)
 					# if this is not the host we are looking for, continue
 					if ((str(h.id) != targetHost and h.name != targetHost)):
@@ -169,7 +169,7 @@ class Primitive(object):
 					h = self.hosts[ctr]
 
 					# XXXstroucki if it's unavailable, find another machine
-					if (__isReady(h) == False):
+					if (self.__isReady(h) == False):
 						continue
 					else:
 						#  If the host is back to normal, get rid of the entry in clearHints
