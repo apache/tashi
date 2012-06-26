@@ -186,6 +186,14 @@ def getSlots(cores, memory):
 	hosts = getVmLayout()
 	count = 0
 
+	if cores < 1:
+		print "Argument to cores must be 1 or greater."
+		return
+
+	if memory <= 0:
+		print "Argument to memory must be greater than 0."
+		return
+
 	for h in hosts:
 		if h.up is False or h.state != HostState.Normal:
 			continue
