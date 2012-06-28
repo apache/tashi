@@ -645,6 +645,11 @@ def main():
 				fargs = []
 
 			res = f(*fargs)
+
+		except TashiException, e:
+			print "Failed in calling %s: %s" (function, e.msg)
+			sys.exit(-1)
+
 		except Exception, e:
 			print "Failed in calling %s: %s" % (function, e)
 			print "Please run tashi-client --examples for syntax information"
