@@ -50,7 +50,7 @@ def getUser():
 	for user in users:
 		if (users[user].name == userStr):
 			return users[user].id
-	raise ValueError("Unknown user %s" % (userStr))
+	raise TashiException({'msg':"Unknown user %s" % (userStr)})
 
 def checkHid(host):
 	userId = getUser()
@@ -665,15 +665,12 @@ def main():
 			except Exception, e:
 				print e
 	except TashiException, e:
-		print "TashiException:"
+		print "A Tashi exception occurred""
 		print e.msg
 		exitCode = e.errno
-# 	except Exception, e:
-# 		print e
-		# XXXstroucki: exception may be unrelated to usage of function
-		# so don't print usage on exception as if there were a problem
-		# with the arguments
-		#usage(function)
+ 	except Exception, e:
+		print "A general exception occurred"
+ 		print e
 	sys.exit(exitCode)
 
 if __name__ == "__main__":
