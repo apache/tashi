@@ -670,7 +670,7 @@ def main():
 			except Exception, e:
 				print e
 	except TashiException, e:
-		print "A Tashi exception occurred""
+		print "A Tashi exception occurred"
 		print e.msg
 		exitCode = e.errno
  	except Exception, e:
