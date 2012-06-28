@@ -429,7 +429,8 @@ class ClusterManagerService(object):
 		except:
 			self.log.exception('suspendVm failed for host %s vmId %d' % (hostname, instance.vmId))
 			raise TashiException(d={'errno':Errors.UnableToSuspend, 'msg':'Failed to suspend %s' % (instance.name)})
-		return
+
+		return "%s is suspending." % (instance.name)
 	
 	# extern
 	def resumeVm(self, instanceId):
@@ -444,7 +445,7 @@ class ClusterManagerService(object):
 		instance.hints['__resume_source'] = source
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM RESUME", instance=instance)
-		return instance
+		return "%s is resuming." % (instance.name)
 	
 	# extern
 	def migrateVm(self, instanceId, targetHostId):
