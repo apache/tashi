@@ -647,7 +647,7 @@ def main():
 			res = f(*fargs)
 
 		except TashiException, e:
-			print "Failed in calling %s: %s" (function, e.msg)
+			print "Failed in calling %s: %s" % (function, e.msg)
 			sys.exit(-1)
 
 		except Exception, e:
