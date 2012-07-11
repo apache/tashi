@@ -63,7 +63,7 @@ def checkHid(host):
 			if (h.name == host):
 				hostId = h.id
 	if (hostId is None):
-		raise ValueError("Unknown host %s" % (str(host)))
+		raise TashiException({'msg':"Unknown host %s" % (str(host))})
 
 	# XXXstroucki permissions for host related stuff?
 	return hostId
@@ -79,13 +79,13 @@ def checkIid(instance):
 			if (i.name == instance):
 				instanceId = i.id
 	if (instanceId is None):
-		raise ValueError("Unknown instance %s" % (str(instance)))
+		raise TashiException({'msg':"Unknown instance %s" % (str(instance))})
 	for instance in instances:
 		if (instance.id == instanceId):
 			# XXXstroucki uid 0 to have superuser access
 			# how about admin groups?
 			if (instance.userId != userId and instance.userId != None and userId != 0):
-				raise ValueError("You don't own that VM")
+				raise TashiException({'msg':"You don't have permissions on VM %s" % instance.name})
 	return instanceId
 
 def requiredArg(name):
@@ -241,7 +241,7 @@ def __shutdownOrDestroyMany(method, basename):
 
 			count = count + 1
 	if (count == 0):
-		raise ValueError("That is an unused basename")
+		raise TashiException({'msg':"%s is an unused basename" % basename})
 	return None
 
 def getMyInstances():
@@ -670,12 +670,12 @@ def main():
 			except Exception, e:
 				print e
 	except TashiException, e:
-		print "A Tashi exception occurred"
+		print "Tashi could not complete your request:"
 		print e.msg
 		exitCode = e.errno
  	except Exception, e:
-		print "A general exception occurred"
  		print e
+		print "Use the --help option to learn how to use the tashi client program"
 	sys.exit(exitCode)
 
 if __name__ == "__main__":
