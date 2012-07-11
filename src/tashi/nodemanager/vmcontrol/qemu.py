@@ -170,6 +170,17 @@ class Qemu(VmControlInterface):
 
 		for vmId in vmIds:
 			child = self.controlledVMs[vmId]
+
+			# check to see if the child was just started.
+			# Only try to check on it if startup was more
+			# than 5 seconds in the past
+			if "startTime" in child.__dict__:
+				if child.startTime + 5 < time.time():
+					del child.startTime
+				else:
+					log.info("Not processing vmId %d because it is newly started" % (vmId))
+					continue
+
 			instance = child.instance
 			name = instance.name
 
@@ -577,9 +588,15 @@ class Qemu(VmControlInterface):
 		child.ptyFile = None
 		child.vncPort = -1
 		child.instance.vmId = child.pid
+
+		# Add a token to this new child object so that
+		# we don't mistakenly clean up when matchHostPids
+		# runs and the child process hasn't exec'ed yet.
+		child.startTime = time.time()
+
 		self.__saveChildInfo(child)
-		self.controlledVMs[child.pid] = child
 		log.info("Adding vmId %d" % (child.pid))
+		self.controlledVMs[child.pid] = child
 		return (child.pid, cmd)
 
 	def __getPtyInfo(self, child, issueContinue):
