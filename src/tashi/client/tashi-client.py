@@ -675,7 +675,7 @@ def main():
 		exitCode = e.errno
  	except Exception, e:
  		print e
-		print "Use the --help option to learn how to use the tashi client program"
+		print "Please run tashi-client --examples for syntax information"
 	sys.exit(exitCode)
 
 if __name__ == "__main__":
