@@ -230,6 +230,9 @@ def __shutdownOrDestroyMany(method, basename):
 	count = 0
 	for i in instances:
 		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
+			# checking permissions here
+			checkIid(i.name)
+
 			if method == "shutdown":
 				client.shutdownVm(i.id)
 
