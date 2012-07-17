@@ -20,18 +20,11 @@
 #
 
 import os
-import sys
-import threading
-import signal
 import logging.config
-import signal
 
-from tashi.util import instantiateImplementation, signalHandler
+from tashi.util import instantiateImplementation
 
-from zoni.extra.util import loadConfigFile, getConfig, debugConsole
-from zoni.version import *
-from zoni.services.hardwareservice import HardwareService
-from zoni.services.pcvciservice import pcmService
+from zoni.extra.util import getConfig, debugConsole
 from zoni.services.rpycservices import ManagerService
 
 from rpyc.utils.server import ThreadedServer

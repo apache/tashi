@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-id = "$Id: version.py 964467 2010-07-15 15:31:02Z rgass $"
+_id = "$Id: version.py 964467 2010-07-15 15:31:02Z rgass $"
 lastChangeDate = "$LastChangedDate$"
 lastChangeRevision = "$Rev: 964467 $"
 revision = lastChangeRevision

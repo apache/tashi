@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.    
 
+#XXXstroucki: for compatibility with python 2.5
+from __future__ import with_statement
+
 import ConfigParser
 #import cPickle
 import os
@@ -22,15 +25,15 @@ import os
 import signal
 #import struct
 import sys
-import threading
+#import threading
 import time
 import traceback
 import types
-import getpass
 import functools
 
 from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import TashiException, Errors, InstanceState, HostState
+from tashi.utils.timeout import *
 
 def broken(oldFunc):
 	"""Decorator that is used to mark a function as temporarily broken"""
@@ -86,14 +89,14 @@ def timed(oldFunc):
 		return res
 	return newFunc
 
-def editAndContinue(file, mod, name):
+def editAndContinue(filespec, mod, name):
 	def wrapper(oldFunc):
 		persist = {}
 		persist['lastMod'] = time.time()
 		persist['oldFunc'] = oldFunc
 		persist['func'] = oldFunc
 		def newFunc(*args, **kw):
-			modTime = os.stat(file)[8]
+			modTime = os.stat(filespec)[8]
 			if (modTime > persist['lastMod']):
 				persist['lastMod'] = modTime
 				space = {}
@@ -163,6 +166,13 @@ def boolean(value):
 		return value
 	if (type(value) == types.IntType):
 		return (value != 0)
+
+	# See if it can be expressed as a string
+	try:
+		value = str(value)
+	except:
+		raise ValueError
+
 	lowercaseValue = value.lower()
 	if lowercaseValue in ['yes', 'true', '1']:
 		return True
@@ -179,9 +189,10 @@ def instantiateImplementation(className, *args):
 		cmd = "import %s\n" % (package)
 	else:
 		cmd = ""
-	cmd += "obj = %s(*args)\n" % (className)
+	cmd += "_obj = %s(*args)\n" % (className)
 	exec cmd in locals()
-	return obj
+	# XXXstroucki: this is correct, even though pydev complains
+	return _obj
 
 def convertExceptions(oldFunc):
 	"""This converts any exception type into a TashiException so that 
@@ -222,13 +233,12 @@ def __getShellFn():
 def debugConsole(globalDict):
 	"""A debugging console that optionally uses pysh"""
 	def realDebugConsole(globalDict):
-		import os
 		try :
 			import atexit
 			(calltype, shellfn) = __getShellFn()
 			def resetConsole():
 # XXXpipe: make input window sane
-				(stdin, stdout) = os.popen2("reset")
+				(__stdin, stdout) = os.popen2("reset")
 				stdout.read()
 			atexit.register(resetConsole)
 			if calltype == 1:
@@ -239,19 +249,19 @@ def debugConsole(globalDict):
 				dbgshell(user_ns=globalDict)
 		except Exception, e:
 			CONSOLE_TEXT=">>> "
-			input = " " 
-			while (input != ""):
+			inputline = " " 
+			while (inputline != ""):
 				sys.stdout.write(CONSOLE_TEXT)
-				input = sys.stdin.readline()
+				inputline = sys.stdin.readline()
 				try:
-					exec(input) in globalDict
+					exec(inputline) in globalDict
 				except Exception, e:
 					sys.stdout.write(str(e) + "\n")
 
 		os._exit(0)
 
 	if (os.getenv("DEBUG", "0") == "1"):
-		threading.Thread(target=lambda: realDebugConsole(globalDict)).start()
+		threading.Thread(name="debugConsole", target=lambda: realDebugConsole(globalDict)).start()
 
 def stringPartition(s, field):
 	index = s.find(field)
@@ -270,6 +280,7 @@ def scrubString(s, allowed="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 	return ns
 
 class Connection:
+
 	def __init__(self, host, port, authAndEncrypt=False, credentials=None):
 		self.host = host
 		self.port = port
@@ -312,11 +323,24 @@ class Connection:
 		if self.connection is None:
 			self.__connect()
 
-		remotefn = getattr(self.connection, name, None)
+		threadname = "%s:%s" % (self.host, self.port)
+		# XXXstroucki: Use 10 second timeout, ok?
+		# XXXstroucki: does this fn touch the network?
+		t = TimeoutThread(getattr, (self.connection, name, None))
+		threading.Thread(name=threadname, target=t.run).start()
+
+		try:
+			remotefn = t.wait(timeout=10)
+		except TimeoutException:
+			self.connection = None
+			raise
 
 		try:
 			if callable(remotefn):
-				returns = remotefn(*args, **kwargs)
+				# XXXstroucki: Use 10 second timeout, ok?
+				t = TimeoutThread(remotefn, args, kwargs)
+				threading.Thread(name=threadname, target=t.run).start()
+				returns = t.wait(timeout=10.0)
 
 			else:
 				raise TashiException({'msg':'%s not callable' % name})

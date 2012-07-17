@@ -19,13 +19,11 @@
 #  $Id$  
 #
 
-import sys
-import os 
 import logging
 import threading
+import time
 
 from systemmanagementinterface import SystemManagementInterface
-from zoni.data.resourcequerysql import *
 
 from tashi.util import instantiateImplementation
 
@@ -41,7 +39,7 @@ class SystemManagement(SystemManagementInterface):
 
 
 	def getInfo(self, nodeName):
-		self.host = self.data.getHostInfo(node)
+		self.host = self.data.getHostInfo(nodeName)
 		
 		
 	def setVerbose(self, verbose):
@@ -65,7 +63,7 @@ class SystemManagement(SystemManagementInterface):
 		#  [2] = hw method password
 		success = 0
 		for i in hw:
-			inst = instantiateImplementation(self.config['hardwareControl'][i[0]]['class'], self.config, nodeName, self.host)
+			__inst = instantiateImplementation(self.config['hardwareControl'][i[0]]['class'], self.config, nodeName, self.host)
 			a = "inst.%s" % mycmd
 			for count in range(retries):
 				doit = eval(a)
@@ -89,7 +87,7 @@ class SystemManagement(SystemManagementInterface):
 	def softPowerConfirm(self, method, nodeName):
 		#  using a sleep for now...
 		time.sleep(30)
-		inst = instantiateImplementation(self.config['hardwareControl'][method]['class'], self.config, nodeName, self.host)
+		__inst = instantiateImplementation(self.config['hardwareControl'][method]['class'], self.config, nodeName, self.host)
 		mycmd = "%s()" % ("powerOff")
 		a = "inst.%s" % mycmd
 		doit = eval(a)

@@ -18,19 +18,19 @@
 #  $Id$
 #
 
-import sys
-import os 
-import string
 import warnings
 import logging
+import string
+import sys
 import time
+
 warnings.filterwarnings("ignore")
 
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from pysnmp.proto import rfc1902
-from zoni.data.resourcequerysql import *
+from zoni.data.resourcequerysql import ResourceQuerySql
 from zoni.hardware.systemmanagementinterface import SystemManagementInterface
-
+from zoni.agents.dhcpdns import DhcpDns
 
 #class systemmagement():
 	#def __init__(self, proto):
@@ -90,7 +90,7 @@ class raritanDominionPx(SystemManagementInterface):
 	'''
 	def getOffset(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(0))
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 0), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
 		output = varBinds[0][1]
@@ -102,7 +102,7 @@ class raritanDominionPx(SystemManagementInterface):
 
 	def __setPowerStatus(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port))
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 0), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
 		output = varBinds[0][1]
@@ -134,7 +134,7 @@ class raritanDominionPx(SystemManagementInterface):
 
 	def powerOn(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port)) 
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().setCmd( \
+		__errorIndication, __errorStatus, __errorIndex, __varBinds = cmdgen.CommandGenerator().setCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('1')))
@@ -142,7 +142,7 @@ class raritanDominionPx(SystemManagementInterface):
 
 	def powerOff(self):
 		thisoid = eval(str(self.oid) + str(self.oid_status) + "," + str(self.port)) 
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().setCmd( \
+		__errorIndication, __errorStatus, __errorIndex, __varBinds = cmdgen.CommandGenerator().setCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('0')))
@@ -181,7 +181,7 @@ class raritanDominionPx(SystemManagementInterface):
 
 		a={}
 		oid = eval(str("1,3,6,1,2,1,1,1,0"))
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 
@@ -193,7 +193,7 @@ class raritanDominionPx(SystemManagementInterface):
 		a['hw_make'] = str(varBinds[0][1])
 
 		oid = eval("1,3,6,1,4,1,13742,4,1,1,6,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		x = []
@@ -204,7 +204,7 @@ class raritanDominionPx(SystemManagementInterface):
 		a['hw_mac'] = ":".join(['%s' % d for d in x])
 
 		oid = eval("1,3,6,1,4,1,13742,4,1,1,2,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		serial = str(varBinds[0][1])
@@ -214,13 +214,13 @@ class raritanDominionPx(SystemManagementInterface):
 		a['hw_notes'] = val + "; Serial " + serial
 
 		oid = eval("1,3,6,1,4,1,13742,4,1,1,1,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_version_fw'] = str(varBinds[0][1])
 
 		oid = eval("1,3,6,1,4,1,13742,4,1,1,12,0")
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', user, 0), \
 		cmdgen.UdpTransportTarget((host, 161)), oid)
 		a['hw_model'] = str(varBinds[0][1])

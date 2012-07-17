@@ -20,11 +20,8 @@ import socket
 import threading
 import time
 
-from tashi.rpycservices import rpycservices
 from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
 from tashi import boolean, vmStates, ConnectionManager
-import tashi
-
 
 class NodeManagerService(object):
 	"""RPC handler for the NodeManager
@@ -33,35 +30,32 @@ class NodeManagerService(object):
 	   VmControlInterface and do all dfs operations here?"""
 
 	def __init__(self, config, vmm):
+		# XXXstroucki: vmm will wait for this constructor to complete
 		self.config = config
 		self.vmm = vmm
-		self.cmHost = config.get("NodeManagerService", "clusterManagerHost")
-		self.cmPort = int(config.get("NodeManagerService", "clusterManagerPort"))
-		self.authAndEncrypt = boolean(config.get('Security', 'authAndEncrypt'))
+		self.cmHost = self.config.get("NodeManagerService", "clusterManagerHost")
+		self.cmPort = int(self.config.get("NodeManagerService", "clusterManagerPort"))
+		self.authAndEncrypt = boolean(self.config.get('Security', 'authAndEncrypt'))
 		if self.authAndEncrypt:
-			self.username = config.get('AccessClusterManager', 'username')
-			self.password = config.get('AccessClusterManager', 'password')
+			self.username = self.config.get('AccessClusterManager', 'username')
+			self.password = self.config.get('AccessClusterManager', 'password')
 		else:
 			self.username = None
 			self.password = None
 		self.log = logging.getLogger(__file__)
-		self.convertExceptions = boolean(config.get('NodeManagerService', 'convertExceptions'))
-		self.registerFrequency = float(config.get('NodeManagerService', 'registerFrequency'))
-		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval'))
-		self.registerHost = boolean(config.get('NodeManagerService', 'registerHost'))
+		self.convertExceptions = boolean(self.config.get('NodeManagerService', 'convertExceptions'))
+		self.registerFrequency = float(self.config.get('NodeManagerService', 'registerFrequency'))
+		self.statsInterval = float(self.config.get('NodeManagerService', 'statsInterval', default = 0))
+		self.registerHost = boolean(self.config.get('NodeManagerService', 'registerHost'))
 		try:
 			self.cm = ConnectionManager(self.username, self.password, self.cmPort)[self.cmHost]
 		except:
 			self.log.exception("Could not connect to CM")
+			# XXXstroucki: raise?
 			return
 
-		self.accountingHost = None
-		self.accountingPort = None
-		try:
-			self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
-			self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
-		except:
-			pass
+		self.accountingHost = self.config.get('NodeManagerService', 'accountingHost')
+		self.accountingPort = self.config.getint('NodeManagerService', 'accountingPort')
 
 		self.notifyCM = []
 
@@ -77,14 +71,12 @@ class NodeManagerService(object):
 		self.__registerHost()
 
 		# XXXstroucki: should make an effort to retry
-		# otherwise vmm will wait forever
+		# This can time out now with an exception
 		self.id = self.cm.registerNodeManager(self.host, self.instances.values())
 
-		# XXXstroucki cut cross check for NM/VMM state
-
 		# start service threads
-		threading.Thread(target=self.__registerWithClusterManager).start()
-		threading.Thread(target=self.__statsThread).start()
+		threading.Thread(name="registerWithClusterManager", target=self.__registerWithClusterManager).start()
+		threading.Thread(name="statsThread", target=self.__statsThread).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
@@ -107,7 +99,6 @@ class NodeManagerService(object):
 	# send data to CM
 	# XXXstroucki adapt this for accounting?
 	def __flushNotifyCM(self):
-		start = time.time()
 		# send data to CM, adding message to buffer if
 		# it fails
 		try:
@@ -117,7 +108,10 @@ class NodeManagerService(object):
 					# XXXstroucki ValueError: need more than 1 value to unpack
 					# observed here. How?
 					value = self.notifyCM.pop(0)
-					(instanceId, newInst, old, success) = value
+					try:
+						(instanceId, newInst, old, success) = value
+					except:
+						self.log.exception("problem with value: %s" % value)
 					try:
 						self.cm.vmUpdate(instanceId, newInst, old)
 					except TashiException, e:
@@ -180,14 +174,25 @@ class NodeManagerService(object):
 
 	# service thread function
 	def __registerWithClusterManager(self):
+		happy = False
 		while True:
 			#self.__ACCOUNT("TESTING")
 			start = time.time()
 			try:
 				instances = self.instances.values()
 				self.id = self.cm.registerNodeManager(self.host, instances)
+				if not happy:
+					happy = True
+					self.log.info("Registered with the CM")
+
 			except Exception:
 				self.log.exception('Failed to register with the CM')
+				happy = False
+
+			# make sure we flush our notification buffers
+			# if we have good comms with the CM
+			if happy:
+				self.__flushNotifyCM()
 
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):
@@ -205,14 +210,16 @@ class NodeManagerService(object):
 						instance = self.instances.get(vmId, None)
 						if (not instance):
 							continue
-						id = instance.id
+						_id = instance.id
 						stats = self.vmm.getStats(vmId)
 						for stat in stats:
-							publishList.append({"vm_%d_%s" % (id, stat):stats[stat]})
+							publishList.append({"vm_%d_%s" % (_id, stat):stats[stat]})
 					except:
 						self.log.exception('statsThread threw an exception')
 				if (len(publishList) > 0):
-					tashi.publisher.publishList(publishList)
+					# XXXstroucki: no publisher currently
+					pass
+					#tashi.publisher.publishList(publishList)
 			except:
 				self.log.exception('statsThread threw an exception')
 			time.sleep(self.statsInterval)
@@ -220,7 +227,8 @@ class NodeManagerService(object):
 	def __registerHost(self):
 		hostname = socket.gethostname()
 		# populate some defaults
-		# XXXstroucki: I think it's better if the nodemanager fills these in properly when registering with the clustermanager
+		# XXXstroucki: I think it's better if the nodemanager fills these in
+		# properly when registering with the clustermanager
 		memory = 0
 		cores = 0
 		version = "empty"
@@ -246,8 +254,16 @@ class NodeManagerService(object):
 	# qemu.py calls this in the matchSystemPids thread
 	# xenpv.py: i have no real idea why it is called there
 	def vmStateChange(self, vmId, old, cur):
-		instance = self.__getInstance(vmId)
+		try:
+			instance = self.__getInstance(vmId)
+		except TashiException, e:
+			if e.errno == Errors.NoSuchVmId:
+				self.log.warning("Asked to change state for unknown VM. Has it not completed starting yet?")
+				return False
+			else:
+				raise
 
+		before = instance.state
 		if (instance.state == cur):
 			# Don't do anything if state is what it should be
 			return True
@@ -263,9 +279,18 @@ class NodeManagerService(object):
 
 		newInst = Instance(d={'state':cur})
 		success = lambda: None
-		# send the state change up to the CM
-		self.notifyCM.append((instance.id, newInst, old, success))
-		self.__flushNotifyCM()
+
+		# if this instance was in MigrateTrans, and has exited
+		# then don't tell the CM; it is the source instance
+		# exiting, and the CM should have updated its information
+		# to the target instance's info.
+		# Otherwise, send the state change up to the CM
+
+		if before == InstanceState.MigrateTrans and cur == InstanceState.Exited:
+			pass
+		else:
+			self.notifyCM.append((instance.id, newInst, old, success))
+			self.__flushNotifyCM()
 
 		# cache change locally
 		self.instances[vmId] = instance
@@ -274,7 +299,6 @@ class NodeManagerService(object):
 			# At this point, the VMM will clean up,
 			# so forget about this instance
 			del self.instances[vmId]
-			return True
 
 		return True
 
@@ -286,6 +310,8 @@ class NodeManagerService(object):
 
 	# remote
 	def instantiateVm(self, instance):
+		# XXXstroucki: check my capacity before instantiating
+
 		self.__ACCOUNT("NM VM INSTANTIATE", instance=instance)
 		try:
 			vmId = self.vmm.instantiateVm(instance)
@@ -348,7 +374,9 @@ class NodeManagerService(object):
 	# XXXstroucki migrate out?
 	def __migrateVmHelper(self, instance, target, transportCookie):
 		self.vmm.migrateVm(instance.vmId, target.name, transportCookie)
-		del self.instances[instance.vmId]
+		# removal from self.instances done by communication from
+		# VMM as part of above migrateVm function
+		return
 
 	# remote
 	# XXXstroucki migrate out?
@@ -357,7 +385,7 @@ class NodeManagerService(object):
 		self.__ACCOUNT("NM VM MIGRATE", instance=instance)
 		instance.state = InstanceState.MigrateTrans
 		self.instances[vmId] = instance
-		threading.Thread(target=self.__migrateVmHelper, args=(instance, target, transportCookie)).start()
+		threading.Thread(name="migrateVmHelper", target=self.__migrateVmHelper, args=(instance, target, transportCookie)).start()
 		return
 
 	# called by receiveVm as thread
@@ -370,15 +398,16 @@ class NodeManagerService(object):
 		self.instances[vmId] = instance
 		newInstance = Instance(d={'id':instance.id,'state':instance.state,'vmId':instance.vmId,'hostId':instance.hostId})
 		success = lambda: None
-		self.notifyCM.append((newInstance.id, newInstance, InstanceState.Running, success))
+		self.notifyCM.append((newInstance.id, newInstance, InstanceState.MigrateTrans, success))
 		self.__flushNotifyCM()
 
 	# remote
 	# XXXstroucki migrate in?
 	def receiveVm(self, instance, transportCookie):
 		instance.state = InstanceState.MigrateTrans
-		vmId = instance.vmId
-		self.instances[vmId] = instance
+		# XXXstroucki new vmId is not known yet until VM is received
+		#vmId = instance.vmId
+		#self.instances[vmId] = instance
 		self.__ACCOUNT("NM VM MIGRATE RECEIVE", instance=instance)
 		threading.Thread(target=self.__receiveVmHelper, args=(instance, transportCookie)).start()
 		return

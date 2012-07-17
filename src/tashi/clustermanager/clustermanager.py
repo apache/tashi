@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -19,10 +19,10 @@
 
 import os
 import sys
-import time
 import logging.config
 
-from tashi.util import boolean, instantiateImplementation, getConfig, debugConsole
+from tashi.util import boolean, instantiateImplementation, debugConsole
+from tashi.utils.config import Config
 import tashi
 
 from tashi.rpycservices import rpycservices
@@ -47,6 +47,9 @@ def startClusterManager(config):
 		users[config.get('AllowedUsers', 'nodeManagerUser')] = config.get('AllowedUsers', 'nodeManagerPassword')
 		users[config.get('AllowedUsers', 'agentUser')] = config.get('AllowedUsers', 'agentPassword')
 		authenticator = TlsliteVdbAuthenticator.from_dict(users)
+
+		# XXXstroucki ThreadedServer is liable to have exceptions
+		# occur within if an endpoint is lost.
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('ClusterManagerService', 'port')), auto_register=False)
@@ -64,7 +67,8 @@ def main():
 	global log
 	
 	# setup configuration and logging
-	(config, configFiles) = getConfig(["ClusterManager"])
+	config = Config(["ClusterManager"])
+	configFiles = config.getFiles()
 	publisher = instantiateImplementation(config.get("ClusterManager", "publisher"), config)
 	tashi.publisher = publisher
 	logging.config.fileConfig(configFiles)

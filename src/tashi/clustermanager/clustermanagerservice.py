@@ -19,9 +19,8 @@ import logging
 import threading
 import time
 
-from tashi.rpycservices import rpycservices	     
-from tashi.rpycservices.rpyctypes import Errors, InstanceState, HostState, TashiException
-from tashi import boolean, ConnectionManager, vmStates, version, scrubString
+from tashi.rpycservices.rpyctypes import Errors, InstanceState, Instance, HostState, TashiException
+from tashi import boolean, ConnectionManager, vmStates, hostStates, version, scrubString
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -49,6 +48,9 @@ class ClusterManagerService(object):
 		self.allowMismatchedVersions = boolean(self.config.get('ClusterManagerService', 'allowMismatchedVersions'))
 		self.maxMemory = int(self.config.get('ClusterManagerService', 'maxMemory'))
 		self.maxCores = int(self.config.get('ClusterManagerService', 'maxCores'))
+
+		self.defaultNetwork = self.config.getint('ClusterManagerService', 'defaultNetwork', 0)
+
 		self.allowDuplicateNames = boolean(self.config.get('ClusterManagerService', 'allowDuplicateNames'))
 
 		self.accountingHost = None
@@ -62,7 +64,7 @@ class ClusterManagerService(object):
 		self.__initAccounting()
 		self.__initCluster()
 
-		threading.Thread(target=self.__monitorCluster).start()
+		threading.Thread(name="monitorCluster", target=self.__monitorCluster).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
@@ -232,7 +234,7 @@ class ClusterManagerService(object):
 				# get a list of VMs running on host
 				try:
 					hostProxy = self.proxy[host.name]
-					remoteInstances = [hostProxy.getVmInfo(vmId) for vmId in hostProxy.listVms()]
+					remoteInstances = [self.__getVmInfo(host.name, vmId) for vmId in hostProxy.listVms()]
 				except:
 					self.log.warning('Failure getting instances from host %s' % (host.name))
 					self.data.releaseHost(host)
@@ -241,6 +243,9 @@ class ClusterManagerService(object):
 				# register instances I don't know about
 				for instance in remoteInstances:
 					if (instance.id not in myInstances):
+						if instance.state == InstanceState.Exited:
+							self.log.warning("%s telling me about exited instance %s, ignoring." % (host.name, instance.id))
+							continue
 						instance.hostId = host.id
 						instance = self.data.registerInstance(instance)
 						self.data.releaseInstance(instance)
@@ -282,9 +287,7 @@ class ClusterManagerService(object):
 					# Don't query non-running VMs. eg. if a VM
 					# is suspended, and has no host, then there's
 					# no one to ask
-					if instance.state != InstanceState.Running and \
-					   instance.state != InstanceState.Activating and \
-					   instance.state != InstanceState.Orphaned:
+					if instance.state not in [InstanceState.Running, InstanceState.Activating, InstanceState.Orphaned]:
 						self.data.releaseInstance(instance)
 						continue
 				except:
@@ -299,22 +302,34 @@ class ClusterManagerService(object):
 
 				# get updated state on VM
 				try:
-					hostProxy = self.proxy[host.name]
-					newInstance = hostProxy.getVmInfo(instance.vmId)
+					newInstance = self.__getVmInfo(host.name, instance.vmId)
 				except:
 					self.log.warning('Failure getting data for instance %s from host %s' % (instance.name, host.name))
 					self.data.releaseInstance(instance)
 					continue
 
-				# replace existing state with new state
-				# XXXstroucki more?
-				instance.state = newInstance.state
-				self.instanceLastContactTime[instanceId] = self.__now()
-				instance.decayed = False
-				self.data.releaseInstance(instance)
+				# update the information we have on the vm
+				#before = instance.state
+				rv = self.__vmUpdate(instance, newInstance, None)
+				if (rv == "release"):
+					self.data.releaseInstance(instance)
+
+				if (rv == "remove"):
+					self.data.removeInstance(instance)
 
 
-	def normalize(self, instance):
+	def __getVmInfo(self, host, vmid):
+		hostProxy = self.proxy[host]
+		rv = hostProxy.getVmInfo(vmid)
+		if isinstance(rv, Exception):
+			raise rv
+
+		if not isinstance(rv, Instance):
+			raise ValueError
+
+		return rv
+
+	def __normalize(self, instance):
 		instance.id = None
 		instance.vmId = None
 		instance.hostId = None
@@ -342,15 +357,17 @@ class ClusterManagerService(object):
 				del instance.hints[hint]
 		return instance
 	
+	# extern
 	def createVm(self, instance):
 		"""Function to add a VM to the list of pending VMs"""
 		# XXXstroucki: check for exception here
-		instance = self.normalize(instance)
+		instance = self.__normalize(instance)
 		instance = self.data.registerInstance(instance)
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM REQUEST", instance=instance)
 		return instance
-	
+
+	# extern
 	def shutdownVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		self.__stateTransition(instance, None, InstanceState.ShuttingDown)
@@ -363,7 +380,8 @@ class ClusterManagerService(object):
 			self.log.exception('shutdownVm failed for host %s vmId %d' % (instance.name, instance.vmId))
 			raise
 		return
-	
+
+	# extern
 	def destroyVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		if (instance.state is InstanceState.Pending or instance.state is InstanceState.Held):
@@ -393,6 +411,7 @@ class ClusterManagerService(object):
 
 		return
 	
+	# extern
 	def suspendVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		try:
@@ -410,8 +429,10 @@ class ClusterManagerService(object):
 		except:
 			self.log.exception('suspendVm failed for host %s vmId %d' % (hostname, instance.vmId))
 			raise TashiException(d={'errno':Errors.UnableToSuspend, 'msg':'Failed to suspend %s' % (instance.name)})
-		return
+
+		return "%s is suspending." % (instance.name)
 	
+	# extern
 	def resumeVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		try:
@@ -424,8 +445,9 @@ class ClusterManagerService(object):
 		instance.hints['__resume_source'] = source
 		self.data.releaseInstance(instance)
 		self.__ACCOUNT("CM VM RESUME", instance=instance)
-		return instance
+		return "%s is resuming." % (instance.name)
 	
+	# extern
 	def migrateVm(self, instanceId, targetHostId):
 		instance = self.data.acquireInstance(instanceId)
 		self.__ACCOUNT("CM VM MIGRATE", instance=instance)
@@ -476,12 +498,15 @@ class ClusterManagerService(object):
 
 		try:
 			# Notify the target
-			vmId = self.proxy[targetHost.name].receiveVm(instance, cookie)
+			__vmid = self.proxy[targetHost.name].receiveVm(instance, cookie)
 		except Exception:
 			self.log.exception('receiveVm failed')
 			raise
+
+		self.log.info("migrateVM finished")
 		return
-	
+
+	# extern
 	def pauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		try:
@@ -508,6 +533,7 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return
 
+	# extern
 	def unpauseVm(self, instanceId):
 		instance = self.data.acquireInstance(instanceId)
 		try:
@@ -533,22 +559,53 @@ class ClusterManagerService(object):
 
 		self.data.releaseInstance(instance)
 		return
-	
+
+	# extern
 	def getHosts(self):
 		return self.data.getHosts().values()
 	
+	# extern
+	def setHostState(self, hostId, state):
+		state = state.lower()
+		hostState = None
+		if state == "normal":
+			hostState = HostState.Normal
+		if state == "drained":
+			hostState = HostState.Drained
+
+		if hostState is None:
+			return "%s is not a valid host state" % state
+
+		host = self.data.acquireHost(hostId)
+		try:
+			host.state = hostState
+		finally:
+			self.data.releaseHost(host)
+
+		return "Host state set to %s." % hostStates[hostState]
+
+	# extern
 	def getNetworks(self):
-		return self.data.getNetworks().values()
-	
+		networks = self.data.getNetworks()
+		for network in networks:
+			if self.defaultNetwork == networks[network].id:
+				setattr(networks[network], "default", True)
+
+		return networks.values()
+
+	# extern
 	def getUsers(self):
 		return self.data.getUsers().values()
-	
+
+	# extern
 	def getInstances(self):
 		return self.data.getInstances().values()
 
+	# extern
 	def getImages(self):
 		return self.data.getImages()
 	
+	# extern
 	def copyImage(self, src, dst):
 		imageSrc = self.dfs.getLocalHandle("images/" + src)
 		imageDst = self.dfs.getLocalHandle("images/" + dst)
@@ -562,6 +619,7 @@ class ClusterManagerService(object):
 		except Exception, e:
 			self.log.exception('DFS image copy failed: %s (%s->%s)' % (e, imageSrc, imageDst))
 
+	# extern
 	def vmmSpecificCall(self, instanceId, arg):
 		instance = self.data.getInstance(instanceId)
 		hostname = self.data.getHost(instance.hostId).name
@@ -573,7 +631,7 @@ class ClusterManagerService(object):
 			raise
 		return res
 	
-#	@timed
+	# extern
 	def registerNodeManager(self, host, instances):
 		"""Called by the NM every so often as a keep-alive/state polling -- state changes here are NOT AUTHORITATIVE"""
 
@@ -606,45 +664,47 @@ class ClusterManagerService(object):
 		# let the host communicate what it is running
 		# and note that the information is not stale
 		for instance in instances:
+			if instance.state == InstanceState.Exited:
+				self.log.warning("%s reporting exited instance %s, ignoring." % (host.name, instance.id))
+				continue
 			self.instanceLastContactTime.setdefault(instance.id, 0)
 
 		self.data.releaseHost(oldHost)
 		return host.id
 	
-	def vmUpdate(self, instanceId, instance, oldState):
-		try:
-			oldInstance = self.data.acquireInstance(instanceId)
-		except TashiException, e:
-			# shouldn't have a lock to clean up after here
-			if (e.errno == Errors.NoSuchInstanceId):
-				self.log.warning('Got vmUpdate for unknown instanceId %d' % (instanceId))
-				return
-		except:
-			self.log.exception("Could not acquire instance")
-			raise
+	def __vmUpdate(self, oldInstance, instance, oldState):
+		# this function assumes a lock is held on the instance
+		# already, and will be released elsewhere
 
-		self.instanceLastContactTime[instanceId] = self.__now()
+		self.instanceLastContactTime[oldInstance.id] = self.__now()
 		oldInstance.decayed = False
-		self.__ACCOUNT("CM VM UPDATE", instance=oldInstance)
 
 		if (instance.state == InstanceState.Exited):
 			# determine why a VM has exited
 			hostname = self.data.getHost(oldInstance.hostId).name
+
 			if (oldInstance.state not in [InstanceState.ShuttingDown, InstanceState.Destroying, InstanceState.Suspending]):
 				self.log.warning('Unexpected exit on %s of instance %s (vmId %d)' % (hostname, oldInstance.name, oldInstance.vmId))
+
 			if (oldInstance.state == InstanceState.Suspending):
 				self.__stateTransition(oldInstance, InstanceState.Suspending, InstanceState.Suspended)
 				oldInstance.hostId = None
 				oldInstance.vmId = None
-				self.data.releaseInstance(oldInstance)
+				return "release"
+
+			if (oldInstance.state == InstanceState.MigrateTrans):
+				# Just await update from target host
+				return "release"
+
 			else:
 				del self.instanceLastContactTime[oldInstance.id]
-				self.data.removeInstance(oldInstance)
+				return "remove"
+
 		else:
 			if (instance.state):
 				# XXXstroucki does this matter?
 				if (oldState and oldInstance.state != oldState):
-					self.log.warning('Got vmUpdate of state from %s to %s, but the instance was previously %s' % (vmStates[oldState], vmStates[instance.state], vmStates[oldInstance.state]))
+					self.log.warning('Doing vmUpdate of state from %s to %s, but the instance was previously %s' % (vmStates[oldState], vmStates[instance.state], vmStates[oldInstance.state]))
 				oldInstance.state = instance.state
 			if (instance.vmId):
 				oldInstance.vmId = instance.vmId
@@ -657,11 +717,44 @@ class ClusterManagerService(object):
 							if (oldNic.mac == nic.mac):
 								oldNic.ip = nic.ip
 
-			self.data.releaseInstance(oldInstance)
+			return "release"
+
 
 		return "success"
-	
+
+	# extern
+	def vmUpdate(self, instanceId, instance, oldState):
+		try:
+			oldInstance = self.data.acquireInstance(instanceId)
+		except TashiException, e:
+			# shouldn't have a lock to clean up after here
+			if (e.errno == Errors.NoSuchInstanceId):
+				self.log.warning('Got vmUpdate for unknown instanceId %d' % (instanceId))
+				return
+		except:
+			self.log.exception("Could not acquire instance")
+			raise
+
+		import copy
+		displayInstance = copy.copy(oldInstance)
+		displayInstance.state = instance.state
+		self.__ACCOUNT("CM VM UPDATE", instance=displayInstance)
+
+		rv = self.__vmUpdate(oldInstance, instance, oldState)
+
+		if (rv == "release"):
+			self.data.releaseInstance(oldInstance)
+
+		if (rv == "remove"):
+			self.data.removeInstance(oldInstance)
+
+		return "success"
+
+	# extern
 	def activateVm(self, instanceId, host):
+		# XXXstroucki: check my idea of the host's capacity before
+		# trying.
+
 		dataHost = self.data.acquireHost(host.id)
 
 		if (dataHost.name != host.name):
@@ -725,6 +818,7 @@ class ClusterManagerService(object):
 		self.data.releaseInstance(instance)
 		return "success"
 
+	# extern
 	def registerHost(self, hostname, memory, cores, version):
 		hostId, alreadyRegistered = self.data.registerHost(hostname, memory, cores, version)
 		if alreadyRegistered:
@@ -740,6 +834,7 @@ class ClusterManagerService(object):
 
 		return hostId
 
+	# extern
 	def unregisterHost(self, hostId):
 		try:
 			host = self.data.getHost(hostId)

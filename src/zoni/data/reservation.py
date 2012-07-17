@@ -18,7 +18,6 @@
 #  $Id:$ 
 #
 
-import sys
 import os 
 import string
 import logging
@@ -88,9 +87,9 @@ class reservationMysql(ReservationManagementInterface):
 	def delReservation (self, userId):
 		raise NotImplementedError
 	
-	def defineReservation():
+	def defineReservation(self):
 		raise NotImplementedError
 
-	def showReservation():
+	def showReservation(self):
 		raise NotImplementedError
 

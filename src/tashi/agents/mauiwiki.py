@@ -17,20 +17,122 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# XXXstroucki: wiki is a text based resource manager that maui can
+# use. It also seems to have disappeared from the face of the web.
+# This code is unmaintained.
+
+# XXXstroucki former file mauipacket.py
+#import subprocess
 import time
-import hashlib
-import sys
-import subprocess
-import socket, SocketServer
-from socket import gethostname
-import os
+import SocketServer
+from tashi.utils import pseudoDes
+from tashi.rpycservices.rpyctypes import HostState, InstanceState
+
+class MauiPacket:
+	def __init__(self, key=0):
+		self.size = 0
+		self.char = '\n'
+		self.chksum = '0'*16
+		self.timestamp = int(time.time())
+		self.auth = ''
+		self.data = []
+		self.msg = ''
+		self.key=key
+	def readPacket(self, istream):
+		self.msg = ''
+
+		size = istream.read(8)
+		self.msg = self.msg+size
+		self.size = int(size)
+
+		self.char = istream.read(1)
+		self.msg = self.msg + self.char
+
+		packet = istream.read(self.size)
+		self.msg = self.msg + packet
+
+		packet = packet.split()
+		
+		for i in range(len(packet)):
+			item = packet[i].split('=')
+			if item[0] == 'CK':
+				self.chksum = item[1]
+			if item[0] == 'TS':
+				self.timestamp = int(item[1])
+			if item[0] == 'AUTH':
+				self.auth = item[1]
+			if item[0] == 'DT':
+				self.data = packet[i:]
+				self.data=self.data[0].split('=',1)[1:] + self.data[1:]
+
+	def checksumMessage(self, message, key=None):
+		if key == None:
+			key = self.key
+		if type(key) == type(''):
+			key = int(key)
+		chksum = pseudoDes.generateKey(message, key)
+		chksum = '%016x' % chksum
+		return chksum
+	def getChecksum(self):
+		cs = self.msg.partition('TS=')
+		cs = cs[1]+cs[2]
+		chksum = self.checksumMessage(cs)
+		return chksum
+	def verifyChecksum(self):
+		chksum = self.getChecksum()
+		if chksum != self.chksum:
+			print 'verifyChecksum: "%s"\t"%s"'%(chksum, self.chksum)
+			print 'verifyChecksum (types): %s\t%s' %(type(chksum), type(self.chksum))
+			return False
+		return True
+	def set(self, data, auth=None, key=None, timestamp=None):
+		if timestamp==None:
+			timestamp = int(time.time())
+		self.data = data
+		if auth !=None:
+			self.auth = auth
+		if key != None:
+			self.key = key
+		self.timestamp=timestamp
+		self.fixup()
+	def fixup(self):
+		datastring = "TS=%i AUTH=%s DT=%s"%(self.timestamp, self.auth, (' '.join(self.data)))
+		self.chksum = self.checksumMessage(datastring)
+
+		pktstring = 'CK=%s %s'%(self.chksum, datastring)
+		self.size = len(pktstring)
+	def __str__(self):
+		datastring = "TS=%i AUTH=%s DT=%s"%(self.timestamp, self.auth, (' '.join(self.data)))
+		self.chksum = self.checksumMessage(datastring)
+
+		pktstring = 'CK=%s %s'%(self.chksum, datastring)
+		self.msg = ''
+		self.msg = self.msg + '%08i'%len(pktstring)
+		self.msg = self.msg + self.char
+		self.msg = self.msg + pktstring
+
+		return self.msg
+	def prettyString(self):
+		s = '''Maui Packet
+-----------
+size:\t\t%i
+checksum:\t%s
+timestamp:\t%s
+auth:\t\t%s
+data:
+%s
+-----------'''
+		s = s%(self.size, self.chksum, self.timestamp, self.auth, self.data)
+		return s
+
+# XXXstroucki original file mauiwiki.py
 import threading
 import logging.config
 
 from tashi.parallel import synchronizedmethod
 from tashi.services.ttypes import *
-from tashi.util import getConfig, createClient, instantiateImplementation, boolean
-from tashi.agents.mauipacket import MauiPacket
+from tashi.util import getConfig, createClient, instantiateImplementation
+#from tashi.agents.mauipacket import MauiPacket
 import tashi.util
 
 def jobnameToId(jobname):
@@ -57,24 +159,24 @@ class InstanceHooks():
 	def postDestroy(self, inst):
 		for hook in self.hooks:
 			hook.postDestroy(inst)
-	def idToInst(self, id):
+	def idToInst(self, _id):
 		instances = self.client.getInstances()
 		print 'instances ', instances
-		insts = [i for i in instances if str(i.id)==str(id)]
+		insts = [i for i in instances if str(i.id)==str(_id)]
 		if len(insts) == 0:
-			raise "No instance with ID %s"%id
+			raise "No instance with ID %s"%_id
 		if len(insts) > 1:
-			raise "Multiple instances with ID %s"%id
+			raise "Multiple instances with ID %s"%_id
 		inst = insts[0]
 		return inst
-	def destroyById(self, id):
-		inst = self.idToInst(id)
-		self.client.destroyVm(int(id))
+	def destroyById(self, _id):
+		inst = self.idToInst(_id)
+		self.client.destroyVm(int(_id))
 		self.postDestroy(inst)
-	def activateById(self, id, host):
-		inst = self.idToInst(id)
+	def activateById(self, _id, host):
+		inst = self.idToInst(_id)
 		self.preCreate(inst)
-		self.client.activateVm(int(id), host)
+		self.client.activateVm(int(_id), host)
 
 def cmplists(a, b):
 	for i in range(len(a)):
@@ -301,8 +403,8 @@ class TashiConnection(threading.Thread):
 					if j.updateTime >= updatetime and j.id in joblist]
 		jl = {}
 		for job in jobs:
-			id = "%s.%i"%(job.name, job.id)
-			jl[id] = {'STATE':self.wikiInstanceState(job),
+			_id = "%s.%i"%(job.name, job.id)
+			jl[_id] = {'STATE':self.wikiInstanceState(job),
 			          'UNAME':self.users[job.userId].name,
 			          'GNAME':self.users[job.userId].name,
 			          'UPDATETIME':int(job.updateTime),
@@ -313,14 +415,14 @@ class TashiConnection(threading.Thread):
 			          'RMEM':str(job.memory),
 			          'WCLIMIT':str(self.defaultJobTime)}
 			if job.hostId != None:
-				jl[id]['TASKLIST'] = self.hosts[job.hostId].name
+				jl[_id]['TASKLIST'] = self.hosts[job.hostId].name
 		return jl
 	@synchronizedmethod
-	def activateById(self, id, host):
-		if not self.instances.has_key(id):
+	def activateById(self, _id, host):
+		if not self.instances.has_key(_id):
 			raise "no such instance"
-		self.ihooks.activateById(id, host)
-		self.instances[id].state=InstanceState.Activating
+		self.ihooks.activateById(_id, host)
+		self.instances[_id].state=InstanceState.Activating
 
 class MauiListener(SocketServer.StreamRequestHandler):
 	def setup(self):

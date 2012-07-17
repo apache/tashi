@@ -18,25 +18,25 @@
 # under the License.    
 
 import logging.config
-import signal
 import sys
 import os
-import time
 
-from tashi.util import instantiateImplementation, getConfig, debugConsole
+from tashi.util import instantiateImplementation, debugConsole
 import tashi
 from tashi import boolean
 
 from tashi.rpycservices import rpycservices
+from tashi.utils.config import Config
+
 from rpyc.utils.server import ThreadedServer
 from rpyc.utils.authenticators import TlsliteVdbAuthenticator
 
 def main():
 	global config, log
 	
-	(config, configFiles) = getConfig(["NodeManager"])
-	publisher = instantiateImplementation(config.get("NodeManager", "publisher"), config)
-	tashi.publisher = publisher
+	config = Config(["NodeManager"])
+	configFiles = config.getFiles()
+
 	logging.config.fileConfig(configFiles)
 	log = logging.getLogger(__name__)
 	log.info('Using configuration file(s) %s' % configFiles)
@@ -78,6 +78,9 @@ def startNodeManager():
 		users = {}
 		users[config.get('AllowedUsers', 'clusterManagerUser')] = config.get('AllowedUsers', 'clusterManagerPassword')
 		authenticator = TlsliteVdbAuthenticator.from_dict(users)
+
+		# XXXstroucki: ThreadedServer is liable to have exceptions
+		# occur within if an endpoint is lost.
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False, authenticator=authenticator)
 	else:
 		t = ThreadedServer(service=rpycservices.ManagerService, hostname='0.0.0.0', port=int(config.get('NodeManagerService', 'port')), auto_register=False)

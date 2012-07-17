@@ -1,0 +1,8 @@
+prompt 0
+timeout 1
+default ubuntu_generic
+
+label ubuntu_generic
+	menu label ^Ubuntu Generic
+	kernel ubuntu-installer/amd64/linux
+	append vga=normal locale=en_US setup/layoutcode=en_US console-setup/layoutcode=us initrd=ubuntu-installer/amd64/initrd.gz preseed/url=http://$IMAGEHOST/cgi-bin/bootnode.py?IMGSVR=$IMAGEHOST&NTPSVR=$NTPSVRIP&BOOTTYPE=$ROLE&HDDTYPE=$USEHDDTYPE netcfg/choose_interface=eth0 netcfg/get_hostname="" -- quiet

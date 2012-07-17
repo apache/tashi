@@ -18,8 +18,6 @@
 #  $Id$
 #
 
-import sys
-import os 
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -46,7 +44,7 @@ class apcSwitchedRackPdu(SystemManagementInterface):
 
 	def getPowerStatus(self):
 		thisoid = eval(str(self.oid_status) + "," + str(self.port))
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
+		__errorIndication, __errorStatus, __errorIndex, varBinds = cmdgen.CommandGenerator().getCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 0), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), thisoid)
 		output = varBinds[0][1]
@@ -81,7 +79,7 @@ class apcSwitchedRackPdu(SystemManagementInterface):
 
 	def powerOn(self):
 		thisoid = eval(str(self.oid_status) + "," + str(self.port)) 
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().setCmd( \
+		__errorIndication, __errorStatus, __errorIndex, __varBinds = cmdgen.CommandGenerator().setCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('1')))
@@ -89,7 +87,7 @@ class apcSwitchedRackPdu(SystemManagementInterface):
 
 	def powerOff(self):
 		thisoid = eval(str(self.oid_status) + "," + str(self.port)) 
-		errorIndication, errorStatus, errorIndex, varBinds = cmdgen.CommandGenerator().setCmd( \
+		__errorIndication, __errorStatus, __errorIndex, __varBinds = cmdgen.CommandGenerator().setCmd( \
 		cmdgen.CommunityData('my-agent', self.user, 1), \
 		cmdgen.UdpTransportTarget((self.pdu_name, 161)), \
 		(thisoid, rfc1902.Integer('2')))

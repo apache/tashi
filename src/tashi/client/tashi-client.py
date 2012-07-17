@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -21,8 +21,10 @@ import os.path
 import random
 import sys
 import types
-from tashi.rpycservices.rpyctypes import *
-from tashi import vmStates, hostStates, boolean, getConfig, stringPartition, createClient
+from tashi.rpycservices.rpyctypes import NetworkConfiguration,\
+	DiskConfiguration, HostState, Instance, Host, TashiException
+from tashi.utils.config import Config
+from tashi import vmStates, hostStates, boolean, stringPartition, createClient
 
 users = {}
 networks = {}
@@ -48,7 +50,23 @@ def getUser():
 	for user in users:
 		if (users[user].name == userStr):
 			return users[user].id
-	raise ValueError("Unknown user %s" % (userStr))
+	raise TashiException({'msg':"Unknown user %s" % (userStr)})
+
+def checkHid(host):
+	userId = getUser()
+	hosts = client.getHosts()
+	hostId = None
+	try:
+		hostId = int(host)
+	except:
+		for h in hosts:
+			if (h.name == host):
+				hostId = h.id
+	if (hostId is None):
+		raise TashiException({'msg':"Unknown host %s" % (str(host))})
+
+	# XXXstroucki permissions for host related stuff?
+	return hostId
 
 def checkIid(instance):
 	userId = getUser()
@@ -61,13 +79,13 @@ def checkIid(instance):
 			if (i.name == instance):
 				instanceId = i.id
 	if (instanceId is None):
-		raise ValueError("Unknown instance %s" % (str(instance)))
+		raise TashiException({'msg':"Unknown instance %s" % (str(instance))})
 	for instance in instances:
 		if (instance.id == instanceId):
 			# XXXstroucki uid 0 to have superuser access
 			# how about admin groups?
 			if (instance.userId != userId and instance.userId != None and userId != 0):
-				raise ValueError("You don't own that VM")
+				raise TashiException({'msg':"You don't have permissions on VM %s" % instance.name})
 	return instanceId
 
 def requiredArg(name):
@@ -78,10 +96,17 @@ def randomMac():
 
 def getDefaultNetwork():
 	fetchNetworks()
-	networkId = 1
+	networkId = 0
 	for network in networks:
+		if (getattr(networks[network], "default", False) is True):
+			networkId = network
+			break
+
+		# Naming the network "default" is deprecated, and
+		# this functionality will be removed soon
 		if (networks[network].name == "default"):
 			networkId = network
+			break
 	return networkId
 
 def randomNetwork():
@@ -93,7 +118,7 @@ def parseDisks(arg):
 		disks = []
 		for strDisk in strDisks:
 			strDisk = strDisk.strip()
-			(l, s, r) = stringPartition(strDisk, ":")
+			(l, __s, r) = stringPartition(strDisk, ":")
 			if (r == ""):
 				r = "False"
 			r = boolean(r)
@@ -109,12 +134,12 @@ def parseNics(arg):
 		nics = []
 		for strNic in strNics:
 			strNic = strNic.strip()
-			(l, s, r) = stringPartition(strNic, ":")
+			(l, __s, r) = stringPartition(strNic, ":")
 			n = l
 			if (n == ''):
 				n = getDefaultNetwork()
 			n = int(n)
-			(l, s, r) = stringPartition(r, ":")
+			(l, __s, r) = stringPartition(r, ":")
 			ip = l
 			if (ip == ''):
 				ip = None
@@ -133,7 +158,7 @@ def parseHints(arg):
 		hints = {}
 		for strHint in strHints:
 			strHint = strHint.strip()
-			(l, s, r) = stringPartition(strHint, "=")
+			(l, __s, r) = stringPartition(strHint, "=")
 			hints[l] = r
 		return hints
 	except:
@@ -160,6 +185,14 @@ def getVmLayout():
 def getSlots(cores, memory):
 	hosts = getVmLayout()
 	count = 0
+
+	if cores < 1:
+		print "Argument to cores must be 1 or greater."
+		return
+
+	if memory <= 0:
+		print "Argument to memory must be greater than 0."
+		return
 
 	for h in hosts:
 		if h.up is False or h.state != HostState.Normal:
@@ -197,6 +230,9 @@ def __shutdownOrDestroyMany(method, basename):
 	count = 0
 	for i in instances:
 		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
+			# checking permissions here
+			checkIid(i.name)
+
 			if method == "shutdown":
 				client.shutdownVm(i.id)
 
@@ -208,7 +244,7 @@ def __shutdownOrDestroyMany(method, basename):
 
 			count = count + 1
 	if (count == 0):
-		raise ValueError("That is an unused basename")
+		raise TashiException({'msg':"%s is an unused basename" % basename})
 	return None
 
 def getMyInstances():
@@ -244,13 +280,14 @@ argLists = {
 'destroyMany': [('basename', str, lambda: requiredArg('basename'), True)],
 'suspendVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'resumeVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
-'migrateVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('targetHostId', int, lambda: requiredArg('targetHostId'), True)],
+'migrateVm': [('instance', checkIid, lambda: requiredArg('instance'), True), ('dst', checkHid, lambda: requiredArg('dst'), True)],
 'pauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'unpauseVm': [('instance', checkIid, lambda: requiredArg('instance'), True)],
 'getSlots': [('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False)],
 'getImages': [],
 'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
+'setHostState': [('host', checkHid, lambda: requiredArg('host'), True), ('state', str, lambda: requiredArg('state'), True)],
 'getUsers': [],
 'getNetworks': [],
 'getInstances': [],
@@ -270,13 +307,14 @@ convertArgs = {
 'destroyMany': '[basename]',
 'suspendVm': '[instance]',
 'resumeVm': '[instance]',
-'migrateVm': '[instance, targetHostId]',
+'migrateVm': '[instance, dst]',
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
 'vmmSpecificCall': '[instance, arg]',
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
+'setHostState' : '[host, state]',
 }
 
 # Descriptions
@@ -294,6 +332,7 @@ description = {
 'unpauseVm': 'Unpauses a paused VM',
 'getSlots': 'Get a count of how many VMs could be started in the cluster',
 'getHosts': 'Gets a list of hosts running Node Managers',
+'setHostState': 'Set the state of a host, eg. Normal or Drained',
 'getUsers': 'Gets a list of users',
 'getNetworks': 'Gets a list of available networks for VMs to be placed on',
 'getInstances': 'Gets a list of all VMs in the cluster',
@@ -307,19 +346,20 @@ description = {
 
 # Example use strings
 examples = {
-'createVm': ['--name foobar --disks i386-hardy.qcow2', '--userId 3 --name foobar --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics :1.2.3.4,1::52:54:00:00:56:78 --hints enableDisplay=True'],
-'createMany': ['--basename foobar --disks i386-hardy.qcow2 --count 4'],
-'shutdownVm': ['--instance 12345', '--instance foobar'],
-'destroyVm': ['--instance 12345', '--instance foobar'],
-'shutdownMany': ['--basename foobar'],
-'destroyMany': ['--basename foobar'],
-'suspendVm': ['--instance 12345', '--instance foobar'],
-'resumeVm': ['--instance 12345', '--instance foobar'],
-'migrateVm': ['--instance 12345 --targetHostId 73', '--instance foobar --targetHostId 73'],
-'pauseVm': ['--instance 12345', '--instance foobar'],
-'unpauseVm': ['--instance 12345', '--instance foobar'],
+'createVm': ['--name vmname --disks i386-hardy.qcow2', '--userId 3 --name vmname --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics :1.2.3.4,1::52:54:00:00:56:78 --hints enableDisplay=True'],
+'createMany': ['--basename vmname --disks i386-hardy.qcow2 --count 4'],
+'shutdownVm': ['--instance 12345', '--instance vmname'],
+'destroyVm': ['--instance 12345', '--instance vmname'],
+'shutdownMany': ['--basename vmname'],
+'destroyMany': ['--basename vmname'],
+'suspendVm': ['--instance 12345', '--instance vmname'],
+'resumeVm': ['--instance 12345', '--instance vmname'],
+'migrateVm': ['--instance 12345 --dst vmhost1', '--instance vmname --dst 73'],
+'pauseVm': ['--instance 12345', '--instance vmname'],
+'unpauseVm': ['--instance 12345', '--instance vmname'],
 'getSlots': ['--cores 1 --memory 128'],
 'getHosts': [''],
+'setHostState': ['--host vmhost1 --state Drained'],
 'getUsers': [''],
 'getNetworks': [''],
 'getInstances': [''],
@@ -327,7 +367,7 @@ examples = {
 'getVmLayout': [''],
 'getImages': [''],
 'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
-'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance foobar --arg stopVnc'],
+'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance vmname --arg stopVnc'],
 'unregisterHost' : ['--hostId 2'],
 }
 
@@ -393,9 +433,9 @@ def transformState(obj):
 		except:
 			obj.state = 'Unknown'
 
-def genKeys(list):
+def genKeys(_list):
 	keys = {}
-	for row in list:
+	for row in _list:
 		for item in row.__dict__.keys():
 			keys[item] = item
 	if ('id' in keys):
@@ -405,25 +445,25 @@ def genKeys(list):
 		keys = keys.values()
 	return keys
 
-def makeTable(list, keys=None):
-	(consoleWidth, consoleHeight) = (9999, 9999)
+def makeTable(_list, keys=None):
+	(consoleWidth, __consoleHeight) = (9999, 9999)
 	try:
 # XXXpipe: get number of rows and column on current window
 		stdout = os.popen("stty size")
-		r = stdout.read()
+		__r = stdout.read()
 		stdout.close()
 	except:
 		pass
-	for obj in list:
+	for obj in _list:
 		transformState(obj)
 	if (keys == None):
-		keys = genKeys(list)
+		keys = genKeys(_list)
 	for (show, k) in show_hide:
 		if (show):
 			if (k != "all"):
 				keys.append(k)
 			else:
-				keys = genKeys(list)
+				keys = genKeys(_list)
 		else:
 			if (k in keys):
 				keys.remove(k)
@@ -432,7 +472,7 @@ def makeTable(list, keys=None):
 	maxWidth = {}
 	for k in keys:
 		maxWidth[k] = len(k)
-	for row in list:
+	for row in _list:
 		for k in keys:
 			if (k in row.__dict__):
 				maxWidth[k] = max(maxWidth[k], len(str(row.__dict__[k])))
@@ -465,8 +505,8 @@ def makeTable(list, keys=None):
 			return 1
 		else:
 			return 0
-	list.sort(cmp=sortFunction)
-	for row in list:
+	_list.sort(cmp=sortFunction)
+	for row in _list:
 		line = ""
 		for k in keys:
 			row.__dict__[k] = row.__dict__.get(k, "")
@@ -532,7 +572,7 @@ def main():
 	if (len(sys.argv) < 2):
 		usage()
 	function = matchFunction(sys.argv[1])
-	(config, configFiles) = getConfig(["Client"])
+	config = Config(["Client"])
 
 	# build a structure of possible arguments
 	possibleArgs = {}
@@ -608,6 +648,11 @@ def main():
 				fargs = []
 
 			res = f(*fargs)
+
+		except TashiException, e:
+			print "Failed in calling %s: %s" % (function, e.msg)
+			sys.exit(-1)
+
 		except Exception, e:
 			print "Failed in calling %s: %s" % (function, e)
 			print "Please run tashi-client --examples for syntax information"
@@ -628,15 +673,12 @@ def main():
 			except Exception, e:
 				print e
 	except TashiException, e:
-		print "TashiException:"
+		print "Tashi could not complete your request:"
 		print e.msg
 		exitCode = e.errno
-# 	except Exception, e:
-# 		print e
-		# XXXstroucki: exception may be unrelated to usage of function
-		# so don't print usage on exception as if there were a problem
-		# with the arguments
-		#usage(function)
+ 	except Exception, e:
+ 		print e
+		print "Please run tashi-client --examples for syntax information"
 	sys.exit(exitCode)
 
 if __name__ == "__main__":
