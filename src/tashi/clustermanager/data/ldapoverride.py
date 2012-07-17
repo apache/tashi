@@ -19,9 +19,8 @@ import subprocess
 import time
 #XXXstroucki getImages requires os?
 import os
-from tashi.rpycservices.rpyctypes import Errors, Network, Host, User, Instance, TashiException, LocalImages, DiskConfiguration, NetworkConfiguration
-from tashi.util import stringPartition, boolean, instantiateImplementation, humanReadable
-from tashi.rpycservices.rpyctypes import User
+from tashi.rpycservices.rpyctypes import User, LocalImages
+from tashi.util import instantiateImplementation, humanReadable
 from tashi.clustermanager.data import DataInterface
 
 class LdapOverride(DataInterface):
@@ -57,20 +56,20 @@ class LdapOverride(DataInterface):
 	def getHosts(self):
 		return self.baseDataObject.getHosts()
 	
-	def getHost(self, id):
-		return self.baseDataObject.getHost(id)
+	def getHost(self, _id):
+		return self.baseDataObject.getHost(_id)
 	
 	def getInstances(self):
 		return self.baseDataObject.getInstances()
 	
-	def getInstance(self, id):
-		return self.baseDataObject.getInstance(id)
+	def getInstance(self, _id):
+		return self.baseDataObject.getInstance(_id)
 	
 	def getNetworks(self):
 		return self.baseDataObject.getNetworks()
 	
-	def getNetwork(self, id):
-		return self.baseDataObject.getNetwork(id)
+	def getNetwork(self, _id):
+		return self.baseDataObject.getNetwork(_id)
 
 	def getImages(self):
 		count = 0
@@ -101,7 +100,7 @@ class LdapOverride(DataInterface):
 								myUsers[user.id] = user
 							thisUser = {}
 						else:
-							(key, sep, val) = l.partition(":")
+							(key, __sep, val) = l.partition(":")
 							key = key.strip()
 							val = val.strip()
 							thisUser[key] = val
@@ -116,9 +115,9 @@ class LdapOverride(DataInterface):
 		self.fetchFromLdap()
 		return self.users
 	
-	def getUser(self, id):
+	def getUser(self, _id):
 		self.fetchFromLdap()
-		return self.users[id]
+		return self.users[_id]
 		
 	def registerHost(self, hostname, memory, cores, version):
 		return self.baseDataObject.registerHost(hostname, memory, cores, version)

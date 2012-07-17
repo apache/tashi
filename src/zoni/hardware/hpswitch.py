@@ -25,13 +25,11 @@ import sys
 import pexpect
 import datetime
 import thread
-import time
 import threading
 import logging
 
 
 from hwswitchinterface import HwSwitchInterface
-from resourcequerysql import ResourceQuerySql
 
 
 class HwHPSwitch(HwSwitchInterface):
@@ -169,10 +167,10 @@ class HwHPSwitch(HwSwitchInterface):
 				i=child.expect(['console','sw', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 				i=child.expect(['console','sw', 'Name:', pexpect.EOF, pexpect.TIMEOUT], timeout=2)
 
-			except EOF:
+			except pexpect.EOF:
 				print "EOF", i
 				#child.sendline()
-			except TIMEOUT:
+			except pexpect.TIMEOUT:
 				print "TIMEOUT", i
 		#child.interact(escape_character='\x1d', input_filter=None, output_filter=None)
 
@@ -245,7 +243,7 @@ class HwHPSwitch(HwSwitchInterface):
 		cmd = "/info/port " + str(self.host['hw_port'])
 		child.sendline(cmd)
 		child.logfile = sys.stdout
-		opt = child.expect(['Info(.*)', pexpect.EOF, pexpect.TIMEOUT])
+		__opt = child.expect(['Info(.*)', pexpect.EOF, pexpect.TIMEOUT])
 
 	#  this needs to be removed or rewritten
 	def interactiveSwitchConfig(self):

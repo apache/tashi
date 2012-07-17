@@ -1,0 +1,31 @@
+The files in this folders are Debian Live Packages to support live boot.
+convertz will require these files to be in /var/www/live-boot-support in order
+to inject them into live the image during conversion from VM image.
+
+Debian Live Packages can be found at http://live.debian.net. The necessary
+pakcages are live-boot, live-config and live-tools. As of the preparation of
+this README (21-Feb-2012), the respective version and date for each package is:
+
+- live-boot	3.0~a25-1	17-Feb-2012
+- live-config	3.0~a32-1	17-Feb-2012
+- live-tools	3.0~a6-1	17-Feb-2012
+
+Generally to the deb files are available to download but you can choose to
+rebuild from source (instructions are available from the url listed above).
+
+If you choose to download the deb files instead, here are the ones that you
+will need:
+
+- live-boot
+	- live-boot_<version>_all.deb
+	- live-boot-initramfs-tools_<version>_all.deb
+-live-config
+	- live-config_<version>_all.deb
+	- live-config-upstart_<version>_all.deb
+-live-tools
+	- live-tools_<version>_all.deb
+
+If you decide to try new versions of the deb files, please remember to
+move the ones in this folder to a safe place before downloading the new
+ones here.
+

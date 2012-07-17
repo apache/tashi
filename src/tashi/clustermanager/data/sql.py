@@ -45,8 +45,8 @@ class SQL(DataInterface):
 		else:
 			raise TashiException, 'Unknown SQL database engine by URI: %s' % (self.uri)
 
-		self.instanceOrder = ['id', 'vmId', 'hostId', 'decayed', 'state', 'userId', 'name', 'cores', 'memory', 'disks', 'nics', 'hints']
-		self.hostOrder = ['id', 'name', 'up', 'decayed', 'state', 'memory', 'cores', 'version']
+		self.instanceOrder = ['id', 'vmId', 'hostId', 'decayed', 'state', 'userId', 'name', 'cores', 'memory', 'disks', 'nics', 'hints', 'groupName']
+		self.hostOrder = ['id', 'name', 'up', 'decayed', 'state', 'memory', 'cores', 'version', 'notes', 'reserved']
 		self.instanceLock = threading.Lock()
 		self.instanceIdLock = threading.Lock()
 		self.instanceLocks = {}
@@ -83,8 +83,8 @@ class SQL(DataInterface):
 		return instanceId
 	
 	def verifyStructure(self):
-		self.executeStatement("CREATE TABLE IF NOT EXISTS instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL)")
-		self.executeStatement("CREATE TABLE IF NOT EXISTS hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256))")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS instances (id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL, groupName varchar(256))")
+		self.executeStatement("CREATE TABLE IF NOT EXISTS hosts (id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256), notes varchar(256), reserved varchar(1024))")
 		self.executeStatement("CREATE TABLE IF NOT EXISTS networks (id int(11) NOT NULL, name varchar(256) NOT NULL)")
 		self.executeStatement("CREATE TABLE IF NOT EXISTS users (id int(11) NOT NULL, name varchar(256) NOT NULL, passwd varchar(256))")
 	
@@ -101,7 +101,7 @@ class SQL(DataInterface):
 		l = []
 		for e in range(0, len(self.instanceOrder)):
 			l.append(i.__dict__[self.instanceOrder[e]])
-		return map(lambda x: self.sanitizeForSql('"' + str(x) + '"'), l)
+		return map(lambda x: self.sanitizeForSql('"%s"' % str(x)), l)
 	
 	def makeListInstance(self, l):
 		i = Instance()
@@ -118,7 +118,7 @@ class SQL(DataInterface):
 		l = []
 		for e in range(0, len(self.hostOrder)):
 			l.append(h.__dict__[self.hostOrder[e]])
-		return map(lambda x: self.sanitizeForSql('"' + str(x) + '"'), l)
+		return map(lambda x: self.sanitizeForSql('"%s"' % str(x)), l)
 	
 	def makeListHost(self, l):
 		h = Host()
@@ -127,6 +127,10 @@ class SQL(DataInterface):
 		h.up = boolean(h.up)
 		h.decayed = boolean(h.decayed)
 		h.state = int(h.state)
+		if h.reserved is not None:
+			h.reserved = eval(h.reserved)
+		else:
+			h.reserved = []
 		return h
 	
 	def registerInstance(self, instance):
@@ -148,7 +152,8 @@ class SQL(DataInterface):
 			instance._lock.acquire()
 			self.instanceBusy[instance.id] = True
 			l = self.makeInstanceList(instance)
-			self.executeStatement("INSERT INTO instances VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
+			# XXXstroucki nicer?
+			self.executeStatement("INSERT INTO instances VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		finally:
 			self.instanceLock.release()
 		return instance
@@ -254,14 +259,14 @@ class SQL(DataInterface):
 	
 	def getHost(self, in_id):
 		try:
-			id = int(in_id)
+			_id = int(in_id)
 		except:
 			self.log.exception("Argument to getHost was not integer: %s" % in_id)
 
-		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % id)
+		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % _id)
 		r = cur.fetchone()
 		if (r == None):
-			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchHostId,'msg':"No such hostId - %s" % (_id)})
 		host = self.makeListHost(r)
 		return host
 	
@@ -276,16 +281,16 @@ class SQL(DataInterface):
 	
 	def getInstance(self, in_id):
 		try:
-			id = int(in_id)
+			_id = int(in_id)
 		except:
 			self.log.exception("Argument to getInstance was not integer: %s" % in_id)
 
-		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (id))
+		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (_id))
 		# XXXstroucki should only return one row.
 		# what about migration? should it be enforced?
 		r = cur.fetchone()
 		if (not r):
-			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (id)})
+			raise TashiException(d={'errno':Errors.NoSuchInstanceId, 'msg':"No such instanceId - %d" % (_id)})
 		instance = self.makeListInstance(r)
 		return instance
 	
@@ -298,8 +303,8 @@ class SQL(DataInterface):
 			networks[network.id] = network
 		return networks
 	
-	def getNetwork(self, id):
-		cur = self.executeStatement("SELECT * FROM networks WHERE id = %d" % (id))
+	def getNetwork(self, _id):
+		cur = self.executeStatement("SELECT * FROM networks WHERE id = %d" % (_id))
 		r = cur.fetchone()
 		network = Network(d={'id':r[0], 'name':r[1]})
 		return network
@@ -325,8 +330,8 @@ class SQL(DataInterface):
 			users[user.id] = user
 		return users
 	
-	def getUser(self, id):
-		cur = self.executeStatement("SELECT * FROM users WHERE id = %d" % (id))
+	def getUser(self, _id):
+		cur = self.executeStatement("SELECT * FROM users WHERE id = %d" % (_id))
 		r = cur.fetchone()
 		user = User(d={'id':r[0], 'name':r[1], 'passwd':r[2]})
 		return user
@@ -337,22 +342,23 @@ class SQL(DataInterface):
 		res = cur.fetchall()
 		for r in res:
 			if r[1] == hostname:
-				id = r[0]
-				self.log.warning("Host %s already registered, update will be done" % id)
+				_id = r[0]
+				self.log.warning("Host %s already registered, update will be done" % _id)
 				s = ""
-				host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+				host = Host(d={'id': _id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
 				l = self.makeHostList(host)
 				for e in range(0, len(self.hostOrder)):
 					s = s + self.hostOrder[e] + "=" + l[e]
 					if (e < len(self.hostOrder)-1):
 						s = s + ", "
-				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, id))
+				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, _id))
 				self.hostLock.release()
 				return r[0], True
-		id = self.getNewId("hosts")
-		host = Host(d={'id': id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version})
+		_id = self.getNewId("hosts")
+		host = Host(d={'id': _id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version, 'notes':'', 'reserved':[]})
 		l = self.makeHostList(host)
-		self.executeStatement("INSERT INTO hosts VALUES (%s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
+		# XXXstroucki nicer?
+		self.executeStatement("INSERT INTO hosts VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		self.hostLock.release()
 		return id, False
 	
@@ -374,10 +380,10 @@ class SQL(DataInterface):
 		maxId = 0 # the first id would be 1
 		l = []
 		for r in res:
-			id = r[0]
-			l.append(id)
-			if id >= maxId:
-				maxId = id
+			_id = r[0]
+			l.append(_id)
+			if _id >= maxId:
+				maxId = _id
 		l.sort() # sort to enable comparing with range output
 		# check if some id is released:
 		t = range(maxId + 1)

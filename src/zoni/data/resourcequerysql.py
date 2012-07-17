@@ -22,16 +22,13 @@ import os
 import sys
 import string
 import MySQLdb
-import subprocess
 import traceback
 import logging
-import threading
 import time
 
 import usermanagement
 from zoni.data.infostore import InfoStore
-from zoni.extra.util import checkSuper, createKey
-from zoni.agents.dhcpdns import DhcpDns
+from zoni.extra.util import createKey
 
 class ResourceQuerySql(InfoStore):
 	def __init__(self, config, verbose=None):
@@ -80,7 +77,7 @@ class ResourceQuerySql(InfoStore):
 		vlans = []
 		for val in vlanInfo.split(","):
 			try:
-				ret = self.getVlanId(val.split(":")[0])
+				__ret = self.getVlanId(val.split(":")[0])
 				vlans.append(val)
 			except Exception, e:
 				print e
@@ -96,7 +93,7 @@ class ResourceQuerySql(InfoStore):
 		domainKey = createKey(name)
 		query = "insert into domaininfo (domain_name, domain_desc, domain_key) values ('%s','%s', '%s')" % (name, desc, domainKey)
 		try:
-			result = self.insertDb(query)
+			__result = self.insertDb(query)
 			mesg = "Adding domain %s(%s)" % (name, desc)
 			self.log.info(mesg)
 		except Exception, e:
@@ -112,7 +109,7 @@ class ResourceQuerySql(InfoStore):
 			vlanType = i.split(":")[1]
 			query = "insert into domainmembermap values (%d, %d, '%s')" % (domainId, vlanId, vlanType)
 			try:
-				result = self.insertDb(query)
+				__result = self.insertDb(query)
 			except Exception, e:
 				print e
 		
@@ -133,16 +130,16 @@ class ResourceQuerySql(InfoStore):
 		mesg = "Removing domain %s" % (name)
 		self.log.info(mesg)
 		query = "delete from domaininfo where domain_name = '%s'" % (name)
-		result = self.__deleteDb(query)
+		__result = self.__deleteDb(query)
 		#  Need to remove any vlans attached to this domain
 		query = "delete from domainmembermap where domain_id = '%s'" % (domainId)
-		result = self.__deleteDb(query)
+		__result = self.__deleteDb(query)
 
 	def showDomains(self):
 		usermgt = eval("usermanagement.%s" % (self.config['userManagement']) + "()")
 		query = "select r.reservation_id, r.user_id, d.domain_name, d.domain_desc from domaininfo d, allocationinfo a, reservationinfo r where d.domain_id = a.domain_id and a.reservation_id = r.reservation_id"
 		result = self.selectDb(query)
-		desc = result.description
+		#desc = result.description
 		if result.rowcount > 0:
 			print "%s\t%s\t%s\t%s" % (result.description[0][0], result.description[1][0], result.description[2][0], result.description[3][0])
 			print "------------------------------------------------------------"
@@ -173,7 +170,7 @@ class ResourceQuerySql(InfoStore):
 			return -1
 		query = "insert into vlaninfo (vlan_num, vlan_desc) values ('%s','%s')" % (vnumber, desc)
 		try:
-			result = self.insertDb(query)
+			__result = self.insertDb(query)
 			mesg = "Adding vlan %s(%s)" % (vnumber, desc)
 			self.log.info(mesg)
 		except Exception, e:
@@ -290,8 +287,6 @@ class ResourceQuerySql(InfoStore):
 		
 
 	def showResources(self, cmdargs):
-
-		queryopt = ""
 		defaultFields = "mac_addr, location, num_procs, num_cores, clock_speed, mem_total "
 		#defaultFields = "*"
 		
@@ -303,6 +298,11 @@ class ResourceQuerySql(InfoStore):
 		query = "select " + defaultFields + "from sysinfo " + queryopt
 		result = self.selectDb(query)	
 
+		# Extensions from MIMOS - allow showResources to fail gracefully if the Zoni DB is not populated yet
+		if result.rowcount < 1:
+			print "Zoni Hardware/System Database is empty."
+			exit(1)
+
 		line = ""
 		for i in defaultFields.split(","):
 			#line += string.strip(str(i)) + "\t"
@@ -310,20 +310,21 @@ class ResourceQuerySql(InfoStore):
 		#  header
 		print line
 
-		sum = {}
+		_sum = {}
 		for row in result.fetchall():
 			line = ""
-			sum['totProc'] = sum.get('totProc', 0)
-			sum['totProc'] += int(row[2])
-			sum['totCores'] = sum.get('totCores', 0)
-			sum['totCores'] += int(row[3])
-			sum['totMemory'] = sum.get('totMemory', 0)
-			sum['totMemory'] += int(row[5])
+			_sum['totProc'] = _sum.get('totProc', 0)
+			_sum['totProc'] += int(row[2])
+			_sum['totCores'] = _sum.get('totCores', 0)
+			_sum['totCores'] += int(row[3])
+			_sum['totMemory'] = _sum.get('totMemory', 0)
+			_sum['totMemory'] += int(row[5])
 			for val in row:
 				line += str(val).center(20)
 			
 			print line
-		print "\n%s systems registered -  %d procs | %d cores | %d bytes RAM" % (str(result.rowcount), sum['totProc'], sum['totCores'], sum['totMemory'],)
+		print "\n%s systems registered -  %d procs | %d cores | %d bytes RAM" % \
+			(str(result.rowcount), _sum['totProc'], _sum['totCores'], _sum['totMemory'],)
 
 	def getAvailableResources(self):
 		#  Maybe should add a status flag?
@@ -508,7 +509,7 @@ class ResourceQuerySql(InfoStore):
 		result = self.selectDb(query)
 		
 		print "NODE ALLOCATION\n"
-		sum = {}
+		_sum = {}
 		if self.verbose:
 			print "%-5s%-10s%-10s%-10s%-13s%-12s%-10s%-34s%-20s%s" % ("Res", "User", "Host", "Domain", "Cores/Mem","Expiration", "Hostname", "Boot Image Name", "Vlan Member", "Notes")
 		else:
@@ -533,10 +534,10 @@ class ResourceQuerySql(InfoStore):
 			allocation_id = i[11]
 			userName = usermgt.getUserName(uid)
 			combined_notes = str(rnotes) + "|" + str(anotes)
-			sum['totCores'] = sum.get('totCores', 0)
-			sum['totCores'] += cores
-			sum['totMemory'] = sum.get('totMemory', 0)
-			sum['totMemory'] += memory
+			_sum['totCores'] = _sum.get('totCores', 0)
+			_sum['totCores'] += cores
+			_sum['totMemory'] = _sum.get('totMemory', 0)
+			_sum['totMemory'] += memory
 			if self.verbose:
 				query = "select v.vlan_num, m.vlan_type from vlaninfo v, vlanmembermap m where v.vlan_id = m.vlan_id and allocation_id = '%d' order by vlan_num asc" % allocation_id
 				vlanRes = self.selectDb(query)
@@ -550,7 +551,7 @@ class ResourceQuerySql(InfoStore):
 				print "%-5s%-10s%-10s%-10s%-2s/%-10s%-12s%-10s%-34s%-20s%s" % (resId, userName, host, domain, cores, memory,expire, hostname, image_name, vlanMember,combined_notes)
 			else:
 				print "%-10s%-10s%-10s%-2s/%-10s%-12s%s" % (userName, host, domain, cores, memory,expire, combined_notes)
-		print "\n%s systems allocated - %d cores| %d bytes RAM" % (str(result.rowcount), sum['totCores'], sum['totMemory'])
+		print "\n%s systems allocated - %d cores| %d bytes RAM" % (str(result.rowcount), _sum['totCores'], _sum['totMemory'])
 
 	def showReservation(self, userId=None):
 		#from IPython.Shell import IPShellEmbed
@@ -612,7 +613,7 @@ class ResourceQuerySql(InfoStore):
 		query = "select image_name from imageinfo"
 		result = self.selectDb(query)
 		row = result.fetchall()
-		desc = result.description
+		#desc = result.description
 
 		imagelist = []
 		for i in row:
@@ -625,7 +626,7 @@ class ResourceQuerySql(InfoStore):
 		query = "select image_name, dist, dist_ver  from imageinfo"
 		result = self.selectDb(query)
 		row = result.fetchall()
-		desc = result.description
+		#desc = result.description
 
 		for i in row:
 			print i
@@ -736,7 +737,7 @@ class ResourceQuerySql(InfoStore):
 			host['hw_port'] = int(i[6])
 
 		#  Get drac info
-		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, 0, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'drac' and sys_id = " +  str(host['sys_id'])
 		result = self.selectDb(query)
 		if result.rowcount > 0:
 			for i in result.fetchall():
@@ -746,7 +747,10 @@ class ResourceQuerySql(InfoStore):
 				host['drac_ipaddr'] = i[3]
 				host['drac_userid'] = i[4]
 				host['drac_password'] = i[5]
-				host['drac_port'] = int(i[6])
+				# Extensions from MIMOS - for Dell Blade
+				# XXXstroucki removed hw_blenc from query
+				# host['drac_enclosure'] = i[6]
+				host['drac_port'] = int(i[7])
 
 		#  Get PDU info
 		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and h.hw_type = 'pdu' and p.sys_id = " +  str(host['sys_id'])
@@ -760,6 +764,19 @@ class ResourceQuerySql(InfoStore):
 			host['pdu_password'] = i[5]
 			host['pdu_port'] = int(i[6])
 
+		# Extensions from MIMOS - for HP Blade iLO
+		query = "select h.hw_id, h.hw_name, h.hw_model, h.hw_ipaddr, h.hw_userid, h.hw_password, 0, p.port_num from hardwareinfo h, portmap p where p.hw_id = h.hw_id and hw_type = 'hpilo' and sys_id = " +  str(host['sys_id'])
+		result = self.selectDb(query)
+		for i in result.fetchall():
+			host['ilo_id'] = int(i[0])
+			host['ilo_name'] = i[1]
+			host['ilo_model'] = i[2]
+			host['ilo_ipaddr'] = i[3]
+			host['ilo_userid'] = i[4]
+			host['ilo_password'] = i[5]
+			# XXXstroucki removed hw_blenc from query
+			#host['ilo_enclosure'] = i[6]
+			host['ilo_port'] = int(i[7])
 
 		#print "host is ", host
 		return host
@@ -786,7 +803,7 @@ class ResourceQuerySql(InfoStore):
 			cursor.execute (query)
 			self.conn.commit()
 			row = cursor.fetchall()
-			desc = cursor.description
+			#desc = cursor.description
 		except MySQLdb.OperationalError, e:
 			msg = "%s : %s" % (e[1], query)
 			self.log.error(msg)
@@ -867,12 +884,12 @@ class ResourceQuerySql(InfoStore):
 		return cursor
 
 
-	def updateReservation (self, reservationId, userId=None, reservationDuration=None, vlanIsolate=None, allocationNotes=None):
+	def updateReservation (self, reservationId, userId=None, resDuration=None, vlanIsolate=None, allocationNotes=None):
 
 		mesg = "Updating reservation %s" % (str(reservationId))
 		self.log.info(mesg)
 
-		if reservationDuration:
+		if resDuration:
 			if len(resDuration) == 8:
 				expireDate = resDuration
 			elif len(resDuration) < 4:
@@ -887,7 +904,7 @@ class ResourceQuerySql(InfoStore):
 
 			mesg = "Updating reservationDuration :" + resDuration
 			self.log.info(mesg)
-			query = "update reservationinfo set reservation_exiration = \"" + expireDate_ + "\" where reservation_id = \"" + str(reservationId) + "\""
+			query = "update reservationinfo set reservation_expiration = \"" + expireDate + "\" where reservation_id = \"" + str(reservationId) + "\""
 			self.__updateDb(query)
 
 		if allocationNotes:
@@ -1043,7 +1060,7 @@ class ResourceQuerySql(InfoStore):
 		vId = self.getVlanId(v)
 		query = "delete from vlanmembermap where allocation_id = '%s' and vlan_id = '%s'" % (allocationId, vId)
 
-		result = self.insertDb(query)
+		__result = self.insertDb(query)
 		mesg = "Removing vlan %s from node %s" % (v, nodeName)
 		self.log.info(mesg)
 
@@ -1092,8 +1109,14 @@ class ResourceQuerySql(InfoStore):
 			name = imageName.split(":")[0]
 		if len(imageName.split(":")) > 2:
 			dist = imageName.split(":")[1]
-		if len(imageName.split(":")) >= 3:
+		# Extensions from MIMOS - allow adding 2 more pieces of info - kernel_id and initrd_id
+		#if len(imageName.split(":")) >= 3:
+		if len(imageName.split(":")) > 3:
 			dist_ver = imageName.split(":")[2]
+		if len(imageName.split(":")) > 4:
+			kernel_id = imageName.split(":")[3]
+		if len(imageName.split(":")) >= 5:
+			initrd_id = imageName.split(":")[4]
 
 		query = "select * from imageinfo where image_name = \"" + name + "\""
 		result = self.selectDb(query)
@@ -1110,7 +1133,9 @@ class ResourceQuerySql(InfoStore):
 			sys.stderr.write(mesg)
 			return 
 
-		query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
+		# Extensions from MIMOS - to take care of the addition of kernel_id and initrd_id
+		#query = "insert into imageinfo (image_name, dist, dist_ver) values(\"" + name + "\", \"" + dist + "\", \"" + dist_ver + "\")"
+		query = "insert into imageinfo (image_name, dist, dist_ver, kernel_id, initrd_id) values ('%s', '%s', '%s', '%s', '%s')" % (name, dist, dist_ver, kernel_id, initrd_id)
 		self.insertDb(query)
 
 
@@ -1126,7 +1151,7 @@ class ResourceQuerySql(InfoStore):
 		#  imagemap db should be sys_id instead of mac_addr
 		#  change later
 
-		cur_image = host['pxe_image_name']
+		#cur_image = host['pxe_image_name']
 		#  Get the id of the new image
 		query = "select image_id from imageinfo where image_name = " + "\"" + image + "\""
 		row = self.__queryDb(query)
@@ -1207,7 +1232,7 @@ class ResourceQuerySql(InfoStore):
 		return cap
 
 	#  print out data in a consistent format
-	def __showIt(data):
+	def __showIt(self, data):
 		pass
 
 	

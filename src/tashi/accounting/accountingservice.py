@@ -55,7 +55,7 @@ class AccountingService(object):
 				instances = self.cm.getInstances()
 				for instance in instances:
 					# XXXstroucki this currently duplicates what the CM was doing.
-					self.log.info('Accounting: id %d host %d vmId %d user %d cores %d memory %d' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory))
+					self.log.info('Accounting: id %s host %s vmId %s user %s cores %s memory %s' % (instance.id, instance.hostId, instance.vmId, instance.userId, instance.cores, instance.memory))
 			except:
 				self.log.warning("Accounting iteration failed")
 

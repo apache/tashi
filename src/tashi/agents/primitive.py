@@ -19,16 +19,18 @@
 
 import time
 import logging.config
+import sys
 
 from tashi.rpycservices.rpyctypes import Errors, HostState, InstanceState, TashiException
 
-from tashi.util import getConfig, createClient, instantiateImplementation, boolean
+from tashi.util import createClient, instantiateImplementation, boolean
+from tashi.utils.config import Config
 import tashi
 
 class Primitive(object):
-	def __init__(self, config, cmclient):
+	def __init__(self, config):
 		self.config = config
-		self.cm = cmclient
+		self.cm = createClient(config)
 		self.hooks = []
 		self.log = logging.getLogger(__file__)
 		self.scheduleDelay = float(self.config.get("Primitive", "scheduleDelay"))
@@ -40,7 +42,7 @@ class Primitive(object):
 			name = name.lower()
 			if (name.startswith("hook")):
 				try:
-					self.hooks.append(instantiateImplementation(value, config, cmclient, False))
+					self.hooks.append(instantiateImplementation(value, config, self.cm, False))
 				except:
 					self.log.exception("Failed to load hook %s" % (value))
 		self.hosts = {}
@@ -61,7 +63,7 @@ class Primitive(object):
 
 		for h in self.cm.getHosts():
 			#XXXstroucki get all hosts here?
-			#if (h.up == True and h.state == HostState.Normal):
+			#if (self.__isReady(h)):
 			hosts[ctr] = h
 			ctr = ctr + 1
 			load[h.id] = []
@@ -75,8 +77,9 @@ class Primitive(object):
 		# XXXstroucki put held machines behind pending ones
 		heldInstances = []
 		for i in instances.itervalues():
+			# Nonrunning VMs will have hostId of None, but
+			# so will Suspended VMs.
 			if (i.hostId or i.state == InstanceState.Pending):
-				# Nonrunning VMs will have hostId of None
 				load[i.hostId] = load[i.hostId] + [i.id]
 			elif (i.hostId is None and i.state == InstanceState.Held):
 				heldInstances = heldInstances + [i.id]
@@ -101,6 +104,11 @@ class Primitive(object):
 		if name in self.clearHints[hint]:
 			popit = self.clearHints[hint].index(name)
 			self.clearHints[hint].pop(popit)
+
+	def __isReady(self, host):
+		if host.up == False or host.state != HostState.Normal:
+			return False
+		return True
 	
 	def __scheduleInstance(self, inst):
 
@@ -132,7 +140,7 @@ class Primitive(object):
 			# has a host preference been expressed?
 			if (targetHost != None):
 				for h in self.hosts.values():
-					if (h.state == HostState.Normal):
+					if (self.__isReady(h)):
 						self.__clearHints("targetHost", h.name)
 					# if this is not the host we are looking for, continue
 					if ((str(h.id) != targetHost and h.name != targetHost)):
@@ -160,13 +168,8 @@ class Primitive(object):
 				for ctr in range(self.lastScheduledHost, len(self.hosts)) + range(0, self.lastScheduledHost):
 					h = self.hosts[ctr]
 
-					# XXXstroucki if it's down, find another machine
-					if (h.up == False):
-						continue
-
-					#  If the host not in normal operating state, 
-					#  find another machine
-					if (h.state != HostState.Normal):
+					# XXXstroucki if it's unavailable, find another machine
+					if (self.__isReady(h) == False):
 						continue
 					else:
 						#  If the host is back to normal, get rid of the entry in clearHints
@@ -206,7 +209,10 @@ class Primitive(object):
 				if (not inst.hints.get("__resume_source", None)):
 					# only run preCreate hooks if newly starting
 					for hook in self.hooks:
-						hook.preCreate(inst)
+						try:
+							hook.preCreate(inst)
+						except:
+							self.log.warning("Failed to run preCreate hook")
 				self.log.info("Scheduling instance %s (%d mem, %d cores, %d uid) on host %s" % (inst.name, inst.memory, inst.cores, inst.userId, minMaxHost.name))	
 				rv = "fail"
 				try:
@@ -241,8 +247,21 @@ class Primitive(object):
 	def start(self):
 		oldInstances = {}
 
+		# XXXstroucki: scheduling races have been observed, where
+		# a vm is scheduled on a host that had not updated its
+		# capacity with the clustermanager, leading to overloaded
+		# hosts. I think the place to insure against this happening
+		# is in the nodemanager. This scheduler will keep an
+		# internal state of cluster loading, but that is best
+		# effort and will be refreshed from CM once the buffer
+		# of vms to be scheduled is exhausted.
+
 		while True:
 			try:
+				# XXXstroucki: to get a list of vms to be
+				# scheduled, it asks the CM for a full
+				# cluster state, and will look at those
+				# without a host.
 				self.__getState()
 				
 				# Check for VMs that have exited and call
@@ -250,7 +269,7 @@ class Primitive(object):
 				for i in oldInstances:
 					# XXXstroucki what about paused and saved VMs?
 					# XXXstroucki: do we need to look at Held VMs here?
-					if (i not in self.instances and (oldInstances[i].state == InstanceState.Running or oldInstances[i].state == InstanceState.Destroying)):
+					if (i not in self.instances and (oldInstances[i].state == InstanceState.Running or oldInstances[i].state == InstanceState.Destroying or oldInstances[i].state == InstanceState.ShuttingDown)):
 						self.log.info("VM exited: %s" % (oldInstances[i].name))
 						for hook in self.hooks:
 							hook.postDestroy(oldInstances[i])
@@ -280,13 +299,22 @@ class Primitive(object):
 			time.sleep(self.scheduleDelay)
 
 def main():
-	(config, configFiles) = getConfig(["Agent"])
+	config = Config(["Agent"])
+	configFiles = config.getFiles()
+
 	publisher = instantiateImplementation(config.get("Agent", "publisher"), config)
 	tashi.publisher = publisher
-	cmclient = createClient(config)
 	logging.config.fileConfig(configFiles)
-	agent = Primitive(config, cmclient)
-	agent.start()
+	agent = Primitive(config)
+
+	try:
+		agent.start()
+	except KeyboardInterrupt:
+		pass
+
+	log = logging.getLogger(__file__)
+	log.info("Primitive exiting")
+	sys.exit(0)
 
 if __name__ == "__main__":
 	main()

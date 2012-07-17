@@ -19,7 +19,7 @@ import logging
 import subprocess
 import time
 import os
-from tashi.rpycservices.rpyctypes import User, LocalImages
+from tashi.rpycservices.rpyctypes import User, LocalImages, Instance, Host
 from tashi.clustermanager.data import DataInterface
 from tashi.util import instantiateImplementation, humanReadable
 
@@ -66,7 +66,7 @@ class GetentOverride(DataInterface):
 		return self.baseDataObject.acquireHost(hostId)
 	
 	def releaseHost(self, host):
-		if type(host) is not Instance:
+		if type(host) is not Host:
 			self.log.exception("Argument is not of type Host, but of type %s" % (type(host)))
 			raise TypeError
 
@@ -75,20 +75,20 @@ class GetentOverride(DataInterface):
 	def getHosts(self):
 		return self.baseDataObject.getHosts()
 	
-	def getHost(self, id):
-		return self.baseDataObject.getHost(id)
+	def getHost(self, _id):
+		return self.baseDataObject.getHost(_id)
 	
 	def getInstances(self):
 		return self.baseDataObject.getInstances()
 	
-	def getInstance(self, id):
-		return self.baseDataObject.getInstance(id)
+	def getInstance(self, _id):
+		return self.baseDataObject.getInstance(_id)
 	
 	def getNetworks(self):
 		return self.baseDataObject.getNetworks()
 	
-	def getNetwork(self, id):
-		return self.baseDataObject.getNetwork(id)
+	def getNetwork(self, _id):
+		return self.baseDataObject.getNetwork(_id)
 
 	def getImages(self):
 		count = 0
@@ -109,12 +109,12 @@ class GetentOverride(DataInterface):
 			try:
 				for l in p.stdout.xreadlines():
 					ws = l.strip().split(":")
-					id = int(ws[2])
+					_id = int(ws[2])
 					name = ws[0]
 					user = User()
-					user.id = id
+					user.id = _id
 					user.name = name
-					myUsers[id] = user
+					myUsers[_id] = user
 				self.users = myUsers
 				self.lastUserUpdate = now
 			finally:	
@@ -124,9 +124,9 @@ class GetentOverride(DataInterface):
 		self.fetchFromGetent()
 		return self.users
 	
-	def getUser(self, id):
+	def getUser(self, _id):
 		self.fetchFromGetent()
-		return self.users[id]
+		return self.users[_id]
 		
 	def registerHost(self, hostname, memory, cores, version):
 		return self.baseDataObject.registerHost(hostname, memory, cores, version)

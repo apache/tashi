@@ -1,0 +1,14 @@
+This file will list important information for updaters. Protocol and database
+changes will also be found here.
+
+---++ Changes from release 201203-incubating:
+---+++ sql.py has more complete support for Tashi data fields
+Conversion procedure:
+   * If you do not use the SQL data store for the cluster manager, this change does not affect you.
+   * Shut down the cluster manager
+   * ALTER your host table to match this:
+(id INTEGER PRIMARY KEY, name varchar(256) NOT NULL, up tinyint(1) DEFAULT 0, decayed tinyint(1) DEFAULT 0, state int(11) DEFAULT 1, memory int(11), cores int(11), version varchar(256), notes varchar(256), reserved varchar(1024))
+   * Please ALTER your instance table to match this:
+(id int(11) NOT NULL, vmId int(11), hostId int(11), decayed tinyint(1) NOT NULL, state int(11) NOT NULL, userId int(11), name varchar(256), cores int(11) NOT NULL, memory int(11) NOT NULL, disks varchar(1024) NOT NULL, nics varchar(1024) NOT NULL, hints varchar(1024) NOT NULL, groupName varchar(256))
+   * Start the cluster manager
+

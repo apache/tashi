@@ -15,10 +15,3 @@
 # specific language governing permissions and limitations
 # under the License.    
 
-all: nmd
-
-clean:
-	rm -f ./nmd
-
-nmd: nmd.c
-	${CC} $< -o $@

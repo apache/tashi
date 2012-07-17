@@ -48,6 +48,16 @@ exit 0
 Note that the entire path of a network connection must be configured to 
 use jumbo frames, if the virtual machines are to use them.
 
+If you have large numbers of VLANs, and don't want to hardcode them into
+each VM host, you can find a sample qemu-ifup in the doc directory. This
+script will need to be adapted to your local standards by changing the
+basic parameters at the top. This script can then be linked to by the name
+Tashi expects them to have. For example, if you have a VLAN 1001, you will
+create a link from /etc/qemu-ifup.1001 to this script.
+
+The script will handle the creation of the VM interface, and creation of the
+bridge and VLANs if they haven't been created before.
+
 ---+ Accounting server
 
 An accounting server is available in the distribution. It will log 

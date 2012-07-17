@@ -124,6 +124,7 @@ When defining the host, you must provide the name the host has been
 given by the hostname command. If you plan on eventually having several 
 hosts and networks, feel free to add them now.
 
+root@grml:/usr/local/tashi# cd bin
 root@grml:/usr/local/tashi/bin# DEBUG=1 ./clustermanager
 2012-01-26 23:12:33,972 [./clustermanager:INFO] Using configuration file(s) ['/usr/local/tashi/etc/TashiDefaults.cfg']
 2012-01-26 23:12:33,972 [./clustermanager:INFO] Starting cluster manager
@@ -152,15 +153,14 @@ Please press <RETURN> to start IPython.
 
 In [1]: from tashi.rpycservices.rpyctypes import Host, HostState, Network
 
-In [2]: data.baseDataObject.hosts[1] = Host(d={'id':1,'name':'grml','state': HostState.Normal,'up':False})
+In [2]: data.baseDataObject.hosts[0] = Host(d={'id':0,'name':'grml','state': HostState.Normal,'up':False})
 
-In [3]: data.baseDataObject.networks[1]=Network(d={'id':0,'name':'default'})
+In [3]: data.baseDataObject.networks[0]=Network(d={'id':0,'name':'My Network'})
 
 In [4]: data.baseDataObject.save()
 
-In [5]: import os
-
-In [6]: os.kill(os.getpid(), 9)
+In [5]: (^C)
+2012-03-07 20:00:00,456 [./bin/clustermanager:INFO] Exiting cluster manager after receiving a SIGINT signal
 
 Run the cluster manager in the background:
 root@grml:/usr/local/tashi/bin# ./clustermanager &

@@ -22,12 +22,8 @@
 import os 
 import sys
 import time
-import string
-import traceback
-import optparse
+#import optparse
 import shutil
-import urllib
-import tarfile
 
 a = os.path.join("../")
 sys.path.append(a)
@@ -36,21 +32,20 @@ sys.path.append(a)
 a = os.path.join("../../..")
 sys.path.append(a)
 
-from zoni.extra.util import *
-from zoni.version import *
-from zoni.bootstrap.pxe import Pxe
+from zoni.extra.util import getConfig, checkSuper, createDir
+#from zoni.version import version, revision
 
 
 def main():
 	''' This file sets up the web files for Zoni '''
 
-	ver = version.split(" ")[0]
-	rev = revision
+	#ver = version.split(" ")[0]
+	#rev = revision
 
-	parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
-	(options, args) = parser.parse_args()
+	#parser = optparse.OptionParser(usage="%prog ", version="%prog " + ver + " " + rev)
+	#(options, args) = parser.parse_args()
 
-	(configs, configFiles) = getConfig()
+	(configs, __configFiles) = getConfig()
 
 	ZoniWebSetup(configs)
 	ZoniCreateWebConfigFile(configs)

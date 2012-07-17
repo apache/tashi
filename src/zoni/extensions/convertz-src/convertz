@@ -1,0 +1,466 @@
+#!/bin/bash
+
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+#This is a quick prototype to convert VM images to a barebone/live image.
+#Several steps/guidelines need to be followed in preparation of the VM image.
+#The assumption is that the VM image is running Ubuntu would have live-boot and
+#live-config installed; consists of only a root (/) partition and a swap
+#partition where the root is the first partition.
+#
+#Few other adjustment required to the kernel in order to get this working:
+#add max_loop=x and loop.max_part=y to the /etc/default/grub and update-grub.
+#Version $thisver: Written 2011 by Jing-Yuan Luke at MIMOS
+
+#export PYTHONPATH=/opt/tashi/tashi/branches/luke-zoni/src
+export PATH=$PATH:$PYTHONPATH/zoni/extra
+thisver="1.0"
+
+usage()
+{
+cat << EOF
+usage: $0 options
+
+This script converts an VM image to a live boot image and registers it to Zoni.
+Currently it only support Ubuntu/Debian based VM images using the live-boot,
+live-config and live-tools packages.
+
+It consists of 2 stages:
+- 1st stage to check and if necessary converts the VM image from any formats to
+  raw, insert live-* packages if missing and finally create a squashfs image.
+- 2nd stage (still work in progress), the script will check the version of
+  kernel and initrd with Zoni's database before registering the new image to Zoni
+  and move it to the appropriate folder.
+
+OPTIONS:
+   -h                   Show this message
+   -i <input image>     Your input VM image
+   -n <image name>      Name for the live image to be registered in Zoni
+   -u                   Update live image
+   -p <partition #>     The / or root partition of the input VM Image (optional)
+   -v                   Print version and Exit
+
+EOF
+}
+
+# Self Check routine, should run just once when convertz is triggered the first time.
+self_check ()
+{
+	if [ -f $WHEREISGRUB ]
+	then
+		if [ ! "`grep -E "max_loop=.*loop\.max_part=" $WHEREISGRUB`" ]
+		then
+        		echo "Missing max_loop and loop.max_part in ${WHEREISGRUB}, please check and correct then reboot."
+			exit 1
+		else
+			echo "grub and loop OK!"
+		fi
+	else
+		echo "Grub missing! Please check!"
+		exit 1
+	fi 
+	if [ -z "${MYQEMUIMG}" -o ! -f "${MYQEMUIMG}" ]
+	then
+		echo "Missing qemu-img, please install the package."
+		exit 1
+	else
+		echo "qemu-img OK!"
+	fi
+	if [ -z "${MYMKSQUASHFS}" -o ! -f "${MYMKSQUASHFS}" ]
+	then
+		echo "Missing mksquashfs, please install the package."
+		exit 1
+	else
+		echo "mksquashfs OK!"
+	fi
+	if [ -z "${MYUUIDGEN}" -o ! -f "${MYUUIDGEN}" ]
+	then
+		echo "Missing uuidgen, please install the package."
+		exit 1
+	else
+		echo "uuidgen OK!"
+	fi
+	if [ -z "${MYPARTED}" -o ! -f "${MYPARTED}" ]
+	then
+		echo "Missing parted, please install the package."
+		exit 1
+	else
+		echo "parted OK!"
+	fi
+	if [ `ls /var/www/live-boot-support/live-*.deb 2> /dev/null | wc -l` -ge 5 ]
+	then
+		echo "live boot and live config debs OK!"
+	else
+		echo "Missing necessary debs, please build and copy to /var/www/live-boot-support."
+		exit 1
+	fi
+
+	# Create a dummy self-checked file
+	touch $HOME/.convertz-selfchecked
+}
+
+# Add live packages to the mounted image but first check and if necessary remove casper package
+add_live_package ()
+{
+	echo "Checking for casper..."
+	if [ -f $MYTEMPDIR/var/lib/dpkg/info/casper.list ]
+	then
+		echo "chroot remove casper pacakge..."
+		chroot $MYTEMPDIR dpkg --purge casper
+	fi
+	echo "Checking for live-* packages..."
+	if [ -f $MYTEMPDIR/var/lib/dpkg/info/live-boot.list -a -f $MYTEMPDIR/var/lib/dpkg/info/live-config.list -a -f $MYTEMPDIR/var/lib/dpkg/info/live-config-upstart.list -a -f $MYTEMPDIR/var/lib/dpkg/info/live-tools.list ]
+	then
+		echo "debian live packages installed"
+	else
+		echo "chroot adding live packages..."
+		cp /var/www/live-boot-support/live-* $MYTEMPDIR
+		index=0
+		for i in `ls /var/www/live-boot-support/live-* | cut -f5 -d"/"`
+		do
+			LIVEDEBS[index]=$i
+			let index=index+1
+		done
+		chroot $MYTEMPDIR dpkg -i ${LIVEDEBS[@]}
+		rm $MYTEMPDIR/live-*
+	fi
+}
+
+# Clean up temporary file and folder before unmounting
+clean_tmp ()
+{
+	if [ -e $MYTEMPIMG ]
+	then
+		echo "Cleaning ${MYTEMPIMG}..."
+		rm $MYTEMPIMG
+	fi
+	if [ -d $MYTEMPDIR ]
+	then
+		if mount | grep $MYTEMPDIR | grep $MYFREELOOP &> /dev/null
+		then
+			echo "Unmounting ${MYTEMPDIR}..."
+			umount $MYTEMPDIR
+		fi
+		echo "Removing ${MYTEMPDIR}..."
+		rmdir $MYTEMPDIR
+	fi
+	echo "Cleaning done."
+}
+
+# Check the loop device partitions
+check_loop_part ()
+{
+	echo "Checking Image Partitions..."
+	if [ `parted $MYFREELOOP unit s p | tail -n +7 | head -n -1 | grep -v extended | wc -l` -gt 2 ]
+	then
+		echo "You got more than 2 partitions, please use the \"-p <partition #>\" option."
+		umnt_loop
+		exit 1
+	else
+		echo "Just 2 partitions."
+		MYFREELOOPPART=${MYFREELOOP}p`parted $MYFREELOOP unit s p | tail -n +7 | head -n -1 | grep -v extended | grep -v linux-swap | awk '{ print $1 }'`
+	fi
+}
+
+# Detach the loop device but first clean temp file and folder
+umnt_loop ()
+{
+	# Got to clean and umount the temp dir first before detach loop
+	clean_tmp
+	echo "Detaching loop..."
+	losetup -d $MYFREELOOP &> /dev/null
+	if [ ! $? == "0" ]
+	then
+		echo "Error detaching ${MYFREELOOP}, you may need to manually do it"
+		exit 1
+	else
+		echo "losetup detach success."
+	fi
+}
+
+# Convert image to raw format
+convert_fmt ()
+{
+	echo "Converting from ${MYIMGFMT} to raw..."
+	$MYQEMUIMG convert -O raw $MYIMGFILE $MYTEMPIMG &> /dev/null
+}
+
+# Check image type and if required convert it
+check_img_info ()
+{
+	echo "Checking Your Image Format..."
+	MYIMGFMT=`qemu-img info $MYIMGFILE | grep "file format" | cut -f3 -d" "`
+	echo "Your image is in ${MYIMGFMT} format."
+	if [ ! $MYIMGFMT == "raw" ]
+	then
+		convert_fmt
+		FORLOOPMNT=$MYTEMPIMG
+	else
+		FORLOOPMNT=$MYIMGFILE
+	fi 
+}
+
+# Get info on vmlinuz, initrd.img, architecture, distribution's name and version as well as actual kernel version
+retrieve_img_internals ()
+{
+	# Find the distro name (e.g. Ubuntu, Debian, etc.) and version here (e.g. Lucid, Maverick, etc.)
+	if [ -f $MYTEMPDIR/etc/lsb-release ]
+	then
+		DIST=`grep DISTRIB_ID $MYTEMPDIR/etc/lsb-release | cut -f2 -d"="`
+		echo $DIST
+		DIST_VER=`grep DISTRIB_CODENAME $MYTEMPDIR/etc/lsb-release | cut -f2 -d"="`
+		echo $DIST_VER
+	else
+		echo "Not Ubuntu/Debian! Only Ubuntu/Debian is currently supported."
+		umnt_loop
+		exit 1
+	fi
+
+	# Get the vmlinuz and initrd then get their version
+	cd $MYTEMPDIR/boot
+	if [ `ls vmlinuz* | wc -l` -gt 1 ]
+	then
+		echo "You have more than 1 kernel installed"
+		MYVMLINUZ=`ls -t vmlinuz* | head -n 1`
+		MYINITRD=`ls -t initrd* | head -n 1`
+		echo "Your latest vmlinuz is ${MYVMLINUZ} and initrd is ${MYINITRD}"
+	else
+		MYVMLINUZ=`ls vmlinuz*`
+		MYINITRD=`ls initrd*`
+		echo "Your vmlinuz is ${MYVMLINUZ} and initrd is ${MYINITRD}"
+	fi
+	MYVMLINUZ_VER=`echo $MYVMLINUZ | sed 's/vmlinuz-//'`
+	MYINITRD_VER=`echo $MYINITRD | sed 's/initrd.img-//'`
+
+	# Get the actual kernel version (e.g. 2.x.y-a.b instead of 2.x.y-a-generic)
+	KERN=`zcat /usr/share/doc/linux-image-${KERN_UNAME}/changelog.Debian.gz | head -n 1 | awk '{ print $2 }'`
+	KERN_VERSION=${KERN:1:(-1)}
+	echo "Your actual kernel version is ${KERN_VERSION}"
+
+	# Get bitness/arch type (e.g. i386 or x86_64)
+	if grep "elf64-x86-64" config-${MYVMLINUZ_VER} &> /dev/null && grep "CONFIG_X86_64=y" config-${MYVMLINUZ_VER} &> /dev/null
+	then
+		MYARCHNESS="x86_64"
+	elif grep "elf32-i386" config-${MYVMLINUZ_VER} &> /dev/null && grep "CONFIG_X86_32=y" config-${MYVMLINUZ_VER} &> /dev/null
+	then
+		MYARCHNESS="i386"
+	else
+		echo "Can't determine your image's OS Architecture!"
+		umnt_loop
+		exit 1
+	fi
+	echo "Your have a ${MYARCHNESS} OS"
+	cd $WORKDIR
+}
+
+# Main starts here. First declare a few variables that is required for self check, more declaration after the self check.
+
+WHEREISGRUB="/boot/grub/grub.cfg"
+WORKDIR=$PWD
+MYQEMUIMG=`which qemu-img`
+MYMKSQUASHFS=`which mksquashfs`
+MYUUIDGEN=`which uuidgen`
+MYPARTED=`which parted`
+INPUTIMAGE=
+IMAGENAME=
+PARTNUM=
+
+while getopts "hi:n:p:vu" OPTION
+do
+	case $OPTION in
+	h)
+		usage
+		exit 0
+		;;
+	i)
+		INPUTIMAGE=$OPTARG
+		;;
+	n)
+		IMAGENAME=$OPTARG
+		;;
+	p)
+		PARTNUM=$OPTARG
+		;;
+	v)
+		echo
+		echo "$0: Version ${thisver}"
+		echo "By Jing-Yuan Luke, Written 2011 at MIMOS"
+		echo 
+		exit 0
+		;;
+	u)
+		UPDATE=1
+		;;
+	?)
+		usage
+		exit 1
+		;;
+	esac
+done
+
+if [[ -z $IMAGENAME ]] || [[ -z $INPUTIMAGE ]] 
+then
+     usage
+     exit 1
+fi
+
+MYIMGFILE=$INPUTIMAGE
+if [ ! -f $MYIMGFILE ]
+then
+	echo "Input Image File does not exist!"
+	exit 1
+fi
+
+if zoni -I | grep ${IMAGENAME} &> /dev/null
+then
+	if [[ -n $UPDATE ]]
+	then
+		echo "Image will be updated."
+	else
+		echo "Image is already registered in Zoni! Use -u if you intend to update/refresh the same Image."
+		exit 1
+	fi
+else
+	echo "Image Name OK!"
+fi
+
+echo "Start of Phase 1: Preparing the VM image to squashfs image..."
+echo "Working from ${WORKDIR}..."
+
+# Check for key tools and files, should only run once so check for dummy convertz-selfchecked file first.
+if [ ! -f $HOME/.convertz-selfchecked ]
+then
+	echo "Running Self Check for the first time."
+	self_check
+else
+	echo "Self Check not needed, bypassing it."
+fi
+
+# More variables for the rest of the work
+KIIDS=
+MYVMLINUZ=
+MYINITRD=
+MYVMLINUZ_VER=
+MYINITRD_VER=
+KERN_VERSION=
+MYARCHNESS=
+DIST=
+DIST_VER=
+MYFREELOOPPART=
+MYPID="`echo $$`-`uuidgen -t`"
+MYTEMPDIR="/tmp/convertz-${MYPID}"
+MYTEMPIMG="/tmp/convertz-${MYPID}.img"
+MYDESTFILE="${IMAGENAME}.squashfs"
+LIVEIMAGEDIR="/var/www/liveboot/"
+TFTPBOOTDIR="/var/lib/tftpboot/liveboot/"
+
+# Check image file info and if necessary convert it to raw
+check_img_info
+
+# Check for free loop device and then attach image to the free loop device
+MYFREELOOP=`losetup -f`
+if [ -z $MYFREELOOP ]
+then
+	echo "No more loop devices available."
+	exit 1
+else
+	echo "loop device available: $MYFREELOOP"
+fi
+
+losetup $MYFREELOOP $FORLOOPMNT &> /dev/null
+if [ ! $? == "0" ]
+then
+	echo "Error attaching ${FORLOOPMNT} to ${MYFREELOOP}"
+	clean_tmp
+	exit 1
+else
+	echo "losetup attached successfully."
+fi
+
+# Mount the loop device partition assuming image is created with only 2 partitions else user need to determine themselves but first create a temp dir
+if [ ! -d $MYTEMPDIR ]
+then
+	echo "Create temp folder..."
+	mkdir -p $MYTEMPDIR
+fi
+
+if [ -z $PARTNUM ]
+then
+	check_loop_part
+else
+	MYFREELOOPPART=${MYFREELOOP}p${PARTNUM}
+fi 
+
+if mount "${MYFREELOOPPART}" $MYTEMPDIR &> /dev/null
+then
+	echo "mount ${MYFREELOOPPART} to ${MYTEMPDIR} success."
+else
+	echo "Can't mount ${MYFREELOOPPART} to ${MYTEMPDIR}, please check/recreate your image."
+	umnt_loop
+	exit 1
+fi
+
+# Get some internal info out from the mounted image first, is it ubuntu/debian or something else, check versions of the vmlinuz and initrd as well as OS architecture
+retrieve_img_internals
+
+# Add live packages if necessary
+add_live_package
+
+# Squash the mounted image now, but first clean up /etc/hosts and /etc/hostname
+rm $MYTEMPDIR/etc/hosts &> /dev/null
+rm $MYTEMPDIR/etc/hostname &> /dev/null
+echo "Creating ${MYDESTFILE}, squashing..."
+mksquashfs $MYTEMPDIR $MYDESTFILE -e boot &> /dev/null
+if [ $? == "0" ]
+then
+	echo "mksquashfs done, your ${MYDESTFILE} is ready."
+else
+	echo "Error while squashing, please check and redo."
+	umnt_loop
+	exit 1
+fi
+
+echo "End of Phase 1!"
+echo "Start of Phase 2: Registering to Zoni..."
+KIIDS=`zoni --getKernelInitrdID ${MYVMLINUZ}:${MYINITRD}:${MYARCHNESS}` &> /dev/null
+if [ ! -z $KIIDS ]
+then
+	echo "The kernel and initrd are already registered in Zoni."
+	# To add update feature - need to check the kernel version
+else
+	echo "Registering new kernel and initrd into Zoni..."
+	KIIDS=`zoni --registerKernelInitrd "${MYVMLINUZ}:${KERN_VERSION}:${MYARCHNESS}:${MYINITRD}:${MYARCHNESS}:${MYDESTFILE}"` &> /dev/null
+	echo "Copying new kernel and initrd to tftpboot..."
+	cp $MYTEMPDIR/boot/$MYVMLINUZ $TFTPBOOTDIR
+	cp $MYTEMPDIR/boot/$MYINITRD $TFTPBOOTDIR
+fi
+if [[ -n $UPDATE ]]
+then
+	echo "Updating/Refreshing Image, no registration needed."
+else
+	echo "Registering new live image to Zoni Database..."
+	zoni --addImage "${IMAGENAME}:${DIST}:${DIST_VER}:${KIIDS}"
+fi
+echo "Updating/Moving ${MYDESTFILE} to live image folder..."
+mv $MYDESTFILE $LIVEIMAGEDIR
+#create template for this new image?
+#zoni addpxe here?
+echo "End of Phase 2: unmount, clean temp file/folder and remove loop device..."
+umnt_loop
+echo "All Done!"
+exit 0
