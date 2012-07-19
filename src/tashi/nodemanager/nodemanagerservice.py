@@ -19,6 +19,8 @@ import logging
 import socket
 import threading
 import time
+import dpkt, pcap
+from struct import pack
 
 from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
 from tashi import boolean, vmStates, ConnectionManager
@@ -77,6 +79,7 @@ class NodeManagerService(object):
 		# start service threads
 		threading.Thread(name="registerWithClusterManager", target=self.__registerWithClusterManager).start()
 		threading.Thread(name="statsThread", target=self.__statsThread).start()
+		threading.Thread(name="arpMonitorThread", target=self.__arpMonitorThread, args=(config,)).start()
 
 	def __initAccounting(self):
 		self.accountBuffer = []
@@ -197,6 +200,52 @@ class NodeManagerService(object):
 			toSleep = start - time.time() + self.registerFrequency
 			if (toSleep > 0):
 				time.sleep(toSleep)
+
+	#Convert a string of 6 characters of ethernet address into a colon separated hex string
+	def __stringToMac(self, a):
+		# XXXstroucki: enforce string length?
+		b = ":".join(s.encode("hex") for s in a)
+		return b
+
+	def __updateInstance(self, mac, ip):
+		for vmId in self.instances.keys():
+			try:
+				instance = self.instances.get(vmId, None)
+				if (not instance):
+					continue
+				for i in range(0, len(instance.nics)): 
+					nic = instance.nics[i]
+					if (nic.mac == mac):
+						self.log.debug('Detected IP address: %s for hardware address: %s' % (ip, mac))
+						nic.ip = ip
+			except:
+				self.log.exception('updateInstance threw an exception (vmid %d)' % vmId)
+
+	# service thread function
+	def __arpMonitorThread(self, conf):
+		try:
+			pc = pcap.pcap()
+			# Look for ARP or DHCP traffic
+			pc.setfilter('arp or udp port 67')
+	
+			for ts, pkt in pc:
+				e = dpkt.ethernet.Ethernet(pkt)
+				if e.type == dpkt.ethernet.ETH_TYPE_IP:
+					ip = e.data
+					udp = ip.data
+					dhcp = dpkt.dhcp.DHCP(udp.data)
+					if dhcp.op == dpkt.dhcp.DHCPACK or dhcp.op == dpkt.dhcp.DHCPOFFER:
+						macaddress = self.__stringToMac(dhcp.chaddr)
+						ipaddress = socket.inet_ntoa(pack("!I",dhcp.ciaddr))
+						self.__updateInstance(macaddress, ipaddress)
+				elif e.type == dpkt.ethernet.ETH_TYPE_ARP:
+					a = e.data
+					if a.op == dpkt.arp.ARP_OP_REPLY:
+						ipaddress = socket.inet_ntoa(a.spa)
+						macaddress = self.__stringToMac(a.sha)
+						self.__updateInstance(macaddress, ipaddress)
+		except:
+			self.log.exception('arpMonitorThread threw an exception')
 
 	# service thread function
 	def __statsThread(self):

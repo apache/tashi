@@ -81,6 +81,12 @@ http://sourceforge.net/projects/rpyc/files/main/ and install it.
 If you wish to run the Tashi components in debugging mode, you
 will want iPython from http://ipython.org/.
 
+You will also need pycap from http://code.google.com/p/pypcap/ and dpkt
+from http://code.google.com/p/dpkt/, although they usually come with
+your Linux distribution. Debian packages are python-pypcap and
+python-dpkt. Optionally, you can install them using easy_install or
+pip (Python package managers).
+
 Prepare a virtual machine image in qcow2 format for Tashi to deploy. You 
 can create this with practically any consumer or professional 
 virtualization system, by converting the resulting disk image via 
