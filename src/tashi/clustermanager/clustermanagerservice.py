@@ -585,6 +585,17 @@ class ClusterManagerService(object):
 		return "Host state set to %s." % hostStates[hostState]
 
 	# extern
+	def setHostNotes(self, hostId, notes):
+		hostNotes = notes
+		host = self.data.acquireHost(hostId)
+		try:
+			host.notes = hostNotes
+		finally:
+			self.data.releaseHost(host)
+
+		return 'Host notes set to "%s".' % hostNotes
+
+	# extern
 	def getNetworks(self):
 		networks = self.data.getNetworks()
 		for network in networks:
