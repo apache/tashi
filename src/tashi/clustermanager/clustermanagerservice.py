@@ -593,7 +593,7 @@ class ClusterManagerService(object):
 		finally:
 			self.data.releaseHost(host)
 
-		return Host notes set to "%s".' % hostNotes
+		return 'Host notes set to "%s".' % hostNotes
 
 	# extern
 	def getNetworks(self):
