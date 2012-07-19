@@ -60,7 +60,8 @@ brctl sethello br0 1
 ifdown eth0;ifconfig eth0 0.0.0.0;brctl addif br0 eth0;dhclient br0
 
 # create a script /etc/qemu-ifup.0 which will allow virtual machines
-# to be attached to the default network (0).
+# to be attached to the default network (0). Check your setup for the
+# correct paths. E.g. in Debian, brctl is in /usr/sbin/brctl
 
 cat /etc/qemu-ifup.0
 #!/bin/sh
@@ -76,6 +77,9 @@ chmod 700 /etc/qemu-ifup.0
 
 If you don't have RPyC version 3.1 installed, download a copy from
 http://sourceforge.net/projects/rpyc/files/main/ and install it.
+
+If you wish to run the Tashi components in debugging mode, you
+will want iPython from http://ipython.org/.
 
 Prepare a virtual machine image in qcow2 format for Tashi to deploy. You 
 can create this with practically any consumer or professional 
