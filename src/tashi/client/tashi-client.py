@@ -201,7 +201,7 @@ def getSlots(cores, memory):
 		countbymemory = int((h.memory - h.usedMemory) / memory)
 		count += max(0, min(countbycores, countbymemory))
 
-	print "%d" % (count), "available"
+	print "%d" % (count), "available",
 	print ("slots", "slot")[count == 1],
 	print "for instances with %d" % (cores),
 	print ("cores", "core")[cores == 1],
