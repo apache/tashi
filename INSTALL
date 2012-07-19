@@ -78,14 +78,14 @@ chmod 700 /etc/qemu-ifup.0
 If you don't have RPyC version 3.1 installed, download a copy from
 http://sourceforge.net/projects/rpyc/files/main/ and install it.
 
-If you wish to run the Tashi components in debugging mode, you
-will want iPython from http://ipython.org/.
+If you wish to run the Tashi components in debugging mode, you will want 
+iPython from http://ipython.org/.
 
-You will also need pycap from http://code.google.com/p/pypcap/ and dpkt
-from http://code.google.com/p/dpkt/, although they usually come with
-your Linux distribution. Debian packages are python-pypcap and
-python-dpkt. Optionally, you can install them using easy_install or
-pip (Python package managers).
+You will also need pycap from http://code.google.com/p/pypcap/ and dpkt 
+from http://code.google.com/p/dpkt/, although they usually come with 
+your Linux distribution. Debian packages are python-pypcap and 
+python-dpkt. Optionally, you can install them using easy_install or pip 
+(Python package managers).
 
 Prepare a virtual machine image in qcow2 format for Tashi to deploy. You 
 can create this with practically any consumer or professional 
@@ -236,32 +236,15 @@ root@grml:/usr/local/tashi/bin# ./tashi-client getinstances
 ---------------------------------------------------------------------
  1  1      wheezy root Running debian-wheezy-amd64.qcow2 128    1    
 
-After the machine had a chance to boot, find out what address it got. If 
-you have a DHCP server on your network, search the pool of addresses:
-
-root@grml:/usr/local/tashi/bin# ifconfig br0
-br0       Link encap:Ethernet  HWaddr 00:0c:29:62:b3:76  
-          inet addr:192.168.244.131  Bcast:192.168.244.255  Mask:255.255.255.0
-          inet6 addr: fe80::20c:29ff:fe62:b376/64 Scope:Link
-          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
-          RX packets:2622 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:1598 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
-          RX bytes:730925 (713.7 KiB)  TX bytes:226530 (221.2 KiB)
-
-Find the MAC address given to the VM
+After the machine had a chance to boot, find out what address it got. 
+Once the VM has booted up and obtained an IP address, the address can be 
+retrieved using the "getMyInstances" command:-
 
 root@grml:/usr/local/tashi/bin# ./tashi-client getmyinstances 
 --show-nics --hide-disk
  id hostId name   user state   memory cores nics                                                    
 ----------------------------------------------------------------------------------------------------
- 1  1      wheezy root Running 128    1     [{'ip': None, 'mac': '52:54:00:90:2a:9d', 'network': 0}]
-
-Look for that MAC address on the local network
-root@grml:/usr/local/tashi/bin# arp-scan -I br0 192.168.244.0/24|grep 90:2a:9d
-Interface: br0, datalink type: EN10MB (Ethernet)
-Starting arp-scan 1.6 with 256 hosts (http://www.nta-monitor.com/tools/arp-scan/)
-192.168.244.136 52:54:00:90:2a:9d       QEMU
+ 1  1      wheezy root Running 128    1     [{'ip': '192.168.244.136', 'mac': '52:54:00:90:2a:9d', 'network': 0}]
 
 Log into the VM:
 root@grml:/usr/local/tashi/bin# ssh root@192.168.244.136
