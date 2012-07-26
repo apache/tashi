@@ -461,6 +461,8 @@ class ClusterManagerService(object):
 			raise
 
 		try:
+			# XXXstroucki: if migration fails, we'll still
+			# show MigratePrep as state...
 			self.__stateTransition(instance, InstanceState.Running, InstanceState.MigratePrep)
 		except TashiException:
 			self.data.releaseInstance(instance)
@@ -476,6 +478,7 @@ class ClusterManagerService(object):
 		except Exception:
 			self.log.exception('prepReceiveVm failed')
 			raise
+
 		instance = self.data.acquireInstance(instance.id)
 		try:
 			self.__stateTransition(instance, InstanceState.MigratePrep, InstanceState.MigrateTrans)

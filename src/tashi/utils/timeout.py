@@ -50,7 +50,7 @@ class TimeoutThread:
 		if finished:
 			return rval
 		else: # NOTE: timeout must be set for this to be true.
-			raise TimeoutException("function %s timed out after %f seconds" % (str(self.function), timeout))
+			raise TimeoutException("function %s timed out after %.2f seconds" % (str(self.function), timeout))
 
 	def run(self):
 		try:

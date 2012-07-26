@@ -728,7 +728,8 @@ class Qemu(VmControlInterface):
 
 	def __checkPortListening(self, port):
 		# XXXpipe: find whether something is listening yet on the port
-		(stdin, stdout) = os.popen2("netstat -ln | grep 0.0.0.0:%d | wc -l" % (port))
+		p = subprocess.Popen("netstat -ln | grep 0.0.0.0:%d | wc -l" % (port), shell = True, stdin = PIPE, stdout = PIPE, close_fds = True)
+		(stdin, stdout) = (p.stdin, p.stdout)
 		stdin.close()
 		r = stdout.read()
 		lc = int(r.strip())
