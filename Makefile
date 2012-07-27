@@ -69,10 +69,10 @@ src/utils/nmd: src/utils/nmd.py
 rmnmd:
 	echo Removing nmd...; rm -f bin/nmd
 
-bin: bindir bin/clustermanager bin/nodemanager bin/tashi-client bin/primitive bin/zoni-cli bin/accounting
+bin: bindir bin/clustermanager bin/nodemanager bin/tashi-client bin/tashi-admin bin/primitive bin/zoni-cli bin/accounting
 bindir:
 	if test ! -d bin; then mkdir bin; fi
-rmbin: rmclustermanager rmnodemanager rmtashi-client rmprimitive rmzoni-cli rmaccounting
+rmbin: rmclustermanager rmnodemanager rmtashi-client rmtashi-admin rmprimitive rmzoni-cli rmaccounting
 	if test -d bin; then rmdir bin; fi
 bin/getInstances: 
 	if test ! -e bin/getInstances; then (echo "Generating client symlinks..."; cd bin; PYTHONPATH=../src ../src/tashi/client/client.py --makesyms); fi
@@ -103,6 +103,11 @@ bin/tashi-client:
 	(cd bin; ln -s ../src/tashi/client/tashi-client.py tashi-client)
 rmtashi-client:
 	if test -e bin/tashi-client; then echo Removing tashi-client symlink...; rm bin/tashi-client; fi
+bin/tashi-admin:
+	@echo Symlinking in tashi-admin...
+	(cd bin; ln -s ../src/tashi/client/tashi-admin.py tashi-admin)
+rmtashi-admin:
+	if test -e bin/tashi-admin; then echo Removing tashi-admin symlink...; rm bin/tashi-admin; fi
 src/tags:
 	@echo Generating tags...
 	(cd src; ctags-exuberant -R --c++-kinds=+p --fields=+iaS --extra=+q -f ./tags .)
