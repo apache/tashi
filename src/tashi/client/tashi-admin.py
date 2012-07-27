@@ -69,114 +69,58 @@ def checkHid(host):
 	# XXXstroucki permissions for host related stuff?
 	return hostId
 
-def checkIid(instance):
-	userId = getUser()
-	instances = client.getInstances()
-	instanceId = None
-	try:
-		instanceId = int(instance)
-	except:
-		for i in instances:
-			if (i.name == instance):
-				instanceId = i.id
-	if (instanceId is None):
-		raise TashiException({'msg':"Unknown instance %s" % (str(instance))})
-	for instance in instances:
-		if (instance.id == instanceId):
-			# XXXstroucki uid 0 to have superuser access
-			# how about admin groups?
-			if (instance.userId != userId and instance.userId != None and userId != 0):
-				raise TashiException({'msg':"You don't have permissions on VM %s" % instance.name})
-	return instanceId
+def remoteCommand(command, *args):
+	global client
+	#print "Doing command %s args %s" % (command, args)
+	f = getattr(client, command, None)
 
-def requiredArg(name):
-	raise ValueError("Missing required argument %s" % (name))
+	rv = f(*args)
 
-def randomMac():
-	return ("52:54:00:%2.2x:%2.2x:%2.2x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+	return rv
 
-def getDefaultNetwork():
-	fetchNetworks()
-	networkId = 0
-	for network in networks:
-		if (getattr(networks[network], "default", False) is True):
-			networkId = network
-			break
+def setHostState(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s setHostState [options]" % scriptname)
+	parser.add_option("--host", help="Set the state of this host (mandatory)", action="store", type="string", dest="hostname")
+	parser.add_option("--state", help="Change state to this value, e.g. Normal or Drained (mandatory)", action="store", type="string", dest="state")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None or options.state is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
 
-		# Naming the network "default" is deprecated, and
-		# this functionality will be removed soon
-		if (networks[network].name == "default"):
-			networkId = network
-			break
-	return networkId
+	hostId = checkHid(options.hostname)
+	rv = remoteCommand("setHostState", hostId, options.state)
+	print rv
+	return 0
 
-def parseHints(arg):
-	try:
-		strHints = arg.split(",")
-		hints = {}
-		for strHint in strHints:
-			strHint = strHint.strip()
-			(l, __s, r) = stringPartition(strHint, "=")
-			hints[l] = r
-		return hints
-	except:
-		raise ValueError("Incorrect format for hints argument")
+def setHostNotes(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s setHostNotes [options]" % scriptname)
+	parser.add_option("--host", help="Annotate this host with the note (mandatory)", action="store", type="string", dest="hostname")
+	parser.add_option("--notes", help="Annotate the host with this note (mandatory)", action="store", type="string", dest="notes")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None or options.notes is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
 
-# Used to define default views on functions and to provide extra functionality (getVmLayout)
-extraViews = {
-'getSlots': (getSlots, None),
-'getImages': (None, ['id', 'imageName', 'imageSize']), 
-'copyImage': (None, None), 
-'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
-'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
-'shutdownMany': (shutdownMany, None),
-'destroyMany': (destroyMany, None),
-'getVmLayout': (getVmLayout, ['id', 'name', 'state', 'instances', 'usedMemory', 'memory', 'usedCores', 'cores']),
-'getInstances': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
-'getMyInstances': (getMyInstances, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores'])
-}
+	hostId = checkHid(options.hostname)
+	rv = remoteCommand("setHostNotes", hostId, options.notes)
+	print rv
+	return 0
 
-('addHost', 'Adds a new host to Tashi'),
-('delHost', 'Removes a host from Tashi'),
-('addUser', 'Adds a user to Tashi'),
-('delUser', 'Removes a user from Tashi'),
-('addNet', 'Adds a network to Tashi'),
-('delNet', 'Removes a network from Tashi'),
-('setHostState', 'Set the state of a host, eg. Normal or Drained'),
-('setHostNotes', 'Annotate a host record'),
-# Used to specify what args are excepted for a function, what to use to convert the string to a value, what to use as a default value if it's missing, and whether the argument was required or not
-argLists = {
-'addHost': [('name', str, lambda: requiredArg('name'), True)],
-'delHost': [('name', str, lambda: requiredArg('name'), True)],
-'addUser': [('name', str, lambda: requiredArg('name'), True)],
-'delUser': [('name', str, lambda: requiredArg('name'), True)],
-'addNet': [('name', str, lambda: requiredArg('host'), True)],
-'delNet': [('host', str, lambda: requiredArg('host'), True)],
-'setHostState': [('host', checkHid, lambda: requiredArg('host'), True), ('state', str, lambda: requiredArg('state'), True)],
-'setHostNotes': [('host', checkHid, lambda: requiredArg('host'), True), ('notes', str, lambda: requiredArg('notes'), True)],
-}
+def help(args):
+	global scriptname
+	print "Available commands:"
+	for (command, desc) in cmdsdesc:
+		print "%s\t\t%s" % (command, desc)
+	print "See %s <command> -h for help on these commands." % scriptname
+	return 0
 
-# Used to convert the dictionary built from the arguments into an object that can be used by rpyc
-convertArgs = {
-'createVm': '[Instance(d={"userId":userId,"name":name,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints})]',
-'createMany': '[Instance(d={"userId":userId,"name":basename,"cores":cores,"memory":memory,"disks":disks,"nics":nics,"hints":hints}), count]',
-'shutdownVm': '[instance]',
-'destroyVm': '[instance]',
-'shutdownMany': '[basename]',
-'destroyMany': '[basename]',
-'suspendVm': '[instance]',
-'resumeVm': '[instance]',
-'migrateVm': '[instance, dst]',
-'pauseVm': '[instance]',
-'unpauseVm': '[instance]',
-'vmmSpecificCall': '[instance, arg]',
-'unregisterHost' : '[hostId]',
-'getSlots' : '[cores, memory]',
-'copyImage' : '[src, dst]',
-'setHostState' : '[host, state]',
-}
-
-# Descriptions
+""" Possible functions:
 description = (
 ('addHost', 'Adds a new host to Tashi'),
 ('delHost', 'Removes a host from Tashi'),

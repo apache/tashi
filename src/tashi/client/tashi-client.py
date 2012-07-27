@@ -287,8 +287,6 @@ argLists = {
 'getImages': [],
 'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
-'setHostState': [('host', checkHid, lambda: requiredArg('host'), True), ('state', str, lambda: requiredArg('state'), True)],
-'setHostNotes': [('host', checkHid, lambda: requiredArg('host'), True), ('notes', str, lambda: requiredArg('notes'), True)],
 'getUsers': [],
 'getNetworks': [],
 'getInstances': [],
@@ -315,8 +313,6 @@ convertArgs = {
 'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
-'setHostState' : '[host, state]',
-'setHostNotes' : '[host, notes]',
 }
 
 # Descriptions
@@ -334,8 +330,6 @@ description = {
 'unpauseVm': 'Unpauses a paused VM',
 'getSlots': 'Get a count of how many VMs could be started in the cluster',
 'getHosts': 'Gets a list of hosts running Node Managers',
-'setHostState': 'Set the state of a host, eg. Normal or Drained',
-'setHostNotes': 'Provide an annotation to a host',
 'getUsers': 'Gets a list of users',
 'getNetworks': 'Gets a list of available networks for VMs to be placed on',
 'getInstances': 'Gets a list of all VMs in the cluster',
@@ -362,8 +356,6 @@ examples = {
 'unpauseVm': ['--instance 12345', '--instance vmname'],
 'getSlots': ['--cores 1 --memory 128'],
 'getHosts': [''],
-'setHostState': ['--host vmhost1 --state Drained'],
-'setHostNotes': ['--host vmhost1 --notes "Memory error"'],
 'getUsers': [''],
 'getNetworks': [''],
 'getInstances': [''],
