@@ -19,7 +19,18 @@ import logging
 import socket
 import threading
 import time
-import dpkt, pcap
+
+# these allow discovery of IP addresses assigned to the VM.
+# making these optional in case of ancient installs that don't
+# have provided python-pypcap or python-dpkt packages
+global haveIpDiscovery
+haveIpDiscovery = False
+try:
+	import dpkt, pcap
+	haveIpDiscovery = True
+except ImportError:
+	pass
+	
 from struct import pack
 
 from tashi.rpycservices.rpyctypes import InstanceState, TashiException, Errors, Instance
@@ -76,10 +87,18 @@ class NodeManagerService(object):
 		# This can time out now with an exception
 		self.id = self.cm.registerNodeManager(self.host, self.instances.values())
 
+		# make arp monitoring optional
+		self.haveIpDiscovery = False
+		if "haveIpDiscovery" in globals():
+			self.haveIpDiscovery = haveIpDiscovery
+
 		# start service threads
 		threading.Thread(name="registerWithClusterManager", target=self.__registerWithClusterManager).start()
 		threading.Thread(name="statsThread", target=self.__statsThread).start()
-		threading.Thread(name="arpMonitorThread", target=self.__arpMonitorThread, args=(config,)).start()
+		if self.haveIpDiscovery:
+			threading.Thread(name="arpMonitorThread", target=self.__arpMonitorThread, args=(config,)).start()
+		else:
+			self.log.warning("Disabling ARP monitoring thread")
 
 	def __initAccounting(self):
 		self.accountBuffer = []
