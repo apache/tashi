@@ -20,7 +20,7 @@ def setHostState(args):
 		parser.print_help()
 		sys.exit(-1)
 
-	remoteCommand("shs", options)
+	rv = remoteCommand("shs", options)
 	return 0
 
 def setHostNotes(args):
@@ -36,32 +36,56 @@ def setHostNotes(args):
 		parser.print_help()
 		sys.exit(-1)
 
-	remoteCommand("shn", options)
+	rv = remoteCommand("shn", options)
 	return 0
+
+def help(args):
+	print "Available commands:"
+	for (command, desc) in cmdsdesc:
+		print "%s\t\t%s" % (command, desc)
+	print "See %s <command> -h for help on these commands." % sys.argv[0] 
+	return 0
+
+""" Possible functions:
+description = (
+('addHost', 'Adds a new host to Tashi'),
+('delHost', 'Removes a host from Tashi'),
+('addUser', 'Adds a user to Tashi'),
+('delUser', 'Removes a user from Tashi'),
+('addNet', 'Adds a network to Tashi'),
+('delNet', 'Removes a network from Tashi'),
+('setHostState', 'Set the state of a host, eg. Normal or Drained'),
+('setHostNotes', 'Annotate a host record'),
+)
+"""
 
 cmdsdesc = (
 ("setHostState", "Sets host state"),
 ("setHostNotes", "Annotates a host"),
+("help", "Get list of available commands"),
 )
 
 cmds = {
 'setHostState': setHostState,
 'setHostNotes': setHostNotes,
+'help': help,
 }
 
 def main():
+	scriptname = sys.argv[0]
+
 	if len(sys.argv) < 2:
-		print "too few args"
+		print "Syntax: %s <command>" % scriptname
+		help(None)
 		sys.exit(-1)
 
-	scriptname = sys.argv[0]
 	cmd = sys.argv[1]
 	args = sys.argv[2:]
 
 	print "scriptname: %s" % (scriptname)
 	print "cmd: %s" % (cmd)
 
-	# allow use of lower case for commands
+	# flatten case for commands
 	lccmddict = dict((foo.lower(), foo) for foo in cmds.keys())
 
 	if cmd.lower() not in lccmddict:
