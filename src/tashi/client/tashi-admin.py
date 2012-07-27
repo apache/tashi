@@ -100,7 +100,7 @@ def setHostNotes(args):
 	parser = optparse.OptionParser()
 	parser.set_usage("%s setHostNotes [options]" % scriptname)
 	parser.add_option("--host", help="Annotate this host with the note (mandatory)", action="store", type="string", dest="hostname")
-	parser.add_option("--notes", help="Annotate the host with this note (mandatory)", action="store", type="string", dest="notes")
+	parser.add_option("--notes", help="Annotate the host with this note, e.g. 'Check fan' (mandatory)", action="store", type="string", dest="notes")
 	(options, arguments) = parser.parse_args(args)
 	if options.hostname is None or options.notes is None:
 		print "A mandatory option is missing\n"
