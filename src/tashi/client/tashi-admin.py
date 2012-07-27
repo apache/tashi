@@ -18,6 +18,7 @@
 # under the License.    
 
 import os.path
+import optparse
 import random
 import sys
 import types
@@ -109,49 +110,6 @@ def getDefaultNetwork():
 			break
 	return networkId
 
-def randomNetwork():
-	return [NetworkConfiguration(d={'mac':randomMac(), 'network':getDefaultNetwork()})]
-
-def parseDisks(arg):
-	try:
-		strDisks = arg.split(",")
-		disks = []
-		for strDisk in strDisks:
-			strDisk = strDisk.strip()
-			(l, __s, r) = stringPartition(strDisk, ":")
-			if (r == ""):
-				r = "False"
-			r = boolean(r)
-			disk = DiskConfiguration(d={'uri':l, 'persistent':r})
-			disks.append(disk)
-		return disks
-	except:
-		raise ValueError("Incorrect format for disks argument")
-
-def parseNics(arg):
-	try:
-		strNics = arg.split(",")
-		nics = []
-		for strNic in strNics:
-			strNic = strNic.strip()
-			(l, __s, r) = stringPartition(strNic, ":")
-			n = l
-			if (n == ''):
-				n = getDefaultNetwork()
-			n = int(n)
-			(l, __s, r) = stringPartition(r, ":")
-			ip = l
-			if (ip == ''):
-				ip = None
-			m = r
-			if (m == ''):
-				m = randomMac()
-			nic = NetworkConfiguration(d={'mac':m, 'network':n, 'ip':ip})
-			nics.append(nic)
-		return nics
-	except:
-		raise ValueError("Incorrect format for nics argument")
-
 def parseHints(arg):
 	try:
 		strHints = arg.split(",")
@@ -163,98 +121,6 @@ def parseHints(arg):
 		return hints
 	except:
 		raise ValueError("Incorrect format for hints argument")
-
-def getVmLayout():
-	_hosts = client.getHosts()
-	_instances = client.getInstances()
-	hosts = {}
-	for h in _hosts:
-		h.instances = []
-		h.instanceIds = []
-		h.usedMemory = 0
-		h.usedCores = 0
-		hosts[h.id] = h
-	for i in _instances:
-		if (i.hostId in hosts):
-			hosts[i.hostId].instanceIds.append(i.id)
-			hosts[i.hostId].instances.append(i.name)
-			hosts[i.hostId].usedMemory += i.memory
-			hosts[i.hostId].usedCores += i.cores
-	return hosts.values()
-
-def getSlots(cores, memory):
-	hosts = getVmLayout()
-	count = 0
-
-	if cores < 1:
-		print "Argument to cores must be 1 or greater."
-		return
-
-	if memory <= 0:
-		print "Argument to memory must be greater than 0."
-		return
-
-	for h in hosts:
-		if h.up is False or h.state != HostState.Normal:
-			continue
-		countbycores = int((h.cores - h.usedCores) / cores)
-		countbymemory = int((h.memory - h.usedMemory) / memory)
-		count += max(0, min(countbycores, countbymemory))
-
-	print "%d" % (count), "available slots for",
-	print ("instances", "instance")[count == 1],
-	print "with %d" % (cores),
-	print ("cores", "core")[cores == 1],
-	print "and %d MB memory." % (memory)
-	
-def createMany(instance, count):
-	# will create instances from 0 to count-1
-	l = len(str(count - 1))
-	basename = instance.name
-	instances = []
-	for i in range(0, count):
-		for nic in instance.nics:
-			nic.mac = randomMac()
-		instance.name = basename + (("-%" + str(l) + "." + str(l) + "d") % (i))
-		instances.append(client.createVm(instance))
-	return instances
-
-def shutdownMany(basename):
-	return __shutdownOrDestroyMany("shutdown", basename)
-
-def destroyMany(basename):
-	return __shutdownOrDestroyMany("destroy", basename)
-
-def __shutdownOrDestroyMany(method, basename):
-	instances = client.getInstances()
-	count = 0
-	for i in instances:
-		if (i.name.startswith(basename + "-") and i.name[len(basename)+1].isdigit()):
-			# checking permissions here
-			checkIid(i.name)
-
-			if method == "shutdown":
-				client.shutdownVm(i.id)
-
-			elif method == "destroy":
-				client.destroyVm(i.id)
-
-			else:
-				raise ValueError("Unknown method")
-
-			count = count + 1
-	if (count == 0):
-		raise TashiException({'msg':"%s is an unused basename" % basename})
-	return None
-
-def getMyInstances():
-	userId = getUser()
-	_instances = client.getInstances()
-	instances = []
-	for i in _instances:
-		if (i.userId == userId):
-			instances.append(i)
-	return instances
 
 # Used to define default views on functions and to provide extra functionality (getVmLayout)
 extraViews = {
@@ -534,8 +400,11 @@ def main():
 	INDENT = (os.getenv("INDENT", 4))
 	if (len(sys.argv) < 2):
 		usage()
-	function = matchFunction(sys.argv[1])
+
 	config = Config(["Client"])
+
+	# get command name
+	function = matchFunction(sys.argv[1])
 
 	# build a structure of possible arguments
 	possibleArgs = {}
@@ -563,14 +432,6 @@ def main():
 			if (arg == "--help" or arg == "--examples"):
 				usage(function)
 				# this exits
-
-			if (arg.startswith("--hide-")):
-				show_hide.append((False, arg[7:]))
-				continue
-
-			if (arg.startswith("--show-")):
-				show_hide.append((True, arg[7:]))
-				continue
 
 			if (arg.startswith("--")):
 				if (arg[2:] in possibleArgs):
