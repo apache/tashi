@@ -331,14 +331,14 @@ class Qemu(VmControlInterface):
 				if (c == ""):
 					log.error("Early termination on monitor for vmId %d" % (child.pid))
 					child.errorBit = True
-					raise RuntimeError
+					raise EOFError
 				buf = buf + c
 				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], 0.0)
 		finally:
 			child.monitorHistory.append(buf)
 		return buf
 	
-	def consumeUntil(self, child, needle, timeout = -1):
+	def __consumeUntil(self, child, needle, timeout = -1):
 		"""Consume characters one-by-one until something specific comes up"""
 		if (timeout == -1):
 			timeout = self.monitorTimeout
@@ -352,12 +352,12 @@ class Qemu(VmControlInterface):
 				if (len(rlist) == 0):
 					log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
-					raise RuntimeError
+					raise EOFError
 				c = os.read(monitorFd, 1)
 				if (c == ""):
 					log.error("Early termination on monitor FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
-					raise RuntimeError
+					raise EOFError
 				buf = buf + c
 		finally:
 			child.monitorHistory.append(buf[len(needle):])
@@ -369,8 +369,8 @@ class Qemu(VmControlInterface):
 		os.write(child.monitorFd, command + "\n")
 		if (expectPrompt):
 			# XXXstroucki: receiving a vm can take a long time
-			self.consumeUntil(child, command, timeout=timeout)
-			res = self.consumeUntil(child, "(qemu) ", timeout=timeout)
+			self.__consumeUntil(child, command, timeout=timeout)
+			res = self.__consumeUntil(child, "(qemu) ", timeout=timeout)
 		return res
 
 	def __loadChildInfo(self, vmId):
@@ -702,7 +702,7 @@ class Qemu(VmControlInterface):
 		child = self.__getChildFromPid(vmId)
 		try:
 			self.__getPtyInfo(child, True)
-		except RuntimeError:
+		except EOFError:
 			log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise
@@ -710,7 +710,7 @@ class Qemu(VmControlInterface):
 		while ("running" not in status):
 			try:
 				status = self.__enterCommand(child, "info status")
-			except RuntimeError:
+			except EOFError:
 				pass
 			time.sleep(60)
 
@@ -789,7 +789,7 @@ class Qemu(VmControlInterface):
 			raise
 		try:
 			self.__getPtyInfo(child, True)
-		except RuntimeError:
+		except EOFError:
 			log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise
@@ -953,7 +953,13 @@ class Qemu(VmControlInterface):
 		self.stats[vmId] = self.stats.get(vmId, {})
 		child = self.controlledVMs.get(vmId, None)
 		if (child):
-			res = self.__enterCommand(child, "info blockstats")
+
+			try:
+				res = self.__enterCommand(child, "info blockstats")
+			except EOFError:
+				# The VM is likely exiting
+				return
+
 			for l in res.split("\n"):
 				(device, __sep, data) = stringPartition(l, ": ")
 				if (data != ""):
