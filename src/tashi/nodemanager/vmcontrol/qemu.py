@@ -405,8 +405,10 @@ class Qemu(VmControlInterface):
 		host = Host()
 		host.id = service.id
 		host.name = socket.gethostname()
-		cmd = "head -n 1 /proc/meminfo"		
-		memoryStr = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE).stdout.read().strip().split()
+		cmd = "head -n 1 /proc/meminfo"
+
+		# Linux specific
+		memoryStr = open("/proc/meminfo","r").readline().strip().split()
 		if (memoryStr[2] == "kB"):
 			# XXXstroucki should have parameter for reserved mem
 			host.memory = (int(memoryStr[1])/1024) - self.reservedMem
