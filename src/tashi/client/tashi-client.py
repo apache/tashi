@@ -293,7 +293,6 @@ argLists = {
 'getMyInstances': [],
 'getVmLayout': [],
 'vmmSpecificCall': [('instance', checkIid, lambda: requiredArg('instance'), True), ('arg', str, lambda: requiredArg('arg'), True)],
-'unregisterHost': [('hostId', int, lambda: requiredArg('hostId'), True)],
 }
 
 # Used to convert the dictionary built from the arguments into an object that can be used by rpyc
@@ -310,7 +309,6 @@ convertArgs = {
 'pauseVm': '[instance]',
 'unpauseVm': '[instance]',
 'vmmSpecificCall': '[instance, arg]',
-'unregisterHost' : '[hostId]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
 }
@@ -336,7 +334,6 @@ description = {
 'getMyInstances': 'Utility function that only lists VMs owned by the current user',
 'getVmLayout': 'Utility function that displays what VMs are placed on what hosts',
 'vmmSpecificCall': 'Direct access to VM manager specific functionality',
-'unregisterHost' : 'Unregisters host. Registration happens when starting node manager',
 'getImages' : 'Gets a list of available VM images',
 'copyImage' : 'Copies a VM image',
 }
@@ -364,7 +361,6 @@ examples = {
 'getImages': [''],
 'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
 'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance vmname --arg stopVnc'],
-'unregisterHost' : ['--hostId 2'],
 }
 
 show_hide = []
