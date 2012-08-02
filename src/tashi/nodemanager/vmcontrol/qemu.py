@@ -211,7 +211,8 @@ class Qemu(VmControlInterface):
 				# wait on it
 				if (child.OSchild):
 					try:
-						os.waitpid(vmId, 0)
+						(_pid, status) = os.waitpid(vmId, 0)
+						self.log.info("vmId %s exited with status %s" % (vmId, status))
 					except:
 						self.log.exception("waitpid failed for vmId %s" % (vmId))
 				# recover the child's stderr and monitor
