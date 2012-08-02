@@ -846,16 +846,23 @@ class ClusterManagerService(object):
 		except:
 			self.log.warning("Failed to lookup host %s" % hostId)
 
-		return hostId
+		return "Registered host %s with hostId %s" % (host.name, host.id)
 
 	# extern
 	def unregisterHost(self, hostId):
+		# what about VMs that may be running on the host?
+		# what about VMs attempted to be scheduled here once
+		# we've removed it?
+
 		try:
 			host = self.data.getHost(hostId)
 			self.__ACCOUNT("CM HOST UNREGISTER", host=host)
 		except:
 			self.log.warning("Failed to lookup host %s" % hostId)
 			return
+
+		self.log.info("Aborting non-implemented host unregistration for host %s" % host.name)
+		return "Host removal for host %s not implemented yet" % host.name
 
 		self.data.unregisterHost(hostId)
 		self.log.info("Host %s was unregistered" % hostId)

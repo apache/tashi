@@ -205,6 +205,8 @@ class FromConfig(DataInterface):
 				self.save()
 				self.hostLock.release()
 				return _id, True
+
+		# this is a new host
 		_id = self.getNewId("hosts")
 		self.hosts[_id] = Host(d={'id':_id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
 		self.save()
@@ -212,6 +214,7 @@ class FromConfig(DataInterface):
 		return _id, False
 		
 	def unregisterHost(self, hostId):
+		# what about VMs that may run on this host?
 		self.hostLock.acquire()
 		del self.hosts[hostId]
 		self.save()

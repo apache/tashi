@@ -82,6 +82,42 @@ def setHostNotes(args):
 	print rv
 	return 0
 
+def addHost(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s addHost [options]" % scriptname)
+	parser.add_option("--host", help="Add this host to the cluster (mandatory)", action="store", type="string", dest="hostname")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
+
+	# let the NM on the new host fill this in on its regular checkins
+	memory = 0
+	cores = 0
+	version = "new"
+
+	rv = remoteCommand("registerHost", options.hostname, memory, cores, version)
+	print rv
+	return 0
+
+def delHost(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s delHost [options]" % scriptname)
+	parser.add_option("--host", help="Remove this host from the cluster (mandatory)", action="store", type="string", dest="hostname")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
+
+	hostId = checkHid(options.hostname)
+	rv = remoteCommand("unregisterHost", hostId)
+	print rv
+	return 0
+
 def help(args):
 	global scriptname
 	print "Available commands:"
@@ -106,12 +142,16 @@ description = (
 cmdsdesc = (
 ("setHostState", "Sets host state"),
 ("setHostNotes", "Annotates a host"),
+("addHost", "Add a host to the cluster"),
+("delHost", "Remove a host from the cluster"),
 ("help", "Get list of available commands"),
 )
 
 cmds = {
 'setHostState': setHostState,
 'setHostNotes': setHostNotes,
+'addHost': addHost,
+'delHost': delHost,
 'help': help,
 }
 

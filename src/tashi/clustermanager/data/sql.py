@@ -338,6 +338,7 @@ class SQL(DataInterface):
 		
 	def registerHost(self, hostname, memory, cores, version):
 		self.hostLock.acquire()
+		# does this have to be so general?
 		cur = self.executeStatement("SELECT * from hosts")
 		res = cur.fetchall()
 		for r in res:
@@ -354,6 +355,8 @@ class SQL(DataInterface):
 				self.executeStatement("UPDATE hosts SET %s WHERE id = %d" % (s, _id))
 				self.hostLock.release()
 				return r[0], True
+
+		# this is a new host
 		_id = self.getNewId("hosts")
 		host = Host(d={'id': _id, 'up': 0, 'decayed': 0, 'state': 1, 'name': hostname, 'memory':memory, 'cores': cores, 'version':version, 'notes':'', 'reserved':[]})
 		l = self.makeHostList(host)
@@ -363,7 +366,9 @@ class SQL(DataInterface):
 		return _id, False
 	
 	def unregisterHost(self, hostId):
+		# what about VMs that may run on this host?
 		self.hostLock.acquire()
+		# does this have to be so general?
 		cur = self.executeStatement("SELECT * from hosts")
 		res = cur.fetchall()
 		for r in res:
