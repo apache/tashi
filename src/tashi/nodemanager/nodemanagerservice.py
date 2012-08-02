@@ -44,6 +44,7 @@ class NodeManagerService(object):
 
 	def __init__(self, config, vmm):
 		# XXXstroucki: vmm will wait for this constructor to complete
+		self.hostname = socket.gethostname()
 		self.config = config
 		self.vmm = vmm
 		self.cmHost = self.config.get("NodeManagerService", "clusterManagerHost")
@@ -81,7 +82,10 @@ class NodeManagerService(object):
 		# populate self.instances
 		self.__loadVmInfo()
 
-		self.__registerHost()
+		# try to add myself to the list of available hosts
+		# is this useful, or too dangerous to consider?
+		if self.registerHost:
+			self.__registerHost()
 
 		# XXXstroucki: should make an effort to retry
 		# This can time out now with an exception
@@ -293,14 +297,13 @@ class NodeManagerService(object):
 			time.sleep(self.statsInterval)
 
 	def __registerHost(self):
-		hostname = socket.gethostname()
 		# populate some defaults
 		# XXXstroucki: I think it's better if the nodemanager fills these in
 		# properly when registering with the clustermanager
 		memory = 0
 		cores = 0
 		version = "empty"
-		#self.cm.registerHost(hostname, memory, cores, version)
+		rv = self.cm.registerHost(self.hostname, memory, cores, version)
 
 	def __getInstance(self, vmId):
 		instance = self.instances.get(vmId, None)
