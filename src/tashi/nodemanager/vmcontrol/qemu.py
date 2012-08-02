@@ -34,8 +34,6 @@ from tashi.util import scrubString, boolean
 from tashi import version, stringPartition
 from vmcontrolinterface import VmControlInterface
 
-log = logging.getLogger(__file__)
-
 def controlConsole(child, port):
 	"""This exposes a TCP port that connects to a particular child's monitor -- used for debugging"""
 	#print "controlConsole"
@@ -100,6 +98,7 @@ class Qemu(VmControlInterface):
 
 		self.reservedMem = reservedMem
 
+		self.log = logging.getLogger(__file__)
 		self.ifPrefix = "tashi"
 		self.controlledVMs = {}
 		self.usedPorts = []
@@ -178,7 +177,7 @@ class Qemu(VmControlInterface):
 				if child.startTime + 5 < time.time():
 					del child.startTime
 				else:
-					log.info("Not processing vmId %d because it is newly started" % (vmId))
+					self.log.info("Not processing vmId %d because it is newly started" % (vmId))
 					continue
 
 			instance = child.instance
@@ -206,7 +205,7 @@ class Qemu(VmControlInterface):
 					self.vncPorts.remove(child.vncPort)
 					self.vncPortLock.release()
 
-				log.info("Removing vmId %d because it is no longer running" % (vmId))
+				self.log.info("Removing vmId %d because it is no longer running" % (vmId))
 
 				# if the VM was started from this process,
 				# wait on it
@@ -214,7 +213,7 @@ class Qemu(VmControlInterface):
 					try:
 						os.waitpid(vmId, 0)
 					except:
-						log.exception("waitpid failed for vmId %s" % (vmId))
+						self.log.exception("waitpid failed for vmId %s" % (vmId))
 				# recover the child's stderr and monitor
 				# output if possible
 				if (child.errorBit):
@@ -232,11 +231,11 @@ class Qemu(VmControlInterface):
 				try:
 					if self.scratchVg is not None:
 						scratchName = "lv%s" % name
-						log.info("Removing any scratch for %s" % (name))
+						self.log.info("Removing any scratch for %s" % (name))
 						cmd = "/sbin/lvremove --quiet -f %s/%s" % (self.scratchVg, scratchName)
 						__result = subprocess.Popen(cmd.split(), executable=cmd.split()[0], stdout=subprocess.PIPE, stderr=open(os.devnull, "w"), close_fds=True).wait()
 				except:
-					log.warning("Problem cleaning scratch volumes")
+					self.log.warning("Problem cleaning scratch volumes")
 					pass
 
 				# let the NM know
@@ -247,7 +246,7 @@ class Qemu(VmControlInterface):
 					# exit, but the NM should probably know.
 					self.nm.vmStateChange(vmId, None, InstanceState.Exited)
 				except Exception:
-					log.exception("vmStateChange failed for VM %s" % (name))
+					self.log.exception("vmStateChange failed for VM %s" % (name))
 			else:
 				# VM is still running
 				try:
@@ -258,7 +257,7 @@ class Qemu(VmControlInterface):
 						(instance.state == InstanceState.Activating):
 						self.nm.vmStateChange(vmId, None, InstanceState.Running)
 				except:
-					log.exception("vmStateChange failed for VM %s" % (name))
+					self.log.exception("vmStateChange failed for VM %s" % (name))
 						
 
 	# called once on startup
@@ -267,7 +266,7 @@ class Qemu(VmControlInterface):
 		controlledVMs = {}
 		controlledVMs.update(map(lambda x: (int(x), self.anonClass(OSchild=False, errorBit=False, migratingOut=False)), os.listdir(self.INFO_DIR + "/")))
 		if (len(controlledVMs) == 0):
-			log.info("No VM information found in %s" % (self.INFO_DIR))
+			self.log.info("No VM information found in %s" % (self.INFO_DIR))
 		for vmId in controlledVMs:
 			try:
 				child = self.__loadChildInfo(vmId)
@@ -283,9 +282,9 @@ class Qemu(VmControlInterface):
 				
 				self.controlledVMs[vmId] = child
 			except Exception:
-				log.exception("Failed to load VM info for %d", vmId)
+				self.log.exception("Failed to load VM info for %d", vmId)
 			else:
-				log.info("Loaded VM info for %d", vmId)
+				self.log.info("Loaded VM info for %d", vmId)
 	# service thread
 	def __pollVMsLoop(self):
 		"""Infinite loop that checks for dead VMs"""
@@ -298,7 +297,7 @@ class Qemu(VmControlInterface):
 		# set.
 
 		while self.nm is None:
-			log.info("Waiting for NM initialization")
+			self.log.info("Waiting for NM initialization")
 			time.sleep(2)
 
 		while True:
@@ -306,7 +305,7 @@ class Qemu(VmControlInterface):
 				time.sleep(self.POLL_DELAY)
 				self.__matchHostPids()
 			except:
-				log.exception("Exception in poolVMsLoop")
+				self.log.exception("Exception in poolVMsLoop")
 	
 	def __waitForExit(self, vmId):
 		"""This waits until an element is removed from the dictionary -- the polling thread must detect an exit"""
@@ -329,7 +328,7 @@ class Qemu(VmControlInterface):
 			while (len(rlist) > 0):
 				c = os.read(monitorFd, 1)
 				if (c == ""):
-					log.error("Early termination on monitor for vmId %d" % (child.pid))
+					self.log.error("Early termination on monitor for vmId %d" % (child.pid))
 					child.errorBit = True
 					raise EOFError
 				buf = buf + c
@@ -350,12 +349,12 @@ class Qemu(VmControlInterface):
 				#print "[NEE]: %s" % (needle)
 				(rlist, __wlist, __xlist) = select.select([monitorFd], [], [], timeout)
 				if (len(rlist) == 0):
-					log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
+					self.log.error("Timeout getting results from monitor on FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise EOFError
 				c = os.read(monitorFd, 1)
 				if (c == ""):
-					log.error("Early termination on monitor FD %s for vmId %d" % (monitorFd, child.pid))
+					self.log.error("Early termination on monitor FD %s for vmId %d" % (monitorFd, child.pid))
 					child.errorBit = True
 					raise EOFError
 				buf = buf + c
@@ -413,7 +412,7 @@ class Qemu(VmControlInterface):
 			# XXXstroucki should have parameter for reserved mem
 			host.memory = (int(memoryStr[1])/1024) - self.reservedMem
 		else:
-			log.warning('Unable to determine amount of physical memory - reporting 0')
+			self.log.warning('Unable to determine amount of physical memory - reporting 0')
 			host.memory = 0
 		host.cores = os.sysconf("SC_NPROCESSORS_ONLN")
 		host.up = True
@@ -525,7 +524,7 @@ class Qemu(VmControlInterface):
 				diskString = "%s-drive %s " % (diskString, ",".join(thisDiskList))
 
 		except:
-			log.exception('caught exception in scratch disk formation')
+			self.log.exception('caught exception in scratch disk formation')
 			raise
 	
 		#  Nic hints
@@ -557,7 +556,7 @@ class Qemu(VmControlInterface):
 		# XXXstroucki perhaps we're doing it backwards
 		cmd = shlex.split(strCmd)
 
-		log.info("Executing command: %s" % (strCmd))
+		self.log.info("Executing command: %s" % (strCmd))
 		(pipe_r, pipe_w) = os.pipe()
 		pid = os.fork()
 		if (pid == 0):
@@ -597,7 +596,7 @@ class Qemu(VmControlInterface):
 		child.startTime = time.time()
 
 		self.__saveChildInfo(child)
-		log.info("Adding vmId %d" % (child.pid))
+		self.log.info("Adding vmId %d" % (child.pid))
 		self.controlledVMs[child.pid] = child
 		return (child.pid, cmd)
 
@@ -609,7 +608,7 @@ class Qemu(VmControlInterface):
 				try:
 					os.waitpid(child.pid, 0)
 				except:
-					log.exception("waitpid failed")
+					self.log.exception("waitpid failed")
 				raise Exception, "Failed to start VM -- ptyFile not found"
 			redirLine = "char device redirected to "
 			if (line.find(redirLine) != -1):
@@ -652,9 +651,9 @@ class Qemu(VmControlInterface):
 					retry = 0
 					break
 				else:
-					log.error("Migration (transiently) failed: %s\n", res)
+					self.log.error("Migration (transiently) failed: %s\n", res)
 			if (retry == 0) and (success is False):
-				log.error("Migration failed: %s\n", res)
+				self.log.error("Migration failed: %s\n", res)
 				child.errorBit = True
 				raise RuntimeError
 		# XXXstroucki what if migration is still ongoing, and
@@ -680,7 +679,7 @@ class Qemu(VmControlInterface):
 			self.__saveChildInfo(child)
 			return vmId
 		except:
-			log.exception("instantiateVm failed")
+			self.log.exception("instantiateVm failed")
 			raise
 	
 	# extern
@@ -705,7 +704,7 @@ class Qemu(VmControlInterface):
 		try:
 			self.__getPtyInfo(child, True)
 		except EOFError:
-			log.error("Failed to get pty info -- VM likely died")
+			self.log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise
 		status = "paused"
@@ -786,13 +785,13 @@ class Qemu(VmControlInterface):
 			child = self.__getChildFromPid(vmId)
 		except:
 			# XXXstroucki: Does hostname contain the peer hostname?
-			log.error("Failed to get child info; transportCookie = %s; hostname = %s" %
+			self.log.error("Failed to get child info; transportCookie = %s; hostname = %s" %
 					(str(cPickle.loads(transportCookie)), _hostname))
 			raise
 		try:
 			self.__getPtyInfo(child, True)
 		except EOFError:
-			log.error("Failed to get pty info -- VM likely died")
+			self.log.error("Failed to get pty info -- VM likely died")
 			child.errorBit = True
 			raise
 		self.usedPortsLock.acquire()
@@ -924,7 +923,7 @@ class Qemu(VmControlInterface):
 			procData = f.read()
 			f.close()
 		except:
-			log.warning("Unable to get data for instance %d" % vmId)
+			self.log.warning("Unable to get data for instance %d" % vmId)
 			return
 
 		ws = procData.strip().split()
@@ -944,7 +943,7 @@ class Qemu(VmControlInterface):
 		try:
 			child = self.controlledVMs[vmId]
 		except:
-			log.warning("Unable to obtain information on instance %d" % vmId)
+			self.log.warning("Unable to obtain information on instance %d" % vmId)
 			return
 
 		(recvMBs, sendMBs, recvBytes, sendBytes) = (0.0, 0.0, 0.0, 0.0)
@@ -1019,7 +1018,7 @@ class Qemu(VmControlInterface):
 					self.__processVmStats(vmId)
 
 			except:
-				log.exception("statsThread threw an exception")
+				self.log.exception("statsThread threw an exception")
 			last = now
 			time.sleep(self.statsInterval)
 
