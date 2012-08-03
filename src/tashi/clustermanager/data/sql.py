@@ -360,7 +360,7 @@ class SQL(DataInterface):
 		# XXXstroucki nicer?
 		self.executeStatement("INSERT INTO hosts VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)" % tuple(l))
 		self.hostLock.release()
-		return id, False
+		return _id, False
 	
 	def unregisterHost(self, hostId):
 		self.hostLock.acquire()

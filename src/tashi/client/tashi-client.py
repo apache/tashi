@@ -652,6 +652,9 @@ def main():
 				fargs = []
 
 			res = f(*fargs)
+			if (type(res) is Exception) or \
+			  (type(res) is TashiException):
+				raise res
 
 		except TashiException, e:
 			print "Failed in calling %s: %s" % (function, e.msg)
