@@ -349,6 +349,11 @@ class Connection:
 			self.connection = None
 			raise
 
+		# if we get a remote exception, raise it locally
+		if (type(returns) is Exception) or \
+		  (type(returns) is TashiException):
+			raise returns
+
 		return returns
 
 	def __getattr__(self, name):
