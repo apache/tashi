@@ -405,7 +405,6 @@ class Qemu(VmControlInterface):
 		host = Host()
 		host.id = service.id
 		host.name = socket.gethostname()
-		cmd = "head -n 1 /proc/meminfo"
 
 		# Linux specific
 		memoryStr = open("/proc/meminfo","r").readline().strip().split()
