@@ -208,7 +208,7 @@ class FromConfig(DataInterface):
 
 		# this is a new host
 		_id = self.getNewId("hosts")
-		self.hosts[_id] = Host(d={'id':_id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version})
+		self.hosts[_id] = Host(d={'id':_id,'name':hostname,'state':HostState.Normal,'memory':memory,'cores':cores,'version':version, 'up':False, 'decayed':False, 'notes':'', 'reserved':[]})
 		self.save()
 		self.hostLock.release()
 		return _id, False
