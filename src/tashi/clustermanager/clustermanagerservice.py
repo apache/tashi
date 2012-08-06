@@ -295,7 +295,12 @@ class ClusterManagerService(object):
 
 				instance.decayed = True
 				self.log.debug('Fetching state on instance %s because it is decayed' % (instance.name))
-				if instance.hostId is None: raise AssertionError
+				if instance.hostId is None:
+					# XXXstroucki we should not have reached
+					# here. Log state of instance and raise
+					# an AssertionError
+					self.log.error("Assert failed: hostId is None with instance %s" % instance)
+					raise AssertionError
 
 				# XXXstroucki check if host is down?
 				host = self.data.getHost(instance.hostId)
