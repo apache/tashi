@@ -63,6 +63,7 @@ class NodeManagerService(object):
 
 		self.id = None
 		# XXXstroucki this fn could be in this level maybe?
+		# note we are passing our information down to the VMM here.
 		self.host = self.vmm.getHostInfo(self)
 
 		# populate self.instances
@@ -237,12 +238,18 @@ class NodeManagerService(object):
 	def __getInstance(self, vmId):
 		instance = self.instances.get(vmId, None)
 		if instance is not None:
+			# XXXstroucki: force to my own hostId here. Is this the
+			# right place?
+			instance.hostId = self.id
 			return instance
 
 		# refresh self.instances if not found
 		self.__loadVmInfo()
 		instance = self.instances.get(vmId, None)
 		if instance is not None:
+			# XXXstroucki: force to my own hostId here. Is this the
+			# right place?
+			instance.hostId = self.id
 			return instance
 
 
