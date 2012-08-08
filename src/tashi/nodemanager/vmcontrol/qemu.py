@@ -593,6 +593,9 @@ class Qemu(VmControlInterface):
 		child.ptyFile = None
 		child.vncPort = -1
 		child.instance.vmId = child.pid
+		# XXXstroucki what about our hostId?
+		# we need to make sure we don't report up a VM
+		# with an inaccurate hostId.
 
 		# Add a token to this new child object so that
 		# we don't mistakenly clean up when matchHostPids
@@ -756,6 +759,7 @@ class Qemu(VmControlInterface):
 		(vmId, cmd) = self.__startVm(instance, "tcp:0.0.0.0:%d" % (port))
 		transportCookie = cPickle.dumps((port, vmId, socket.gethostname()))
 		child = self.__getChildFromPid(vmId)
+		child.instance.state = InstanceState.Running
 		child.cmd = cmd
 		child.transportCookie = transportCookie
 		self.__saveChildInfo(child)
