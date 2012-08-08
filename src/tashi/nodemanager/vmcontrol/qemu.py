@@ -101,6 +101,7 @@ class Qemu(VmControlInterface):
 		self.log = logging.getLogger(__file__)
 		self.ifPrefix = "tashi"
 		self.controlledVMs = {}
+		self.hostname = socket.gethostname()
 		self.usedPorts = []
 		self.usedPortsLock = threading.Lock()
 		self.vncPorts = []
@@ -408,7 +409,7 @@ class Qemu(VmControlInterface):
 	def getHostInfo(self, service):
 		host = Host()
 		host.id = service.id
-		host.name = socket.gethostname()
+		host.name = self.hostname
 
 		# Linux specific
 		memoryStr = open("/proc/meminfo","r").readline().strip().split()
@@ -757,7 +758,7 @@ class Qemu(VmControlInterface):
 		self.usedPorts.append(port)
 		self.usedPortsLock.release()
 		(vmId, cmd) = self.__startVm(instance, "tcp:0.0.0.0:%d" % (port))
-		transportCookie = cPickle.dumps((port, vmId, socket.gethostname()))
+		transportCookie = cPickle.dumps((port, vmId, self.hostname))
 		child = self.__getChildFromPid(vmId)
 		child.instance.state = InstanceState.Running
 		child.cmd = cmd
@@ -839,7 +840,6 @@ class Qemu(VmControlInterface):
 	
 	def __specificStartVnc(self, vmId):
 		child = self.__getChildFromPid(vmId)
-		hostname = socket.gethostname()
 		if (child.vncPort == -1):
 			self.vncPortLock.acquire()
 			port = 0
@@ -852,7 +852,7 @@ class Qemu(VmControlInterface):
 			child.vncPort = port
 			self.__saveChildInfo(child)
 		port = child.vncPort
-		return "VNC running on %s:%d" % (hostname, port + 5900)
+		return "VNC running on %s:%d" % (self.hostname, port + 5900)
 
 	def __specificStopVnc(self, vmId):
 		child = self.__getChildFromPid(vmId)
@@ -873,14 +873,13 @@ class Qemu(VmControlInterface):
 
 	def __specificStartConsole(self, vmId):
 		child = self.__getChildFromPid(vmId)
-		hostname = socket.gethostname()
 		self.consolePortLock.acquire()
 		# XXXstroucki why not use the existing ports scheme?
 		consolePort = self.consolePort
 		self.consolePort += 1
 		self.consolePortLock.release()
 		threading.Thread(target=controlConsole, args=(child,consolePort)).start()
-		return "Control console listening on %s:%d" % (hostname, consolePort)
+		return "Control console listening on %s:%d" % (self.hostname, consolePort)
 
 	def __specificReset(self, vmId):
 		child = self.__getChildFromPid(vmId)
