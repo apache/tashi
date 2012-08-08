@@ -100,6 +100,8 @@ class Qemu(VmControlInterface):
 
 		self.log = logging.getLogger(__file__)
 		self.ifPrefix = "tashi"
+		# keep a handle to my NM service
+		self.service = None
 		self.controlledVMs = {}
 		self.hostname = socket.gethostname()
 		self.usedPorts = []
@@ -408,8 +410,9 @@ class Qemu(VmControlInterface):
 	# extern
 	def getHostInfo(self, service):
 		host = Host()
-		host.id = service.id
 		host.name = self.hostname
+		self.service = service
+		host.id = self.service.id
 
 		# Linux specific
 		memoryStr = open("/proc/meminfo","r").readline().strip().split()
@@ -590,6 +593,10 @@ class Qemu(VmControlInterface):
 
 		# parent process
 		os.close(pipe_w)
+
+		# enforce the new instance to have our hostId!
+		# otherwise, a migrated VM will have its previous hostId.
+		instance.hostId = self.service.id
 		child = self.anonClass(pid=pid, instance=instance, stderr=os.fdopen(pipe_r, 'r'), migratingOut = False, monitorHistory=[], errorBit = True, OSchild = True)
 		child.ptyFile = None
 		child.vncPort = -1

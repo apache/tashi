@@ -77,6 +77,7 @@ class NodeManagerService(object):
 
 		self.id = None
 		# XXXstroucki this fn could be in this level maybe?
+		# note we are passing our information down to the VMM here.
 		self.host = self.vmm.getHostInfo(self)
 
 		# populate self.instances
