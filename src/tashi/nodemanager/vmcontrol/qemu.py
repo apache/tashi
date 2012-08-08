@@ -396,6 +396,10 @@ class Qemu(VmControlInterface):
 		return child
 	
 	def __saveChildInfo(self, child):
+		# XXXstroucki: if the disk INFO_DIR is on is full,
+		# we may not be able to store our data. This can lead
+		# to VMs remaining running that the NM doesn't know about
+		# Can we do anything, or should be a task external to Tashi?
 		info = open(self.INFO_DIR + "/%d"%(child.pid), "w")
 		cPickle.dump((child.instance, child.pid, child.ptyFile), info)
 		info.close()
