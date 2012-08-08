@@ -260,8 +260,9 @@ class SQL(DataInterface):
 	def getHost(self, in_id):
 		try:
 			_id = int(in_id)
-		except:
+		except TypeError:
 			self.log.exception("Argument to getHost was not integer: %s" % in_id)
+			raise
 
 		cur = self.executeStatement("SELECT * FROM hosts WHERE id = %d" % _id)
 		r = cur.fetchone()
@@ -282,8 +283,9 @@ class SQL(DataInterface):
 	def getInstance(self, in_id):
 		try:
 			_id = int(in_id)
-		except:
+		except TypeError:
 			self.log.exception("Argument to getInstance was not integer: %s" % in_id)
+			raise
 
 		cur = self.executeStatement("SELECT * FROM instances WHERE id = %d" % (_id))
 		# XXXstroucki should only return one row.
