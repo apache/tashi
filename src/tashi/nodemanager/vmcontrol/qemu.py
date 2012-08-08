@@ -410,7 +410,6 @@ class Qemu(VmControlInterface):
 	def getHostInfo(self, service):
 		host = Host()
 		host.name = socket.gethostname()
-		cmd = "head -n 1 /proc/meminfo"
 		self.service = service
 		host.id = self.service.id
 
