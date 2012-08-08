@@ -12,6 +12,16 @@ in the main installation document.
 You can then start the node manager manually, or have it start from the 
 system initialization scripts.
 
+---+ VM host best practices
+
+The nodemanager will use a small amount of local storage to keep 
+accounting data on the virtual machines that it manages. The 
+copy-on-write storage used by running virtual machines will also be 
+written locally. For the sake of stability, these two storage locations 
+should be chosen so that there is always sufficient space for the 
+accounting data. Otherwise, this could lead to VMs running but not known 
+to the nodemanager.
+
 ---+ Deployment over multiple networks
 
 To add additional networks to the Apache Tashi cluster, they should be 
