@@ -118,13 +118,45 @@ def delHost(args):
 	print rv
 	return 0
 
-def reservation(args):
+def addReservation(args):
 	global scriptname
 	parser = optparse.OptionParser()
-	parser.set_usage("%s reservation [options]" % scriptname)
-	parser.add_option("--host", help="Add or remove reservations from this host (mandatory)", action="store", type="string", dest="hostname")
-	parser.add_option("--add", help="Add this user to the host reservation", action="store", type="string", dest="username")
-	parser.add_option("--remove", help="Remove this user from the host reservation", action="store", type="string", dest="username")
+	parser.set_usage("%s addReservation [options]" % scriptname)
+	parser.add_option("--host", help="Add a reservation to this host (mandatory)", action="store", type="string", dest="hostname")
+	parser.add_option("--user", help="Add this user to the host reservation (mandatory)", action="store", type="string", dest="username")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None or options.username is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
+
+	hostId = checkHid(options.hostname)
+	rv = remoteCommand("addReservation", hostId, username)
+	print rv
+	return 0
+
+def delReservation(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s addReservation [options]" % scriptname)
+	parser.add_option("--host", help="Add a reservation to this host (mandatory)", action="store", type="string", dest="hostname")
+	parser.add_option("--user", help="Remove this user from the host reservation (mandatory)", action="store", type="string", dest="username")
+	(options, arguments) = parser.parse_args(args)
+	if options.hostname is None or options.username is None:
+		print "A mandatory option is missing\n"
+		parser.print_help()
+		sys.exit(-1)
+
+	hostId = checkHid(options.hostname)
+	rv = remoteCommand("delReservation", hostId, username)
+	print rv
+	return 0
+
+def getReservation(args):
+	global scriptname
+	parser = optparse.OptionParser()
+	parser.set_usage("%s getReservation [options]" % scriptname)
+	parser.add_option("--host", help="Show reservations on this host (mandatory)", action="store", type="string", dest="hostname")
 	(options, arguments) = parser.parse_args(args)
 	if options.hostname is None:
 		print "A mandatory option is missing\n"
@@ -132,7 +164,7 @@ def reservation(args):
 		sys.exit(-1)
 
 	hostId = checkHid(options.hostname)
-	rv = remoteCommand("setReservation", hostId, username)
+	rv = remoteCommand("getReservation", hostId)
 	print rv
 	return 0
 
@@ -148,7 +180,9 @@ def help(args):
 description = (
 ('addHost', 'Adds a new host to Tashi'),
 ('delHost', 'Removes a host from Tashi'),
-('reservation', 'Define host reservations'),
+('addReservation', 'Add a user to a host reservation'),
+('delReservation', 'Remove a user from a host reservation'),
+('getReservation', 'Retrieve host reservations'),
 ('addUser', 'Adds a user to Tashi'),
 ('delUser', 'Removes a user from Tashi'),
 ('addNet', 'Adds a network to Tashi'),
@@ -163,7 +197,9 @@ cmdsdesc = (
 ("setHostNotes", "Annotates a host"),
 ("addHost", "Add a host to the cluster"),
 ("delHost", "Remove a host from the cluster"),
-('reservation', 'Define host reservations'),
+('addReservation', 'Add a user to a host reservation'),
+('delReservation', 'Remove a user from a host reservation'),
+('getReservation', 'Retrieve host reservations'),
 ("help", "Get list of available commands"),
 )
 
@@ -172,7 +208,9 @@ cmds = {
 'setHostNotes': setHostNotes,
 'addHost': addHost,
 'delHost': delHost,
-'reservation': reservation,
+'addReservation': addReservation,
+'delReservation': delReservation,
+'getReservation': getReservation,
 'help': help,
 }
 
