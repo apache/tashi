@@ -605,7 +605,6 @@ class ClusterManagerService(object):
 
 	# extern
 	def addReservation(self, hostId, username):
-		hostNotes = notes
 		host = self.data.acquireHost(hostId)
 		msg = None
 		try:
@@ -624,7 +623,6 @@ class ClusterManagerService(object):
 
 	# extern
 	def delReservation(self, hostId, username):
-		hostNotes = notes
 		host = self.data.acquireHost(hostId)
 		msg = None
 		try:
@@ -647,7 +645,7 @@ class ClusterManagerService(object):
 		users = host.reserved
 
 		if len(users) == 0:
-			return 'Host %s is not reserved for any users'
+			return 'Host %s is not reserved for any users' % (host.name)
 
 		usersstring = ', '.join(map(str, users))
 

@@ -131,7 +131,7 @@ def addReservation(args):
 		sys.exit(-1)
 
 	hostId = checkHid(options.hostname)
-	rv = remoteCommand("addReservation", hostId, username)
+	rv = remoteCommand("addReservation", hostId, options.username)
 	print rv
 	return 0
 
@@ -148,7 +148,7 @@ def delReservation(args):
 		sys.exit(-1)
 
 	hostId = checkHid(options.hostname)
-	rv = remoteCommand("delReservation", hostId, username)
+	rv = remoteCommand("delReservation", hostId, options.username)
 	print rv
 	return 0
 
