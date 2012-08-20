@@ -604,6 +604,56 @@ class ClusterManagerService(object):
 		return 'Host notes set to "%s".' % hostNotes
 
 	# extern
+	def addReservation(self, hostId, username):
+		hostNotes = notes
+		host = self.data.acquireHost(hostId)
+		msg = None
+		try:
+			if username not in host.reserved:
+				host.reserved.append(username)
+				msg = "%s added to reservations of host %s" % (username, host.name)
+			else:
+				msg = "%s already in reservations of host %s" % (username, host.name)
+		finally:
+			self.data.releaseHost(host)
+
+		if msg is not None:
+			return msg
+		else:
+			return "Sorry, an error occurred"
+
+	# extern
+	def delReservation(self, hostId, username):
+		hostNotes = notes
+		host = self.data.acquireHost(hostId)
+		msg = None
+		try:
+			if username not in host.reserved:
+				msg = "%s not in reservations of host %s" % (username, host.name)
+			else:
+				host.reserved.remove(username)
+				msg = "%s removed from reservations of host %s" % (username, host.name)
+		finally:
+			self.data.releaseHost(host)
+
+		if msg is not None:
+			return msg
+		else:
+			return "Sorry, an error occurred"
+
+	# extern
+	def getReservation(self, hostId):
+		host = self.data.getHost(hostId)
+		users = host.reserved
+
+		if len(users) == 0:
+			return 'Host %s is not reserved for any users'
+
+		usersstring = ', '.join(map(str, users))
+
+		return 'Host %s reserved for users %s.' % (host.name, usersstring)
+
+	# extern
 	def getNetworks(self):
 		networks = self.data.getNetworks()
 		for network in networks:
