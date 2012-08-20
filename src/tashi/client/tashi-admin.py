@@ -24,7 +24,6 @@ from tashi.utils.config import Config
 from tashi.rpycservices.rpyctypes import TashiException
 
 def checkHid(host):
-	#userId = getUser()
 	hosts = client.getHosts()
 	hostId = None
 	try:
@@ -38,6 +37,21 @@ def checkHid(host):
 
 	# XXXstroucki permissions for host related stuff?
 	return hostId
+
+def checkUid(user):
+	users = client.getUsers()
+	userId = None
+	try:
+		userId = int(user)
+	except:
+		for u in users:
+			if (u.name == user):
+				userId = u.id
+	if (userId is None):
+		raise TashiException({'msg':"Unknown user %s" % (str(host))})
+
+	# XXXstroucki permissions for host related stuff?
+	return userId
 
 def remoteCommand(command, *args):
 	global client
@@ -131,7 +145,8 @@ def addReservation(args):
 		sys.exit(-1)
 
 	hostId = checkHid(options.hostname)
-	rv = remoteCommand("addReservation", hostId, options.username)
+	userId = checkUid(options.username)
+	rv = remoteCommand("addReservation", hostId, userId)
 	print rv
 	return 0
 
@@ -148,7 +163,9 @@ def delReservation(args):
 		sys.exit(-1)
 
 	hostId = checkHid(options.hostname)
-	rv = remoteCommand("delReservation", hostId, options.username)
+	userId = checkUid(options.username)
+
+	rv = remoteCommand("delReservation", hostId, userId)
 	print rv
 	return 0
 

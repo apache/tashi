@@ -604,15 +604,16 @@ class ClusterManagerService(object):
 		return 'Host notes set to "%s".' % hostNotes
 
 	# extern
-	def addReservation(self, hostId, username):
+	def addReservation(self, hostId, userId):
 		host = self.data.acquireHost(hostId)
 		msg = None
+		user = self.__getUser(userId)
 		try:
-			if username not in host.reserved:
-				host.reserved.append(username)
-				msg = "%s added to reservations of host %s" % (username, host.name)
+			if userId not in host.reserved:
+				host.reserved.append(userId)
+				msg = "%s added to reservations of host %s" % (user.name, host.name)
 			else:
-				msg = "%s already in reservations of host %s" % (username, host.name)
+				msg = "%s already in reservations of host %s" % (user.name, host.name)
 		finally:
 			self.data.releaseHost(host)
 
@@ -622,15 +623,16 @@ class ClusterManagerService(object):
 			return "Sorry, an error occurred"
 
 	# extern
-	def delReservation(self, hostId, username):
+	def delReservation(self, hostId, userId):
 		host = self.data.acquireHost(hostId)
 		msg = None
+		user = self.__getUser(userId)
 		try:
-			if username not in host.reserved:
-				msg = "%s not in reservations of host %s" % (username, host.name)
+			if userId not in host.reserved:
+				msg = "%s not in reservations of host %s" % (user.name, host.name)
 			else:
-				host.reserved.remove(username)
-				msg = "%s removed from reservations of host %s" % (username, host.name)
+				host.reserved.remove(userId)
+				msg = "%s removed from reservations of host %s" % (user.name, host.name)
 		finally:
 			self.data.releaseHost(host)
 
@@ -647,7 +649,12 @@ class ClusterManagerService(object):
 		if len(users) == 0:
 			return 'Host %s is not reserved for any users' % (host.name)
 
-		usersstring = ', '.join(map(str, users))
+		namelist = []
+		for u in users:
+			user = self.__getUser(u)
+			namelist.append(user.name)
+
+		usersstring = ', '.join(map(str, namelist))
 
 		return 'Host %s reserved for users %s.' % (host.name, usersstring)
 
@@ -663,6 +670,9 @@ class ClusterManagerService(object):
 	# extern
 	def getUsers(self):
 		return self.data.getUsers().values()
+
+	def __getUser(self, userId):
+		return self.data.getUser(userId)
 
 	# extern
 	def getInstances(self):
