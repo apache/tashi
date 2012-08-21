@@ -48,7 +48,7 @@ def checkUid(user):
 			if (u.name == user):
 				userId = u.id
 	if (userId is None):
-		raise TashiException({'msg':"Unknown user %s" % (str(host))})
+		raise TashiException({'msg':"Unknown user %s" % (str(user))})
 
 	# XXXstroucki permissions for host related stuff?
 	return userId
