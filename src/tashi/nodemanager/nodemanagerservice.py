@@ -231,7 +231,12 @@ class NodeManagerService(object):
 		b = ":".join(s.encode("hex") for s in a)
 		return b
 
-	def __updateInstance(self, mac, ip):
+	def __updateInstanceIp(self, mac, ip):
+		# 0.0.0.0 is sometimes seen when doing DHCP
+		# don't update my info with this address
+		if ip == "0.0.0.0":
+			return
+
 		for vmId in self.instances.keys():
 			try:
 				instance = self.instances.get(vmId, None)
@@ -243,7 +248,7 @@ class NodeManagerService(object):
 						self.log.debug('Detected IP address: %s for hardware address: %s' % (ip, mac))
 						nic.ip = ip
 			except:
-				self.log.exception('updateInstance threw an exception (vmid %d)' % vmId)
+				self.log.exception('updateInstanceIp threw an exception (vmid %d)' % vmId)
 
 	# service thread function
 	def __arpMonitorThread(self, conf):
@@ -261,13 +266,13 @@ class NodeManagerService(object):
 					if dhcp.op == dpkt.dhcp.DHCPACK or dhcp.op == dpkt.dhcp.DHCPOFFER:
 						macaddress = self.__stringToMac(dhcp.chaddr)
 						ipaddress = socket.inet_ntoa(pack("!I",dhcp.ciaddr))
-						self.__updateInstance(macaddress, ipaddress)
+						self.__updateInstanceIp(macaddress, ipaddress)
 				elif e.type == dpkt.ethernet.ETH_TYPE_ARP:
 					a = e.data
 					if a.op == dpkt.arp.ARP_OP_REPLY:
 						ipaddress = socket.inet_ntoa(a.spa)
 						macaddress = self.__stringToMac(a.sha)
-						self.__updateInstance(macaddress, ipaddress)
+						self.__updateInstanceIp(macaddress, ipaddress)
 		except:
 			self.log.exception('arpMonitorThread threw an exception')
 
