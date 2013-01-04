@@ -58,7 +58,7 @@ def main():
 	print "#  Put the following lines in your dhcpd.conf file\n\n"
 	print "key %s {" % options.keyName
 	print "    algorithm hmac-md5;"
-	print "    secret %s" % key
+	print "    secret %s;" % key
 	print "};"
 	print ""
 	print "omapi-key %s" % options.keyName
