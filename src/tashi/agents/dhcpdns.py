@@ -5,15 +5,15 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
-# under the License.    
+# under the License.
 
 import logging
 import os
@@ -24,6 +24,7 @@ import time
 from instancehook import InstanceHook
 from tashi.rpycservices.rpyctypes import Instance
 from tashi import boolean
+
 
 class DhcpDns(InstanceHook):
 	def __init__(self, config, client, post=False):
@@ -48,7 +49,7 @@ class DhcpDns(InstanceHook):
 					network = int(network)
 				except:
 					continue
-				self.ipRange[network] = value	
+				self.ipRange[network] = value
 		self.reverseDns = boolean(self.config.get('DhcpDns', 'reverseDns'))
 		self.log = logging.getLogger(__file__)
 		self.ipMin = {}
@@ -62,7 +63,7 @@ class DhcpDns(InstanceHook):
 		self.usedIPs = {}
 		for network in self.ipRange:
 			ipRange = self.ipRange[network]
-			(ipMin, ipMax) = ipRange.split("-")	
+			(ipMin, ipMax) = ipRange.split("-")
 			ipMin = ipMin.strip()
 			ipMax = ipMax.strip()
 			ipNum = self.strToIp(ipMin)
@@ -80,7 +81,7 @@ class DhcpDns(InstanceHook):
 					self.usedIPs[ipNum] = ip
 				except Exception:
 					pass
-		
+
 	def strToIp(self, s):
 		ipNum = -1
 		try:
@@ -88,10 +89,10 @@ class DhcpDns(InstanceHook):
 		except:
 			pass
 		return ipNum
-	
+
 	def ipToStr(self, ip):
 		return "%d.%d.%d.%d" % ((ip>>24)&0xff, (ip>>16)&0xff, (ip>>8)&0xff, ip&0xff)
-	
+
 	def allocateIP(self, nic):
 		# XXXstroucki: if the network is not defined having an ip
 		# range, this will throw a KeyError. Should be logged.
@@ -99,7 +100,10 @@ class DhcpDns(InstanceHook):
 		allocatedIP = None
 		requestedIP = self.strToIp(nic.ip)
 		wrapToMinAlready = False
-		if (requestedIP <= self.ipMax[network] and requestedIP >= self.ipMin[network] and (requestedIP not in self.usedIPs)):
+		if (requestedIP <= self.ipMax[network] and
+			requestedIP >= self.ipMin[network] and
+			(requestedIP not in self.usedIPs)):
+
 			allocatedIP = requestedIP
 
 		# nic.ip will be updated later in preCreate if chosen
@@ -117,7 +121,7 @@ class DhcpDns(InstanceHook):
 		ipString = self.ipToStr(allocatedIP)
 		self.usedIPs[allocatedIP] = ipString
 		return ipString
-	
+
 	def addDhcp(self, name, ipaddr, hwaddr):
 		try:
 			self.removeDhcp(name)
@@ -159,25 +163,29 @@ class DhcpDns(InstanceHook):
 		stdin.close()
 		__output = stdout.read()
 		stdout.close()
-	
+
 	def addDns(self, name, ip):
 		try:
 			self.removeDns(name)
 		except:
 			pass
 		cmd = "nsupdate"
-		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		child = subprocess.Popen(args=cmd.split(),
+					stdin=subprocess.PIPE,
+					stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
 			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
-			stdin.write("update add %s.%s %d A %s\n" % (name, self.dnsDomain, self.dnsExpire, ip))
+			stdin.write("update add %s %d A %s\n" % (name, self.dnsExpire, ip))
 			stdin.write("\n")
 			if (self.reverseDns):
 				ipSegments = map(int, ip.split("."))
 				ipSegments.reverse()
-				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
-				stdin.write("update add %s %d IN PTR %s.%s.\n" % (reverseIpStr, self.dnsExpire, name, self.dnsDomain))
+				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0],
+						ipSegments[1], ipSegments[2], ipSegments[3]))
+				stdin.write("update add %s %d IN PTR %s.\n" % (reverseIpStr,
+						self.dnsExpire, name))
 				stdin.write("\n")
 			stdin.close()
 			__output = stdout.read()
@@ -185,14 +193,15 @@ class DhcpDns(InstanceHook):
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
 			(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
-			while (pid == 0): 
+			while (pid == 0):
 				time.sleep(0.5)
 				os.kill(child.pid, signal.SIGTERM)
 				(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
-	
+
 	def removeDns(self, name):
 		cmd = "nsupdate"
-		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE,
+					stdout=subprocess.PIPE)
 		try:
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
@@ -201,10 +210,11 @@ class DhcpDns(InstanceHook):
 				ip = socket.gethostbyname(name)
 				ipSegments = map(int, ip.split("."))
 				ipSegments.reverse()
-				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
+				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0],
+						ipSegments[1], ipSegments[2], ipSegments[3]))
 				stdin.write("update delete %s IN PTR\n" % (reverseIpStr))
 				stdin.write("\n")
-			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
+			stdin.write("update delete %s A\n" % (name))
 			stdin.write("\n")
 			stdin.close()
 			__output = stdout.read()
@@ -212,16 +222,26 @@ class DhcpDns(InstanceHook):
 		finally:
 			os.kill(child.pid, signal.SIGTERM)
 			(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
-			while (pid == 0): 
+			while (pid == 0):
 				time.sleep(0.5)
 				os.kill(child.pid, signal.SIGTERM)
 				(pid, __status) = os.waitpid(child.pid, os.WNOHANG)
-	
+
 	def doUpdate(self, instance):
 		newInstance = Instance()
 		newInstance.id = instance.id
 		newInstance.nics = instance.nics
 		self.client.vmUpdate(instance.id, newInstance, None)
+
+	def getFqdn(self, instance):
+		domainName = self.dnsDomain
+		subDomain = instance.hints.get("subDomain", None)
+		if subDomain != None:
+			domainName = "%s.%s" % (subDomain, self.dnsDomain)
+
+		fqdn = "%s.%s" % (instance.name, domainName)
+
+		return fqdn
 
 	def preCreate(self, instance):
 		if (len(instance.nics) < 1):
@@ -232,8 +252,9 @@ class DhcpDns(InstanceHook):
 			nic.ip = ip
 			try:
 				if (i == 0):
-					self.log.info("Adding %s:{%s->%s} to DNS" % (instance.name, instance.name, ip))
-					self.addDns(instance.name, ip)
+					self.log.info("Adding %s:{%s->%s} to DNS" % (instance.name,
+					self.getFqdn(instance), ip))
+					self.addDns(self.getFqdn(instance), ip)
 				if (i == 0):
 					dhcpName = instance.name
 				else:
@@ -258,7 +279,8 @@ class DhcpDns(InstanceHook):
 				# address. How does this happen?
 				del self.usedIPs[ipNum]
 			except Exception:
-				self.log.exception("Failed to remove host %s, ip %s from pool of usedIPs" % (instance.name, ip))
+				self.log.exception("Failed to remove host %s, ip %s from pool of usedIPs" %
+						(instance.name, ip))
 			try:
 				if (i == 0):
 					dhcpName = instance.name
@@ -272,6 +294,6 @@ class DhcpDns(InstanceHook):
 			# resolve the dns server name (line 190). Perhaps
 			# the hostname should be then pushed onto a list
 			# to try again next time.
-			self.removeDns(instance.name)
+			self.removeDns(self.getFqdn(instance))
 		except Exception:
 			self.log.exception("Failed to remove host %s from DNS" % (instance.name))

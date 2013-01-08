@@ -340,7 +340,7 @@ description = {
 
 # Example use strings
 examples = {
-'createVm': ['--name vmname --disks i386-hardy.qcow2', '--userId 3 --name vmname --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics :1.2.3.4,1::52:54:00:00:56:78 --hints enableDisplay=True'],
+'createVm': ['--name vmname --disks i386-hardy.qcow2', '--userId 3 --name vmname --cores 8 --memory 7168 --disks mpi-hardy.qcow2:True,scratch.qcow2:False --nics :1.2.3.4,1::52:54:00:00:56:78 --hints enableDisplay=True --hints subDomain=mysubdomain'],
 'createMany': ['--basename vmname --disks i386-hardy.qcow2 --count 4'],
 'shutdownVm': ['--instance 12345', '--instance vmname'],
 'destroyVm': ['--instance 12345', '--instance vmname'],
