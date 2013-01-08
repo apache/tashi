@@ -83,7 +83,7 @@ def CreateZoniDb(config, adminUser, adminPassword):
 
 	try:
 		conn = connectDb(host, port, adminUser, adminPassword)
-	except e:
+	except Exception, e:
 		print "error here ", e
 		exit()
 	createDatabase(conn, adminUser, adminPassword, db)

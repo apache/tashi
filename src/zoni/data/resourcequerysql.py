@@ -33,7 +33,7 @@ from zoni.extra.util import createKey
 class ResourceQuerySql(InfoStore):
 	def __init__(self, config, verbose=None):
 		self.config = config
-		self.verbose  = verbose
+		self.verbose = verbose
 		self.host = config['dbHost']
 		self.user = config['dbUser']
 		self.passwd = config['dbPassword']

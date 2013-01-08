@@ -70,11 +70,11 @@ class mimos(InfoStore):
 		return
 
 	def getDestFile(self, configs, host):
-		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower()))
 		return therole
 
 	def addRoletoNode(self, configs, host, thenode, roletemplate):
-		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower()))
 		self.log.info("Roles: addRole for %s" % thenode)
 		srctpl = "%s/%s" % (configs['tftpTemplateDir'], roletemplate)
 		if os.path.isfile(therole):
@@ -106,7 +106,7 @@ class mimos(InfoStore):
 		return 0
 
 	def removeRolefromNode(self, configs, host, thenode):
-		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower())
+		therole = ("%s/01-%s" % (configs['tftpImageDir'], (host['mac_addr']).replace(":", "-").lower()))
 		self.log.info("Roles: removeRole for %s" % thenode)
 		if not os.path.isfile(therole):
 			mesg = "No Role File for %s! Exiting!" % thenode

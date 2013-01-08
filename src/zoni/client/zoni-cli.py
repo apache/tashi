@@ -46,10 +46,10 @@ import zoni.hardware.systemmanagement
 from zoni.data import usermanagement
 from zoni.agents.dhcpdns import DhcpDns
 
-from zoni.extra.util import validIp, validMac 
+from zoni.extra.util import validIp, validMac, getConfig
 from zoni.version import version, revision
 
-from tashi.util import instantiateImplementation, getConfig
+from tashi.util import instantiateImplementation
 #import zoni.data.usermanagement 
 #from usermanagement import UserManagement
 
@@ -65,7 +65,6 @@ def main():
 	rev = revision
 
 	(configs, configFiles) = getConfig()
-
 	logging.config.fileConfig(configFiles)
 	#log = logging.getLogger(os.path.basename(__file__))
 	#logit(configs['logFile'], "Starting Zoni client")

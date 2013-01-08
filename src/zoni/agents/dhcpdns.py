@@ -131,7 +131,7 @@ class DhcpDns():
 				ipSegments = map(int, ip.split("."))
 				ipSegments.reverse()
 				reverseIpStr = ("%d.%d.%d.%d.in-addr.arpa" % (ipSegments[0], ipSegments[1], ipSegments[2], ipSegments[3]))
-				stdin.write("update add %s %d IN PTR %s.%s.\n" % (reverseIpStr, self.dnsExpire, name, self.dnsDomain))
+				stdin.write("update add %s %d IN PTR %s.\n" % (reverseIpStr, self.dnsExpire, name))
 				stdin.write("\n")
 			stdin.close()
 			output = stdout.read()
@@ -153,7 +153,7 @@ class DhcpDns():
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
 			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
-			stdin.write("update delete %s.%s A\n" % (name, self.dnsDomain))
+			stdin.write("update delete %s A\n" % (name))
 			stdin.write("\n")
 			if (self.reverseDns):
 				hostInfo = socket.gethostbyaddr(name)
@@ -190,7 +190,7 @@ class DhcpDns():
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
 			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
-			stdin.write("update add %s.%s %d CNAME %s.%s\n" % (name, self.dnsDomain, self.dnsExpire, hostName, self.dnsDomain))
+			stdin.write("update add %s %d CNAME %s\n" % (name, self.dnsExpire, hostInfo[0]))
 			stdin.write("\n")
 			stdin.close()
 			output = stdout.read()
@@ -211,10 +211,11 @@ class DhcpDns():
 		cmd = "nsupdate"
 		child = subprocess.Popen(args=cmd.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		try:
+			hostInfo = socket.gethostbyaddr(name)[0]
 			(stdin, stdout) = (child.stdin, child.stdout)
 			stdin.write("server %s\n" % (self.dnsServer))
 			stdin.write("key %s %s\n" % (self.dnsKeyName, self.dnsSecretKey))
-			stdin.write("update delete %s.%s CNAME\n" % (name, self.dnsDomain))
+			stdin.write("update delete %s CNAME\n" % (name))
 			stdin.write("\n")
 			stdin.close()
 			output = stdout.read()
@@ -235,6 +236,18 @@ class DhcpDns():
 		newInstance.nics = instance.nics
 		self.client.vmUpdate(instance.id, newInstance, None)
 
+
+	def getFqdn(self, instance):
+			domainName = self.dnsDomain
+			subDomain = instance.hints.get("subDomain", None)
+			if subDomain != None:
+					domainName = "%s.%s" % (subDomain, self.dnsDomain)
+
+			fqdn = "%s.%s" % (instance.name, domainName)
+
+			return fqdn
+
+
 	def preCreate(self, instance):
 		if (len(instance.nics) < 1):
 			return
@@ -244,8 +257,8 @@ class DhcpDns():
 			nic.ip = ip
 			try:
 				if (i == 0):
-					self.log.info("Adding %s:{%s->%s} to DNS" % (instance.name, instance.name, ip))
-					self.addDns(instance.name, ip)
+					self.log.info("Adding %s:{%s->%s} to DNS" % (instance.name, self.getFqdn(instance), ip))
+					self.addDns(self.getFqdn(instance), ip)
 				if (i == 0):
 					dhcpName = instance.name
 				else:
@@ -277,6 +290,6 @@ class DhcpDns():
 			except Exception, e:
 				self.log.exception("Failed to remove host %s from DHCP" % (instance.name))
 		try:
-			self.removeDns(instance.name)
+			self.removeDns(self.getFqdn(instance))
 		except Exception, e:
 			self.log.exception("Failed to remove host %s from DNS" % (instance.name))
