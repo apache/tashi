@@ -843,7 +843,7 @@ class Qemu(VmControlInterface):
 		child = self.__getChildFromPid(vmId)
 		child.migratingOut = False
 		# XXX: the child could have exited between these two points, but I don't know how to fix that since it might not be our child process
-		os.kill(child.pid, signal.SIGKILL)
+		os.kill(child.pid, signal.SIGTERM)
 	
 	def __specificStartVnc(self, vmId):
 		child = self.__getChildFromPid(vmId)
