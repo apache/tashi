@@ -29,6 +29,8 @@ class GetentOverride(DataInterface):
 		self.log = logging.getLogger(__name__)
 		self.baseDataObject = instantiateImplementation(config.get("GetentOverride", "baseData"), config)
 		self.dfs = instantiateImplementation(config.get("ClusterManager", "dfs"), config)
+		self.useLocal = config.get("GetentOverride", "getentFromLocalFile")
+		self.localFileName = config.get("GetentOverride", "getentLocalFile")
 
 		self.users = {}
 		self.lastUserUpdate = 0.0
@@ -105,7 +107,18 @@ class GetentOverride(DataInterface):
 		now = time.time()
 		if (now - self.lastUserUpdate > self.fetchThreshold):
 			myUsers = {}
-			p = subprocess.Popen("getent passwd".split(), stdout=subprocess.PIPE)
+            #  Use local getent file instead of querying the administrative db
+			if self.useLocal:
+				if os.path.exists(self.localFileName):
+					cmd = "cat %s" % self.localFileName
+					p = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+				else:
+					self.log.warning("getent cache file not found (%s)" % (self.localFileName))
+					p = subprocess.Popen("getent passwd".split(), stdout=subprocess.PIPE)
+            #  Query administrative database
+			else:
+				p = subprocess.Popen("getent passwd".split(), stdout=subprocess.PIPE)
+
 			try:
 				for l in p.stdout.xreadlines():
 					ws = l.strip().split(":")
