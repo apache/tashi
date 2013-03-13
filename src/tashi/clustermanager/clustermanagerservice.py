@@ -13,7 +13,7 @@
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
-# under the License.    
+# under the License.	
 
 import logging
 import threading
@@ -21,6 +21,7 @@ import time
 
 from tashi.rpycservices.rpyctypes import Errors, InstanceState, Instance, HostState, TashiException
 from tashi import boolean, ConnectionManager, vmStates, hostStates, version, scrubString
+from tashi.dfs.diskimage import QemuImage
 
 class ClusterManagerService(object):
 	"""RPC service for the ClusterManager"""
@@ -66,13 +67,15 @@ class ClusterManagerService(object):
 
 		threading.Thread(name="monitorCluster", target=self.__monitorCluster).start()
 
+		self.qemuImage = QemuImage(self.config)
+
 	def __initAccounting(self):
 		self.accountBuffer = []
 		self.accountLines = 0
 		self.accountingClient = None
 		try:
 			if (self.accountingHost is not None) and \
-				    (self.accountingPort is not None):
+					(self.accountingPort is not None):
 				self.accountingClient = ConnectionManager(self.username, self.password, self.accountingPort)[self.accountingHost]
 		except:
 			self.log.exception("Could not init accounting")
@@ -695,6 +698,26 @@ class ClusterManagerService(object):
 				self.log.warning('DFS image copy bad path: %s->%s' % (imageSrc, imageDst))
 		except Exception, e:
 			self.log.exception('DFS image copy failed: %s (%s->%s)' % (e, imageSrc, imageDst))
+
+    # extern
+	def cloneImage(self, src, dst):
+		imageSrc = self.dfs.getLocalHandle("images/" + src)
+		imageDst = self.dfs.getLocalHandle("images/" + dst)
+		self.log.info('DFS image clone: %s->%s' % (imageSrc, imageDst))
+		try:
+			self.qemuImage.cloneImage(imageSrc, imageDst)
+		except Exception, e:
+			self.log.info('DFS image clone error: %s' % (e))
+
+    # extern
+	def rebaseImage(self, src, dst):
+		imageSrc = self.dfs.getLocalHandle("images/" + src)
+		imageDst = self.dfs.getLocalHandle("images/" + dst)
+		self.log.info('DFS image rebase: %s->%s' % (imageSrc, imageDst))
+		try:
+			self.qemuImage.rebaseImage(imageSrc, imageDst)
+		except Exception, e:
+			self.log.info('DFS image rebase error: %s' % (e))
 
 	# extern
 	def vmmSpecificCall(self, instanceId, arg):

@@ -261,6 +261,8 @@ extraViews = {
 'getSlots': (getSlots, None),
 'getImages': (None, ['id', 'imageName', 'imageSize']), 
 'copyImage': (None, None), 
+'cloneImage': (None, None), 
+'rebaseImage': (None, None), 
 'createVm': (None, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'createMany': (createMany, ['id', 'hostId', 'name', 'user', 'state', 'disk', 'memory', 'cores']),
 'shutdownMany': (shutdownMany, None),
@@ -286,6 +288,8 @@ argLists = {
 'getSlots': [('cores', int, lambda: 1, False), ('memory', int, lambda: 128, False)],
 'getImages': [],
 'copyImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
+'cloneImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
+'rebaseImage': [('src', str, lambda: requiredArg('src'),True), ('dst', str, lambda: requiredArg('dst'), True)],
 'getHosts': [],
 'getUsers': [],
 'getNetworks': [],
@@ -311,6 +315,8 @@ convertArgs = {
 'vmmSpecificCall': '[instance, arg]',
 'getSlots' : '[cores, memory]',
 'copyImage' : '[src, dst]',
+'cloneImage' : '[src, dst]',
+'rebaseImage' : '[src, dst]',
 }
 
 # Descriptions
@@ -336,6 +342,8 @@ description = {
 'vmmSpecificCall': 'Direct access to VM manager specific functionality',
 'getImages' : 'Gets a list of available VM images',
 'copyImage' : 'Copies a VM image',
+'cloneImage' : 'Creates a clone based on an existing image',
+'rebaseImage' : 'Merge changes from a cloned image to another image',
 }
 
 # Example use strings
@@ -360,6 +368,8 @@ examples = {
 'getVmLayout': [''],
 'getImages': [''],
 'copyImage': ['--src src.qcow2 --dst dst.qcow2'],
+'cloneImage': ['--src src.qcow2 --dst dst-clone.qcow2'],
+'rebaseImage': ['--src src-clone.qcow2 --dst dst-newimage.qcow2'],
 'vmmSpecificCall': ['--instance 12345 --arg startVnc', '--instance vmname --arg stopVnc'],
 }
 
